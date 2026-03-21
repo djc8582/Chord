@@ -1,0 +1,11 @@
+{
+  "name": "chord",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The Universal Audio Programming Environment",
+  "scripts": {
+    "dev": "pnpm --filter @chord/app dev",
+    "build": "pnpm --filter @chord/app build",
+    "test": "vitest"
+  }
+}

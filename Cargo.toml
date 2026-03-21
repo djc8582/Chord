@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/audio-graph",
+    "crates/dsp-runtime",
+    "crates/audio-io",
+    "crates/plugin-host",
+    "crates/node-library",
+    "crates/midi-engine",
+    "crates/diagnostics",
+    "crates/export-engine",
+    "crates/mcp-server",
+    "crates/scripting-runtime",
+    "crates/testing-framework",
+    "app/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
