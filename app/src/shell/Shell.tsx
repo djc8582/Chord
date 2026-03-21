@@ -65,20 +65,10 @@ export function Shell({ children, panelContent }: ShellProps) {
     }
   }, [isPlaying, setIsPlaying, _bridge]);
 
-  const handleAddNode = useCallback(() => {
-    _bridge.addNode("oscillator", { x: 400, y: 300 }).catch(console.error);
-  }, [_bridge]);
-
   useCommand("transport.toggle", handleTogglePlay, {
     label: "Play / Stop",
     category: "Transport",
     shortcut: "space",
-  });
-
-  useCommand("node.add", handleAddNode, {
-    label: "Add Node",
-    category: "Edit",
-    shortcut: "n",
   });
 
   useCommand("palette.toggle", toggleCommandPalette, {
@@ -111,7 +101,6 @@ export function Shell({ children, panelContent }: ShellProps) {
 
   useShortcut("mod+k", toggleCommandPalette);
   useShortcut("space", handleTogglePlay);
-  useShortcut("n", handleAddNode);
 
   // ---------------------------------------------------------------------------
   // Derive visible panels by position

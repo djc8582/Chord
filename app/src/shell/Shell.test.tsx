@@ -89,7 +89,6 @@ describe("Shell", () => {
     render(<Shell />);
     const commands = useShellStore.getState().commands;
     expect(commands.has("transport.toggle")).toBe(true);
-    expect(commands.has("node.add")).toBe(true);
     expect(commands.has("palette.toggle")).toBe(true);
     expect(commands.has("theme.toggle")).toBe(true);
     expect(commands.has("file.new")).toBe(true);
