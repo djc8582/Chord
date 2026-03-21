@@ -22,7 +22,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import {
   ReactFlow,
@@ -39,7 +38,6 @@ import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "./store";
 import { ChordNode } from "./ChordNode";
 import { NodeSearchPalette } from "./NodeSearchPalette";
-import { createPatchDocument } from "@chord/document-model";
 
 // Register custom node types
 const nodeTypes: NodeTypes = {
@@ -70,20 +68,8 @@ function CanvasInner() {
   const copySelected = useCanvasStore((s) => s.copySelected);
   const pasteClipboard = useCanvasStore((s) => s.pasteClipboard);
   const duplicateSelected = useCanvasStore((s) => s.duplicateSelected);
-  const initDocument = useCanvasStore((s) => s.initDocument);
-
   const reactFlowInstance = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Initialize document on mount
-  useEffect(() => {
-    if (!isInitialized) {
-      const doc = createPatchDocument();
-      initDocument(doc);
-      setIsInitialized(true);
-    }
-  }, [initDocument, isInitialized]);
 
   // Get viewport center for node spawning
   const getViewportCenter = useCallback((): { x: number; y: number } => {

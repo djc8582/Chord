@@ -7,7 +7,7 @@
  */
 
 export { Canvas } from "./Canvas";
-export { useCanvasStore } from "./store";
+export { useCanvasStore, setCanvasBridge } from "./store";
 export type { CanvasStore, NodeTypeDefinition, PortDefinition } from "./store";
 export { NODE_TYPE_REGISTRY, PORT_COLORS } from "./store";
 export {

@@ -20,6 +20,17 @@ import {
   disconnect as dmDisconnect,
   setNodePosition as dmSetNodePosition,
 } from "@chord/document-model";
+import type { BridgeCommands } from "../bridge/types.js";
+
+// ---------------------------------------------------------------------------
+// Bridge for Tauri backend sync
+// ---------------------------------------------------------------------------
+let _bridge: BridgeCommands | null = null;
+
+/** Set the bridge so canvas mutations also notify the Rust backend. */
+export function setCanvasBridge(b: BridgeCommands) {
+  _bridge = b;
+}
 
 // ---------------------------------------------------------------------------
 // Port type definitions for node rendering
@@ -347,25 +358,28 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   onConnect: (connection) => {
     if (!connection.source || !connection.target) return;
     const store = get();
+    const fromPort = connection.sourceHandle ?? "output";
+    const toPort = connection.targetHandle ?? "input";
     dmConnect(
       store.ydoc,
-      {
-        nodeId: connection.source,
-        port: connection.sourceHandle ?? "output",
-      },
-      {
-        nodeId: connection.target,
-        port: connection.targetHandle ?? "input",
-      },
+      { nodeId: connection.source, port: fromPort },
+      { nodeId: connection.target, port: toPort },
     );
     // The Yjs observer will update the edges
     store.syncFromDocument();
+    // Sync to Rust backend
+    _bridge?.connect(
+      { nodeId: connection.source, port: fromPort },
+      { nodeId: connection.target, port: toPort },
+    ).catch(() => {});
   },
 
   addNode: (type, position, name) => {
     const store = get();
     const id = dmAddNode(store.ydoc, type, { x: position.x, y: position.y }, name);
     store.syncFromDocument();
+    // Sync to Rust backend
+    _bridge?.addNode(type, { x: position.x, y: position.y }).catch(() => {});
     return id;
   },
 
@@ -373,6 +387,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const store = get();
     dmRemoveNode(store.ydoc, nodeId);
     store.syncFromDocument();
+    _bridge?.removeNode(nodeId).catch(() => {});
   },
 
   removeSelectedNodes: () => {
@@ -392,6 +407,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       { nodeId: toNodeId, port: toPort },
     );
     store.syncFromDocument();
+    _bridge?.connect(
+      { nodeId: fromNodeId, port: fromPort },
+      { nodeId: toNodeId, port: toPort },
+    ).catch(() => {});
     return id;
   },
 
@@ -399,6 +418,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const store = get();
     dmDisconnect(store.ydoc, edgeId);
     store.syncFromDocument();
+    _bridge?.disconnect(edgeId).catch(() => {});
   },
 
   updateNodePosition: (nodeId, position) => {

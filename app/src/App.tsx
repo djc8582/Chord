@@ -8,7 +8,7 @@
 
 import { useEffect, useRef } from "react";
 import { Shell } from "./shell/index.js";
-import { Canvas, useCanvasStore } from "./canvas/index.js";
+import { Canvas, useCanvasStore, setCanvasBridge } from "./canvas/index.js";
 import { Inspector, setInspectorBridge } from "./inspector/index.js";
 import { Browser } from "./browser/index.js";
 import { Timeline } from "./timeline/index.js";
@@ -27,7 +27,8 @@ function App() {
     const doc = createPatchDocument();
     useCanvasStore.getState().initDocument(doc);
 
-    // Give the inspector access to the bridge for backend parameter sync
+    // Give the canvas and inspector access to the bridge for backend sync
+    setCanvasBridge(bridge);
     setInspectorBridge(bridge);
   }, [bridge]);
 
