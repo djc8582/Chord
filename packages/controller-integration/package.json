@@ -6,5 +6,12 @@
   "main": "src/index.ts",
   "scripts": {
     "test": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@chord/document-model": "workspace:*"
   }
 }

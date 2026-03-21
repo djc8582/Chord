@@ -18,3 +18,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+chord-audio-graph = { path = "../../crates/audio-graph" }
+chord-dsp-runtime = { path = "../../crates/dsp-runtime" }
+chord-node-library = { path = "../../crates/node-library" }
+chord-audio-io = { path = "../../crates/audio-io" }
+chord-diagnostics = { path = "../../crates/diagnostics" }
