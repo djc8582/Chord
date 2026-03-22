@@ -236,11 +236,17 @@ impl AudioNode for GranularNode {
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
-            // 1. Record incoming audio into circular buffer.
-            let dry = if has_input { ctx.inputs[0][i] } else { 0.0 };
-            self.buffer[self.write_pos] = dry;
-            self.write_pos = (self.write_pos + 1) % buf_len;
-            self.samples_written = self.samples_written.saturating_add(1);
+            // 1. Record incoming audio into circular buffer (only when input is connected).
+            // When no input is connected, preserve the buffer contents (e.g. loaded audio file).
+            let dry = if has_input {
+                let sample = ctx.inputs[0][i];
+                self.buffer[self.write_pos] = sample;
+                self.write_pos = (self.write_pos + 1) % buf_len;
+                self.samples_written = self.samples_written.saturating_add(1);
+                sample
+            } else {
+                0.0
+            };
 
             // 2. Check if we should spawn a new grain.
             self.spawn_accumulator += 1.0;

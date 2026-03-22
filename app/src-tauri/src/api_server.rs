@@ -157,6 +157,7 @@ fn route(path: &str, args: Value, state: &AppState, handle: &AppHandle) -> Value
         "/api/v1/get_signal_stats" => api_get_signal_stats(state),
         "/api/v1/add_modulation" => api_add_modulation(args, state),
         "/api/v1/remove_modulation" => api_remove_modulation(args, state),
+        "/api/v1/load_audio_file" => api_load_audio_file(args, state),
         _ => json!({"error": format!("Unknown endpoint: {path}")}),
     }
 }
@@ -727,6 +728,85 @@ fn api_remove_modulation(args: Value, state: &AppState) -> Value {
     let _ = recompile_and_swap(state);
 
     json!({"removed": id})
+}
+
+fn api_load_audio_file(args: Value, state: &AppState) -> Value {
+    let node_id_str = match args.get("node_id").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'node_id'"}),
+    };
+    let path = match args.get("path").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'path'"}),
+    };
+
+    let node_id = match node_id_str.parse::<u64>() {
+        Ok(n) => NodeId(n),
+        Err(_) => return json!({"error": "Invalid node ID"}),
+    };
+
+    // Read WAV file.
+    let reader = match hound::WavReader::open(&path) {
+        Ok(r) => r,
+        Err(e) => return json!({"error": format!("Failed to open: {e}")}),
+    };
+
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate as f64;
+
+    let samples: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Float => {
+            let all: Vec<f32> = reader.into_samples::<f32>().filter_map(|s| s.ok()).collect();
+            if spec.channels > 1 {
+                let ch = spec.channels as usize;
+                all.chunks(ch).map(|f| f.iter().sum::<f32>() / ch as f32).collect()
+            } else {
+                all
+            }
+        }
+        hound::SampleFormat::Int => {
+            let max_val = (1i64 << (spec.bits_per_sample - 1)) as f32;
+            let all: Vec<f32> = reader.into_samples::<i32>().filter_map(|s| s.ok()).map(|s| s as f32 / max_val).collect();
+            if spec.channels > 1 {
+                let ch = spec.channels as usize;
+                all.chunks(ch).map(|f| f.iter().sum::<f32>() / ch as f32).collect()
+            } else {
+                all
+            }
+        }
+    };
+
+    let sample_count = samples.len();
+
+    // Try engine nodes first (if playing).
+    {
+        let mut engine = state.engine.lock().unwrap();
+        if engine.load_audio_into_node(node_id, &samples, sample_rate) {
+            return json!({
+                "ok": true,
+                "samples": sample_count,
+                "sample_rate": sample_rate,
+                "duration": sample_count as f64 / sample_rate,
+            });
+        }
+    }
+
+    // Try pending instances.
+    {
+        let mut instances = state.node_instances.lock().unwrap();
+        if let Some(node) = instances.get_mut(&node_id) {
+            if node.load_audio_data(&samples, sample_rate) {
+                return json!({
+                    "ok": true,
+                    "samples": sample_count,
+                    "sample_rate": sample_rate,
+                    "duration": sample_count as f64 / sample_rate,
+                });
+            }
+        }
+    }
+
+    json!({"error": format!("Node {} does not support audio loading", node_id_str)})
 }
 
 // ---------------------------------------------------------------------------
