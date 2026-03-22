@@ -633,10 +633,10 @@ fn test_lfo_sine_output() {
 
     let output = tc.output(0);
     // At 1Hz and 48kHz, we get 256/48000 of a cycle ≈ 0.53%.
-    // The output should start near 0 (sine starts at 0).
+    // Unipolar output: sine starts at 0 → (0*0.5+0.5)*depth = 0.5.
     assert!(
-        output[0].abs() < 0.05,
-        "LFO sine should start near 0, got {}",
+        (output[0] - 0.5).abs() < 0.05,
+        "LFO sine should start near 0.5 (unipolar midpoint), got {}",
         output[0]
     );
 }
@@ -682,23 +682,23 @@ fn test_lfo_all_waveforms() {
         tc.process(&mut lfo).unwrap();
 
         let output = tc.output(0);
-        // All waveforms should produce non-trivial output.
+        // All waveforms should produce non-trivial output in unipolar [0, 1] range.
         let max = output.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let min = output.iter().copied().fold(f32::INFINITY, f32::min);
         assert!(
-            max > 0.5,
-            "LFO waveform {waveform} should have positive values, max={max}"
+            max > 0.6,
+            "LFO waveform {waveform} should reach upper range, max={max}"
         );
         assert!(
-            min < -0.5,
-            "LFO waveform {waveform} should have negative values, min={min}"
+            min < 0.4,
+            "LFO waveform {waveform} should reach lower range, min={min}"
         );
 
-        // All values should be within [-1, 1] (with tiny tolerance).
+        // All values should be within [0, 1] (with tiny tolerance).
         for &s in output {
             assert!(
-                (-1.01..=1.01).contains(&s),
-                "LFO waveform {waveform}: sample {s} out of range"
+                (-0.01..=1.01).contains(&s),
+                "LFO waveform {waveform}: sample {s} out of unipolar range"
             );
         }
     }

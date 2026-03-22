@@ -67,7 +67,10 @@ impl AudioNode for Lfo {
                 }
             };
 
-            output[i] = (sample * depth) as f32;
+            // Output unipolar (0..1) scaled by depth. This is more useful for
+            // amplitude modulation (tremolo) and most modulation destinations.
+            // Bipolar destinations can subtract 0.5 and scale ×2 if needed.
+            output[i] = ((sample * 0.5 + 0.5) * depth) as f32;
 
             // Advance phase.
             self.phase += rate / sr;

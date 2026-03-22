@@ -205,16 +205,19 @@ impl AudioEngine {
     /// Build an EngineGraph from a CompiledGraph and connections.
     fn build_engine_graph(&self, compiled: CompiledGraph, connections: &[Connection]) -> EngineGraph {
         // Pre-compute routing as (from_node, from_port_index, to_node, to_port_index).
-        // Port indices are always 0 for single-port nodes. For multi-port nodes,
-        // we'd need the node descriptors to map port IDs to indices, but for now
-        // we use a simple heuristic: port index = order of port in the connection list.
+        // Each node produces exactly 1 output buffer (index 0). For the destination,
+        // we count how many connections target the same node to assign input indices
+        // in order. This ensures multi-input nodes (e.g., oscillator with FM on port 0
+        // and AM on port 1) receive each connection's buffer at the correct index.
+        use std::collections::HashMap;
+        let mut dest_port_counters: HashMap<NodeId, usize> = HashMap::new();
         let routing: Vec<(NodeId, usize, NodeId, usize)> = connections
             .iter()
             .map(|c| {
-                // Use port ID values as indices (they typically start from small numbers)
-                // This is a simplification — a full implementation would look up port
-                // positions in the node descriptors.
-                (c.from_node, 0_usize, c.to_node, 0_usize)
+                let to_port_idx = *dest_port_counters.entry(c.to_node).or_insert(0);
+                *dest_port_counters.get_mut(&c.to_node).unwrap() += 1;
+                // All nodes output on port 0 (single output buffer).
+                (c.from_node, 0_usize, c.to_node, to_port_idx)
             })
             .collect();
         EngineGraph { compiled, routing }
@@ -318,13 +321,24 @@ impl AudioEngine {
                 self.midi_output_buf.clear();
 
                 // Gather input buffers for this node from upstream node outputs.
-                // Look through the routing table to find connections targeting this node.
-                let mut input_buffers: Vec<Vec<f32>> = Vec::new();
-                for &(from_node, from_port, to_node, _to_port) in routing {
+                // First, find the max input port index to size the buffer correctly.
+                let max_input_idx = routing
+                    .iter()
+                    .filter(|&&(_, _, to_node, _)| to_node == node_id)
+                    .map(|&(_, _, _, to_port)| to_port)
+                    .max();
+                let mut input_buffers: Vec<Vec<f32>> = if let Some(max_idx) = max_input_idx {
+                    vec![vec![0.0f32; buffer_size]; max_idx + 1]
+                } else {
+                    Vec::new()
+                };
+                for &(from_node, from_port, to_node, to_port) in routing {
                     if to_node == node_id {
                         if let Some(upstream_outputs) = node_outputs.get(&from_node) {
                             if let Some(buf) = upstream_outputs.get(from_port) {
-                                input_buffers.push(buf.clone());
+                                if to_port < input_buffers.len() {
+                                    input_buffers[to_port] = buf.clone();
+                                }
                             }
                         }
                     }
