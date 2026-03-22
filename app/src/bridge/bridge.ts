@@ -77,6 +77,15 @@ export const bridge: BridgeCommands = {
     return tauriInvoke<void>("set_tempo", { bpm });
   },
 
+  // -- MIDI -----------------------------------------------------------------
+  sendMidiNoteOn(note: number, velocity: number): Promise<void> {
+    return tauriInvoke<void>("send_midi_note_on", { note, velocity });
+  },
+
+  sendMidiNoteOff(note: number): Promise<void> {
+    return tauriInvoke<void>("send_midi_note_off", { note });
+  },
+
   // -- Audio engine ---------------------------------------------------------
   getSignalStats(nodeId: string, port: string): Promise<SignalStats> {
     return tauriInvoke<SignalStats>("get_signal_stats", { nodeId, port });

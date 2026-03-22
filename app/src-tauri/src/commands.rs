@@ -545,6 +545,22 @@ pub fn set_tempo(bpm: f64, state: State<'_, AppArc>) -> Result<(), String> {
     Ok(())
 }
 
+/// Send a MIDI note-on event to the audio engine.
+#[tauri::command]
+pub fn send_midi_note_on(note: u8, velocity: u8, state: State<'_, AppArc>) -> Result<(), String> {
+    let engine = state.engine.lock().map_err(|e| e.to_string())?;
+    engine.send_note_on(note, velocity);
+    Ok(())
+}
+
+/// Send a MIDI note-off event to the audio engine.
+#[tauri::command]
+pub fn send_midi_note_off(note: u8, state: State<'_, AppArc>) -> Result<(), String> {
+    let engine = state.engine.lock().map_err(|e| e.to_string())?;
+    engine.send_note_off(note);
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Tauri Commands — Audio Engine / Diagnostics
 // ---------------------------------------------------------------------------

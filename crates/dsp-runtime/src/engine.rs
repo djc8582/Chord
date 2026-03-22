@@ -93,6 +93,10 @@ pub struct AudioEngine {
     diagnostic_probe: Option<Box<dyn DiagnosticProbe>>,
     /// Pre-allocated MIDI output buffer.
     midi_output_buf: Vec<MidiMessage>,
+    /// Ring buffer for MIDI input (main thread → audio thread).
+    midi_input_ring: Arc<SpscRingBuffer<MidiMessage>>,
+    /// Pre-allocated buffer for draining MIDI input.
+    midi_input_drain_buf: Vec<MidiMessage>,
     /// Pre-allocated single-channel AudioBuffer for diagnostics.
     diagnostic_buffer: AudioBuffer,
     /// Snapshot of the last output buffer (for visualizer). Updated via try_lock
@@ -126,6 +130,8 @@ impl AudioEngine {
             transport: TransportState::new(sample_rate),
             diagnostic_probe: None,
             midi_output_buf: Vec::with_capacity(256),
+            midi_input_ring: Arc::new(SpscRingBuffer::new(256)),
+            midi_input_drain_buf: Vec::with_capacity(256),
             diagnostic_buffer: AudioBuffer::new(1, buffer_size),
             last_output_buffer: Arc::new(std::sync::Mutex::new(Vec::new())),
             _worker_threads: config.worker_threads,
@@ -260,6 +266,32 @@ impl AudioEngine {
         reclaim_box(ptr)
     }
 
+    /// Send a MIDI message to the audio thread. Lock-free (ring buffer push).
+    /// Called from the main thread (e.g. piano roll, MIDI input).
+    pub fn send_midi(&self, msg: MidiMessage) {
+        let _ = self.midi_input_ring.try_push(msg);
+    }
+
+    /// Send a MIDI note-on message.
+    pub fn send_note_on(&self, note: u8, velocity: u8) {
+        self.send_midi(MidiMessage {
+            sample_offset: 0,
+            status: 0x90, // Note On, channel 1
+            data1: note,
+            data2: velocity,
+        });
+    }
+
+    /// Send a MIDI note-off message.
+    pub fn send_note_off(&self, note: u8) {
+        self.send_midi(MidiMessage {
+            sample_offset: 0,
+            status: 0x80, // Note Off, channel 1
+            data1: note,
+            data2: 0,
+        });
+    }
+
     /// Set a parameter value. Lock-free (ring buffer push).
     /// Called from the main thread.
     pub fn set_parameter(&self, node_id: NodeId, param: &str, value: f64) {
@@ -296,6 +328,10 @@ impl AudioEngine {
     pub fn process(&mut self, input: &AudioBuffer, output: &mut AudioBuffer) {
         // Step 0: Set FTZ/DAZ flags for denormal protection.
         set_ftz_daz();
+
+        // Step 0b: Drain MIDI input from the ring buffer.
+        self.midi_input_drain_buf.clear();
+        self.midi_input_ring.drain_into(&mut self.midi_input_drain_buf);
 
         // Step 1: Drain parameter changes from the ring buffer.
         // Use immediate (0) smoothing here because the engine never calls
@@ -403,7 +439,7 @@ impl AudioEngine {
                     sample_rate: self.sample_rate,
                     buffer_size,
                     transport: &self.transport,
-                    midi_input: &[],
+                    midi_input: &self.midi_input_drain_buf,
                     midi_output: &mut self.midi_output_buf,
                 };
 

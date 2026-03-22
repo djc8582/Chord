@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { PianoRoll } from "./PianoRoll";
 import { usePianoRollStore } from "./store";
 import { useShellStore } from "../shell/store.js";
+import { useBridge } from "../bridge/index.js";
 
 // ---------------------------------------------------------------------------
 // Web Audio preview (lightweight sine tone for key audition)
@@ -162,10 +163,17 @@ export const PianoRollPanel: React.FC = () => {
     };
   }, [shellIsPlaying, shellTempo, setPlayheadBeat]);
 
-  // Key preview callback
+  // Key preview callback — plays Web Audio preview AND sends MIDI to backend
+  const bridge = useBridge();
   const handleKeyClick = useCallback((pitch: number) => {
     playPreviewNote(pitch);
-  }, []);
+    // Send MIDI note-on to the backend engine so synth nodes hear it
+    bridge.sendMidiNoteOn(pitch, 100).catch(() => {});
+    // Auto note-off after 300ms
+    setTimeout(() => {
+      bridge.sendMidiNoteOff(pitch).catch(() => {});
+    }, 300);
+  }, [bridge]);
 
   return (
     <div

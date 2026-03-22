@@ -58,6 +58,10 @@ export interface BridgeCommands {
   stop(): Promise<void>;
   setTempo(bpm: number): Promise<void>;
 
+  // MIDI
+  sendMidiNoteOn(note: number, velocity: number): Promise<void>;
+  sendMidiNoteOff(note: number): Promise<void>;
+
   // Audio engine
   getSignalStats(nodeId: NodeId, port: PortId): Promise<SignalStats>;
   runDiagnostics(): Promise<DiagnosticReport>;

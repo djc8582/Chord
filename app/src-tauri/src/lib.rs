@@ -28,6 +28,9 @@ pub fn run() {
             commands::play,
             commands::stop,
             commands::set_tempo,
+            // MIDI
+            commands::send_midi_note_on,
+            commands::send_midi_note_off,
             // Audio engine / diagnostics
             commands::get_signal_stats,
             commands::run_diagnostics,
