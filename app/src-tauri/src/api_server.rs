@@ -153,6 +153,7 @@ fn route(path: &str, args: Value, state: &AppState, handle: &AppHandle) -> Value
         "/api/v1/stop" => api_stop(state),
         "/api/v1/compile" => api_compile(state),
         "/api/v1/get_patch" => api_get_patch(state),
+        "/api/v1/get_waveform_data" => api_get_waveform_data(state),
         _ => json!({"error": format!("Unknown endpoint: {path}")}),
     }
 }
@@ -561,6 +562,12 @@ fn api_get_patch(state: &AppState) -> Value {
         "nodes": nodes,
         "connections": connections,
     })
+}
+
+fn api_get_waveform_data(state: &AppState) -> Value {
+    let engine = state.engine.lock().unwrap();
+    let buffer = engine.get_last_output_buffer();
+    json!(buffer)
 }
 
 // ---------------------------------------------------------------------------
