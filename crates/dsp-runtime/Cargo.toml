@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 chord-audio-graph = { path = "../audio-graph" }
+
+[dev-dependencies]
+chord-node-library = { path = "../node-library" }
