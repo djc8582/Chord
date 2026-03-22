@@ -525,9 +525,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const store = get();
     const patch = getPatchDocument(store.ydoc);
 
+    // Build a set of currently selected node IDs so we can preserve
+    // selection state across rebuilds (e.g. when a parameter changes).
+    const selectedSet = new Set(store.selectedNodeIds);
+
     const nodes: Node[] = [];
     patch.nodes.forEach((nodeData) => {
-      nodes.push(nodeDataToFlowNode(nodeData));
+      const node = nodeDataToFlowNode(nodeData);
+      // Preserve selection state — without this, any Yjs change
+      // (including parameter updates from the inspector) would
+      // deselect all nodes and close the inspector.
+      if (selectedSet.has(node.id)) {
+        node.selected = true;
+      }
+      nodes.push(node);
     });
 
     const edges: Edge[] = [];

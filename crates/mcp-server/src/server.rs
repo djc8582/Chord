@@ -47,6 +47,8 @@ pub struct ChordMcpServer {
     next_patch_id: u64,
     /// If true, the Chord app is running and we forward mutations to it.
     proxy_mode: bool,
+    /// If true, never auto-detect proxy mode (for testing).
+    proxy_detection_disabled: bool,
     /// Maps MCP node IDs (from standalone graph) to app node IDs (strings)
     /// returned by the running app. Used in proxy mode.
     app_node_ids: HashMap<u64, String>,
@@ -73,6 +75,7 @@ impl ChordMcpServer {
             registry: NodeRegistry::with_wave1(),
             next_patch_id: 1,
             proxy_mode,
+            proxy_detection_disabled: false,
             app_node_ids: HashMap::new(),
         }
     }
@@ -84,6 +87,7 @@ impl ChordMcpServer {
             registry: NodeRegistry::with_wave1(),
             next_patch_id: 1,
             proxy_mode: false,
+            proxy_detection_disabled: true,
             app_node_ids: HashMap::new(),
         }
     }
@@ -156,7 +160,7 @@ impl ChordMcpServer {
     /// are also forwarded when the app is running.
     pub fn call_tool(&mut self, name: &str, args: Value) -> McpResult<Value> {
         // Re-check for the app on each call (it may have started after us).
-        if !self.proxy_mode {
+        if !self.proxy_mode && !self.proxy_detection_disabled {
             self.proxy_mode = Self::check_app_running();
             if self.proxy_mode {
                 eprintln!("[chord-mcp] App detected on port {APP_API_PORT} — proxy mode enabled");
@@ -1171,15 +1175,15 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_parameter(ParameterDescriptor::new("gain", "Gain", 1.0, 0.0, 10.0)),
 
         "envelope" => NodeDescriptor::new("envelope")
-            .with_input(PortDescriptor::new("gate", PortDataType::Control))
-            .with_output(PortDescriptor::new("out", PortDataType::Control))
+            .with_input(PortDescriptor::new("gate", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("attack", "Attack", 0.01, 0.0, 10.0).with_unit("s"))
             .with_parameter(ParameterDescriptor::new("decay", "Decay", 0.1, 0.0, 10.0).with_unit("s"))
             .with_parameter(ParameterDescriptor::new("sustain", "Sustain", 0.7, 0.0, 1.0))
             .with_parameter(ParameterDescriptor::new("release", "Release", 0.3, 0.0, 30.0).with_unit("s")),
 
         "lfo" => NodeDescriptor::new("lfo")
-            .with_output(PortDescriptor::new("out", PortDataType::Control))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("rate", "Rate", 1.0, 0.01, 100.0).with_unit("Hz"))
             .with_parameter(ParameterDescriptor::new("depth", "Depth", 1.0, 0.0, 1.0))
             .with_parameter(ParameterDescriptor::new("waveform", "Waveform", 0.0, 0.0, 3.0)),

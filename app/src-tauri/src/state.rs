@@ -124,8 +124,8 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_parameter(ParameterDescriptor::new("gain", "Gain", 1.0, 0.0, 10.0)),
 
         "envelope" => NodeDescriptor::new("envelope")
-            .with_input(PortDescriptor::new("gate", PortDataType::Control))
-            .with_output(PortDescriptor::new("out", PortDataType::Control))
+            .with_input(PortDescriptor::new("gate", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(
                 ParameterDescriptor::new("attack", "Attack", 0.01, 0.0, 10.0).with_unit("s"),
             )
@@ -138,7 +138,7 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             ),
 
         "lfo" => NodeDescriptor::new("lfo")
-            .with_output(PortDescriptor::new("out", PortDataType::Control))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(
                 ParameterDescriptor::new("rate", "Rate", 1.0, 0.01, 100.0).with_unit("Hz"),
             )
