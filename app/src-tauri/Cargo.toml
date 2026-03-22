@@ -24,3 +24,4 @@ chord-dsp-runtime = { path = "../../crates/dsp-runtime" }
 chord-node-library = { path = "../../crates/node-library" }
 chord-audio-io = { path = "../../crates/audio-io" }
 chord-diagnostics = { path = "../../crates/diagnostics" }
+hound = "3.5"

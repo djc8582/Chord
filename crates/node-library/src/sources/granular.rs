@@ -124,6 +124,24 @@ impl GranularNode {
         }
     }
 
+    /// Load audio data into the granular buffer from an external source (e.g. file).
+    /// This replaces the circular buffer contents and resets the write position.
+    /// Called from the main thread (NOT the audio thread).
+    pub fn load_buffer(&mut self, data: &[f32]) {
+        let copy_len = data.len().min(self.buffer.len());
+        self.buffer[..copy_len].copy_from_slice(&data[..copy_len]);
+        // Zero the rest if data is shorter than buffer
+        for s in &mut self.buffer[copy_len..] {
+            *s = 0.0;
+        }
+        self.write_pos = copy_len % self.buffer.len();
+        self.samples_written = copy_len;
+        // Reset all grains
+        for g in &mut self.grains {
+            g.active = false;
+        }
+    }
+
     /// Ensure the buffer is large enough for the given sample rate.
     fn ensure_buffer_size(&mut self, sample_rate: f64) {
         let required = (MAX_BUFFER_SECONDS * sample_rate) as usize + 1;
@@ -296,5 +314,10 @@ impl AudioNode for GranularNode {
     fn tail_length(&self) -> u32 {
         // Tail is the maximum grain size (0.2s) at the allocated sample rate.
         (0.2 * self.allocated_sample_rate) as u32
+    }
+
+    fn load_audio_data(&mut self, data: &[f32], _sample_rate: f64) -> bool {
+        self.load_buffer(data);
+        true
     }
 }

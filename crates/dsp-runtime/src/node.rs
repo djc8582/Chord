@@ -72,6 +72,15 @@ pub trait AudioNode: Send + 'static {
     fn tail_length(&self) -> u32 {
         0
     }
+
+    /// Load audio sample data into the node (e.g. for samplers, granular, file players).
+    ///
+    /// Called from the main thread, NOT the audio thread. The node should copy the
+    /// data into its internal buffer. Returns true if the node accepted the data.
+    /// Default implementation returns false (node doesn't support audio loading).
+    fn load_audio_data(&mut self, _data: &[f32], _sample_rate: f64) -> bool {
+        false
+    }
 }
 
 /// Hooks for monitoring the audio processing pipeline.

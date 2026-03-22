@@ -385,11 +385,16 @@ pub fn sync_and_play(
     }
 
     // Now play (same as the play command).
-    let (compiled, routing) = {
+    let (compiled, routing, mod_routes) = {
         let graph = state.graph.lock().map_err(|e| e.to_string())?;
         let compiled = GraphCompiler::compile(&graph).map_err(|e| e.to_string())?;
         let routing = compute_routing(&graph);
-        (compiled, routing)
+        let mod_routes = state
+            .modulation_routes
+            .lock()
+            .map_err(|e| e.to_string())?
+            .clone();
+        (compiled, routing, mod_routes)
     };
 
     {
@@ -402,7 +407,7 @@ pub fn sync_and_play(
             }
         }
         engine.transport_mut().play();
-        engine.swap_graph_with_routing(compiled, routing);
+        engine.swap_graph_with_routing_and_modulation(compiled, routing, mod_routes);
     }
 
     {
@@ -450,11 +455,16 @@ pub fn play(state: State<'_, AppArc>) -> Result<(), String> {
     log::info("play", "transport started");
 
     // 1. Compile the graph and compute routing.
-    let (compiled, routing) = {
+    let (compiled, routing, mod_routes) = {
         let graph = state.graph.lock().map_err(|e| e.to_string())?;
         let compiled = GraphCompiler::compile(&graph).map_err(|e| e.to_string())?;
         let routing = compute_routing(&graph);
-        (compiled, routing)
+        let mod_routes = state
+            .modulation_routes
+            .lock()
+            .map_err(|e| e.to_string())?
+            .clone();
+        (compiled, routing, mod_routes)
     };
 
     // 2. Move all node instances into the engine.
@@ -473,8 +483,8 @@ pub fn play(state: State<'_, AppArc>) -> Result<(), String> {
         // Start the transport.
         engine.transport_mut().play();
 
-        // 3. Swap in the compiled graph with proper port routing.
-        engine.swap_graph_with_routing(compiled, routing);
+        // 3. Swap in the compiled graph with proper port routing and modulation.
+        engine.swap_graph_with_routing_and_modulation(compiled, routing, mod_routes);
     }
 
     // 4. Open an audio stream (if not already running).
@@ -559,6 +569,195 @@ pub fn send_midi_note_off(note: u8, state: State<'_, AppArc>) -> Result<(), Stri
     let engine = state.engine.lock().map_err(|e| e.to_string())?;
     engine.send_note_off(note);
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Tauri Commands — Modulation Routing
+// ---------------------------------------------------------------------------
+
+/// Add a modulation route: map an audio output signal to a parameter on any node.
+///
+/// Returns a unique modulation route ID that can be used with `remove_modulation`.
+#[tauri::command]
+pub fn add_modulation(
+    source_node: String,
+    source_port: String,
+    target_node: String,
+    target_param: String,
+    amount: f64,
+    offset: f64,
+    state: State<'_, AppArc>,
+) -> Result<String, String> {
+    log::info(
+        "add_modulation",
+        &format!("src={source_node}:{source_port} -> {target_node}:{target_param} amount={amount} offset={offset}"),
+    );
+
+    let src_nid = resolve_node_id(&source_node, &state)?;
+    let tgt_nid = resolve_node_id(&target_node, &state)?;
+
+    // Resolve the source port name to a port index.
+    let src_port_idx = {
+        let graph = state.graph.lock().map_err(|e| e.to_string())?;
+        let node_desc = graph
+            .node(&src_nid)
+            .ok_or_else(|| format!("Source node not found: {source_node}"))?;
+        node_desc
+            .outputs
+            .iter()
+            .position(|p| p.name == source_port)
+            .ok_or_else(|| {
+                format!(
+                    "Output port '{}' not found on node {} (available: {})",
+                    source_port,
+                    source_node,
+                    node_desc.outputs.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
+                )
+            })?
+    };
+
+    // Generate a unique ID for this modulation route.
+    let mod_id = format!("mod-{}", uuid_v4());
+
+    let route = chord_dsp_runtime::ModulationRoute {
+        id: mod_id.clone(),
+        source_node: src_nid,
+        source_port: src_port_idx,
+        target_node: tgt_nid,
+        target_param,
+        amount,
+        offset,
+    };
+
+    {
+        let mut mod_routes = state.modulation_routes.lock().map_err(|e| e.to_string())?;
+        mod_routes.push(route);
+    }
+
+    // Recompile and swap so the modulation is active.
+    recompile_and_swap(state.inner())?;
+
+    Ok(mod_id)
+}
+
+/// Remove a modulation route by its ID.
+#[tauri::command]
+pub fn remove_modulation(id: String, state: State<'_, AppArc>) -> Result<(), String> {
+    log::info("remove_modulation", &format!("id={id}"));
+
+    {
+        let mut mod_routes = state.modulation_routes.lock().map_err(|e| e.to_string())?;
+        let before_len = mod_routes.len();
+        mod_routes.retain(|r| r.id != id);
+        if mod_routes.len() == before_len {
+            return Err(format!("Modulation route not found: {id}"));
+        }
+    }
+
+    // Recompile and swap to remove the modulation from the engine.
+    recompile_and_swap(state.inner())?;
+
+    Ok(())
+}
+
+/// Load an audio file (WAV) into a node's sample buffer.
+///
+/// Opens a file dialog if `path` is empty, otherwise loads the specified path.
+/// The audio data is resampled to mono and fed to the node via `load_audio_data`.
+#[tauri::command]
+pub fn load_audio_file(
+    node_id: String,
+    path: String,
+    state: State<'_, AppArc>,
+) -> Result<serde_json::Value, String> {
+    log::info("load_audio_file", &format!("node={node_id} path={path}"));
+
+    let nid = resolve_node_id(&node_id, &state)?;
+
+    // Read WAV file.
+    let reader = hound::WavReader::open(&path)
+        .map_err(|e| format!("Failed to open audio file: {e}"))?;
+
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate as f64;
+
+    // Convert all samples to mono f32.
+    let samples: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Float => {
+            let all: Vec<f32> = reader
+                .into_samples::<f32>()
+                .filter_map(|s| s.ok())
+                .collect();
+            // Mix to mono if stereo.
+            if spec.channels > 1 {
+                let ch = spec.channels as usize;
+                all.chunks(ch)
+                    .map(|frame| frame.iter().sum::<f32>() / ch as f32)
+                    .collect()
+            } else {
+                all
+            }
+        }
+        hound::SampleFormat::Int => {
+            let bits = spec.bits_per_sample;
+            let max_val = (1i64 << (bits - 1)) as f32;
+            let all: Vec<f32> = reader
+                .into_samples::<i32>()
+                .filter_map(|s| s.ok())
+                .map(|s| s as f32 / max_val)
+                .collect();
+            if spec.channels > 1 {
+                let ch = spec.channels as usize;
+                all.chunks(ch)
+                    .map(|frame| frame.iter().sum::<f32>() / ch as f32)
+                    .collect()
+            } else {
+                all
+            }
+        }
+    };
+
+    let sample_count = samples.len();
+
+    // Try loading into the engine's live node first (if playing).
+    {
+        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+        if engine.load_audio_into_node(nid, &samples, sample_rate) {
+            return Ok(serde_json::json!({
+                "ok": true,
+                "samples": sample_count,
+                "sample_rate": sample_rate,
+                "duration": sample_count as f64 / sample_rate,
+            }));
+        }
+    }
+
+    // Otherwise try the pending instances.
+    {
+        let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+        if let Some(node) = instances.get_mut(&nid) {
+            if node.load_audio_data(&samples, sample_rate) {
+                return Ok(serde_json::json!({
+                    "ok": true,
+                    "samples": sample_count,
+                    "sample_rate": sample_rate,
+                    "duration": sample_count as f64 / sample_rate,
+                }));
+            }
+        }
+    }
+
+    Err(format!("Node {node_id} does not support audio loading"))
+}
+
+/// Generate a simple UUID-like ID.
+fn uuid_v4() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("{:x}-{:x}", nanos, nanos.wrapping_mul(6364136223846793005).wrapping_add(1))
 }
 
 // ---------------------------------------------------------------------------
@@ -792,6 +991,9 @@ fn find_input_port_by_name(
 /// Called after any graph mutation (connect, disconnect, remove_node) to keep
 /// the engine's execution order in sync with the graph. If the graph is empty
 /// or compilation fails, the engine continues with its current graph.
+///
+/// Also passes the current modulation routes to the engine so audio-rate
+/// modulation stays in sync with graph changes.
 fn recompile_and_swap(state: &AppState) -> Result<(), String> {
     let graph = state.graph.lock().map_err(|e| e.to_string())?;
 
@@ -802,8 +1004,13 @@ fn recompile_and_swap(state: &AppState) -> Result<(), String> {
     match GraphCompiler::compile(&graph) {
         Ok(compiled) => {
             let routing = compute_routing(&graph);
+            let mod_routes = state
+                .modulation_routes
+                .lock()
+                .map_err(|e| e.to_string())?
+                .clone();
             let engine = state.engine.lock().map_err(|e| e.to_string())?;
-            engine.swap_graph_with_routing(compiled, routing);
+            engine.swap_graph_with_routing_and_modulation(compiled, routing, mod_routes);
             Ok(())
         }
         Err(e) => {

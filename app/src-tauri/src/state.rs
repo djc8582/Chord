@@ -12,7 +12,7 @@ use chord_audio_graph::{
 };
 use chord_audio_io::{AudioHost, AudioStream};
 use chord_diagnostics::{DiagnosticConfig, DiagnosticEngine};
-use chord_dsp_runtime::{AudioEngine, AudioNode, EngineConfig};
+use chord_dsp_runtime::{AudioEngine, AudioNode, EngineConfig, ModulationRoute};
 use chord_node_library::NodeRegistry;
 
 /// The central application state shared across all Tauri commands.
@@ -41,6 +41,8 @@ pub struct AppState {
     pub node_instances: Mutex<HashMap<NodeId, Box<dyn AudioNode>>>,
     /// Map from frontend connection ID strings to the graph's ConnectionId.
     pub connection_ids: Mutex<HashMap<String, ConnectionId>>,
+    /// Active modulation routes (audio signal → parameter mapping).
+    pub modulation_routes: Mutex<Vec<ModulationRoute>>,
 }
 
 // SAFETY: AudioHost contains a cpal::Host which holds platform-specific audio
@@ -84,6 +86,7 @@ impl AppState {
             diagnostics: Mutex::new(diagnostics),
             node_instances: Mutex::new(HashMap::new()),
             connection_ids: Mutex::new(HashMap::new()),
+            modulation_routes: Mutex::new(Vec::new()),
         }
     }
 }

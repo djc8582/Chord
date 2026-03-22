@@ -22,6 +22,30 @@ use crate::sanitize::{sanitize_buffer, set_ftz_daz};
 use crate::transport::TransportState;
 use crate::{AudioBuffer, AudioError, MidiMessage};
 
+/// A modulation route: maps a source node's audio output to a target node's parameter.
+///
+/// This enables "map anything to anything" modulation — any audio signal can
+/// drive any parameter on any node. The last sample of the source output buffer
+/// is read each process cycle and applied as:
+///   `final_value = offset + last_sample * amount`
+#[derive(Debug, Clone)]
+pub struct ModulationRoute {
+    /// Unique identifier for this modulation route.
+    pub id: String,
+    /// The node producing the modulation signal.
+    pub source_node: NodeId,
+    /// Which output port to read from (0-based index).
+    pub source_port: usize,
+    /// The node whose parameter is being modulated.
+    pub target_node: NodeId,
+    /// The name of the parameter to modulate.
+    pub target_param: String,
+    /// Modulation depth: scales the source signal (-1..1 typical).
+    pub amount: f64,
+    /// Center/offset value: added to the scaled modulation signal.
+    pub offset: f64,
+}
+
 /// Configuration for the audio engine.
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
@@ -62,6 +86,8 @@ struct EngineGraph {
     /// Connections for buffer routing: (from_node, from_port_index, to_node, to_port_index).
     /// Port indices are 0-based positions in the node's output/input port lists.
     routing: Vec<(NodeId, usize, NodeId, usize)>,
+    /// Modulation routes: audio signal → parameter mapping.
+    modulation_routes: Vec<ModulationRoute>,
 }
 
 /// The real-time audio processing engine.
@@ -231,7 +257,21 @@ impl AudioEngine {
         compiled: CompiledGraph,
         routing: Vec<(NodeId, usize, NodeId, usize)>,
     ) -> Option<CompiledGraph> {
-        let engine_graph = EngineGraph { compiled, routing };
+        self.swap_graph_with_routing_and_modulation(compiled, routing, Vec::new())
+    }
+
+    /// Swap in a new compiled graph with pre-computed routing and modulation routes.
+    ///
+    /// Modulation routes allow any audio output to drive any parameter on any node.
+    /// During processing, after each source node computes its output, the last sample
+    /// of the specified output port is read and applied to the target parameter.
+    pub fn swap_graph_with_routing_and_modulation(
+        &self,
+        compiled: CompiledGraph,
+        routing: Vec<(NodeId, usize, NodeId, usize)>,
+        modulation_routes: Vec<ModulationRoute>,
+    ) -> Option<CompiledGraph> {
+        let engine_graph = EngineGraph { compiled, routing, modulation_routes };
         let new_ptr = Box::into_raw(Box::new(engine_graph));
         let old_ptr = self.current_graph.swap(new_ptr, Ordering::AcqRel);
 
@@ -251,7 +291,7 @@ impl AudioEngine {
             .iter()
             .map(|c| (c.from_node, 0_usize, c.to_node, 0_usize))
             .collect();
-        EngineGraph { compiled, routing }
+        EngineGraph { compiled, routing, modulation_routes: Vec::new() }
     }
 
     /// Reclaim an EngineGraph from a raw pointer.
@@ -264,6 +304,18 @@ impl AudioEngine {
         // We cannot avoid this unsafe block because AtomicPtr::swap returns a raw pointer
         // that must be reconstituted into an owned type for proper cleanup.
         reclaim_box(ptr)
+    }
+
+    /// Load audio data into a node (e.g. for granular, sampler).
+    /// Called from the main thread. Returns true if the node accepted the data.
+    /// WARNING: This accesses the node directly — only safe when the audio thread
+    /// is not processing this node. Use when stopped, or coordinate carefully.
+    pub fn load_audio_into_node(&mut self, node_id: NodeId, data: &[f32], sample_rate: f64) -> bool {
+        if let Some(node) = self.nodes.get_mut(&node_id) {
+            node.load_audio_data(data, sample_rate)
+        } else {
+            false
+        }
     }
 
     /// Send a MIDI message to the audio thread. Lock-free (ring buffer push).
@@ -416,11 +468,21 @@ impl AudioEngine {
                 let input_refs: Vec<&[f32]> = input_buffers.iter().map(|v| v.as_slice()).collect();
 
                 // Prepare output buffers — allocate enough for the highest
-                // output port index used by this node's outgoing connections.
-                let max_output_idx = routing
+                // output port index used by this node's outgoing connections
+                // or modulation routes.
+                let max_routing_idx = routing
                     .iter()
                     .filter(|&&(from_node, _, _, _)| from_node == node_id)
                     .map(|&(_, from_port, _, _)| from_port)
+                    .max();
+                let max_mod_idx = engine_graph.modulation_routes
+                    .iter()
+                    .filter(|mr| mr.source_node == node_id)
+                    .map(|mr| mr.source_port)
+                    .max();
+                let max_output_idx = max_routing_idx
+                    .into_iter()
+                    .chain(max_mod_idx)
                     .max()
                     .unwrap_or(0);
                 let num_outputs = max_output_idx + 1;
@@ -507,6 +569,25 @@ impl AudioEngine {
 
                 // Store this node's output for downstream nodes.
                 node_outputs.insert(node_id, output_data);
+
+                // Step 4b: Apply modulation routes from this node's outputs
+                // to downstream node parameters.
+                for mod_route in &engine_graph.modulation_routes {
+                    if mod_route.source_node == node_id {
+                        if let Some(outputs) = node_outputs.get(&node_id) {
+                            if let Some(buf) = outputs.get(mod_route.source_port) {
+                                let mod_value = buf.last().copied().unwrap_or(0.0) as f64;
+                                let final_value = mod_route.offset + mod_value * mod_route.amount;
+                                self.parameters.set(
+                                    mod_route.target_node,
+                                    &mod_route.target_param,
+                                    final_value as f32,
+                                    0,
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
 

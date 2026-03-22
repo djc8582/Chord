@@ -66,7 +66,7 @@ export const PARAMETER_DEFINITIONS: Record<string, ParameterDescriptor[]> = {
   ],
   mixer: [],
   delay: [
-    { id: "time", label: "Delay Time", min: 0, max: 5, step: 0.001, defaultValue: 0.5, unit: "s" },
+    { id: "time", label: "Delay Time", min: 0.001, max: 2, step: 0.001, defaultValue: 0.5, unit: "s" },
     { id: "feedback", label: "Feedback", min: 0, max: 0.99, step: 0.01, defaultValue: 0.3, unit: "" },
     { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
   ],
@@ -117,18 +117,52 @@ export const PARAMETER_DEFINITIONS: Record<string, ParameterDescriptor[]> = {
     { id: "pattern_b", label: "Pattern B", min: 2, max: 16, step: 1, defaultValue: 4, unit: "" },
     { id: "pattern_c", label: "Pattern C", min: 2, max: 16, step: 1, defaultValue: 5, unit: "" },
   ],
-  euclidean: [],
-  chorus: [],
-  phaser: [],
-  waveshaper: [],
-  ring_modulator: [],
-  pitch_shifter: [],
-  limiter: [],
-  gate: [],
-  crossfader: [],
+  euclidean: [
+    { id: "steps", label: "Steps", min: 1, max: 32, step: 1, defaultValue: 16, unit: "" },
+    { id: "pulses", label: "Pulses", min: 0, max: 32, step: 1, defaultValue: 4, unit: "" },
+    { id: "rotation", label: "Rotation", min: 0, max: 31, step: 1, defaultValue: 0, unit: "" },
+  ],
+  chorus: [
+    { id: "rate", label: "Rate", min: 0.1, max: 10, step: 0.01, defaultValue: 1, unit: "Hz" },
+    { id: "depth", label: "Depth", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+  ],
+  phaser: [
+    { id: "rate", label: "Rate", min: 0.1, max: 10, step: 0.01, defaultValue: 0.5, unit: "Hz" },
+    { id: "depth", label: "Depth", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+  ],
+  waveshaper: [
+    { id: "drive", label: "Drive", min: 0, max: 10, step: 0.01, defaultValue: 1, unit: "" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 1, unit: "" },
+  ],
+  ring_modulator: [
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 1, unit: "" },
+  ],
+  pitch_shifter: [
+    { id: "semitones", label: "Semitones", min: -24, max: 24, step: 0.1, defaultValue: 0, unit: "st" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 1, unit: "" },
+  ],
+  limiter: [
+    { id: "ceiling", label: "Ceiling", min: -24, max: 0, step: 0.1, defaultValue: -0.3, unit: "dB" },
+    { id: "release", label: "Release", min: 0.01, max: 2, step: 0.01, defaultValue: 0.1, unit: "s" },
+  ],
+  gate: [
+    { id: "threshold", label: "Threshold", min: -80, max: 0, step: 0.1, defaultValue: -40, unit: "dB" },
+    { id: "attack", label: "Attack", min: 0, max: 1, step: 0.001, defaultValue: 0.001, unit: "s" },
+    { id: "hold", label: "Hold", min: 0, max: 1, step: 0.001, defaultValue: 0.01, unit: "s" },
+    { id: "release", label: "Release", min: 0, max: 2, step: 0.01, defaultValue: 0.1, unit: "s" },
+  ],
+  crossfader: [
+    { id: "position", label: "Position", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+  ],
   sample_and_hold: [],
-  quantizer: [],
-  stereo: [],
+  quantizer: [
+    { id: "scale", label: "Scale", min: 0, max: 11, step: 1, defaultValue: 0, unit: "" },
+  ],
+  stereo: [
+    { id: "width", label: "Width", min: 0, max: 2, step: 0.01, defaultValue: 1, unit: "" },
+  ],
   expression: [
     { id: "preset", label: "Preset", min: 0, max: 7, step: 1, defaultValue: 0, unit: "" },
     { id: "freq", label: "Frequency", min: 0.1, max: 20000, step: 0.1, defaultValue: 440, unit: "Hz" },
@@ -139,6 +173,31 @@ export const PARAMETER_DEFINITIONS: Record<string, ParameterDescriptor[]> = {
     { id: "a4_freq", label: "Concert A", min: 400, max: 480, step: 0.1, defaultValue: 440, unit: "Hz" },
   ],
   dc_blocker: [],
+  granular: [
+    { id: "grain_size", label: "Grain Size", min: 0.01, max: 0.2, step: 0.001, defaultValue: 0.05, unit: "s" },
+    { id: "density", label: "Density", min: 1, max: 50, step: 0.1, defaultValue: 10, unit: "/s" },
+    { id: "pitch", label: "Pitch", min: -24, max: 24, step: 0.1, defaultValue: 0, unit: "st" },
+    { id: "scatter", label: "Scatter", min: 0, max: 1, step: 0.01, defaultValue: 0, unit: "" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 1, unit: "" },
+  ],
+  vocoder: [
+    { id: "bands", label: "Bands", min: 1, max: 16, step: 1, defaultValue: 16, unit: "" },
+    { id: "attack", label: "Attack", min: 1, max: 100, step: 0.1, defaultValue: 5, unit: "ms" },
+    { id: "release", label: "Release", min: 10, max: 500, step: 1, defaultValue: 50, unit: "ms" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 1, unit: "" },
+  ],
+  convolution_reverb: [
+    { id: "decay", label: "Decay", min: 0.1, max: 5, step: 0.01, defaultValue: 1.5, unit: "s" },
+    { id: "brightness", label: "Brightness", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+    { id: "predelay", label: "Pre-delay", min: 0, max: 100, step: 1, defaultValue: 10, unit: "ms" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 0.3, unit: "" },
+  ],
+  spectral: [
+    { id: "freeze", label: "Freeze", min: 0, max: 1, step: 1, defaultValue: 0, unit: "" },
+    { id: "blur", label: "Blur", min: 0, max: 1, step: 0.01, defaultValue: 0, unit: "" },
+    { id: "shift", label: "Shift", min: -512, max: 512, step: 1, defaultValue: 0, unit: "bins" },
+    { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 1, unit: "" },
+  ],
 };
 
 // ---------------------------------------------------------------------------

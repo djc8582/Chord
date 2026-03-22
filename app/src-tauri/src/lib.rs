@@ -31,10 +31,15 @@ pub fn run() {
             // MIDI
             commands::send_midi_note_on,
             commands::send_midi_note_off,
+            // Modulation routing
+            commands::add_modulation,
+            commands::remove_modulation,
             // Audio engine / diagnostics
             commands::get_signal_stats,
             commands::run_diagnostics,
             commands::get_waveform_data,
+            // Audio file loading
+            commands::load_audio_file,
             // File / state
             commands::load_patch,
             commands::save_patch,

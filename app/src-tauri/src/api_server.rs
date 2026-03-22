@@ -155,6 +155,8 @@ fn route(path: &str, args: Value, state: &AppState, handle: &AppHandle) -> Value
         "/api/v1/get_patch" => api_get_patch(state),
         "/api/v1/get_waveform_data" => api_get_waveform_data(state),
         "/api/v1/get_signal_stats" => api_get_signal_stats(state),
+        "/api/v1/add_modulation" => api_add_modulation(args, state),
+        "/api/v1/remove_modulation" => api_remove_modulation(args, state),
         _ => json!({"error": format!("Unknown endpoint: {path}")}),
     }
 }
@@ -425,7 +427,7 @@ fn api_set_parameter(args: Value, state: &AppState, handle: &AppHandle) -> Value
 
 fn api_play(state: &AppState) -> Value {
     // Compile the graph and compute proper port routing.
-    let (compiled, routing) = {
+    let (compiled, routing, mod_routes) = {
         let graph = match state.graph.lock() {
             Ok(g) => g,
             Err(e) => return json!({"error": e.to_string()}),
@@ -435,7 +437,12 @@ fn api_play(state: &AppState) -> Value {
             Err(e) => return json!({"error": e.to_string()}),
         };
         let routing = compute_routing(&graph);
-        (compiled, routing)
+        let mod_routes = state
+            .modulation_routes
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        (compiled, routing, mod_routes)
     };
 
     // Move node instances into the engine.
@@ -451,7 +458,7 @@ fn api_play(state: &AppState) -> Value {
         }
 
         engine.transport_mut().play();
-        engine.swap_graph_with_routing(compiled, routing);
+        engine.swap_graph_with_routing_and_modulation(compiled, routing, mod_routes);
     }
 
     // Open audio stream.
@@ -629,6 +636,99 @@ fn api_get_signal_stats(state: &AppState) -> Value {
     })
 }
 
+fn api_add_modulation(args: Value, state: &AppState) -> Value {
+    let source_node_str = match args.get("source_node").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'source_node'"}),
+    };
+    let source_port = match args.get("source_port").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'source_port'"}),
+    };
+    let target_node_str = match args.get("target_node").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'target_node'"}),
+    };
+    let target_param = match args.get("target_param").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'target_param'"}),
+    };
+    let amount = args.get("amount").and_then(|v| v.as_f64()).unwrap_or(1.0);
+    let offset = args.get("offset").and_then(|v| v.as_f64()).unwrap_or(0.0);
+
+    let src_nid = match source_node_str.parse::<u64>() {
+        Ok(n) => NodeId(n),
+        Err(_) => return json!({"error": "Invalid source_node ID"}),
+    };
+    let tgt_nid = match target_node_str.parse::<u64>() {
+        Ok(n) => NodeId(n),
+        Err(_) => return json!({"error": "Invalid target_node ID"}),
+    };
+
+    // Resolve the source port name to a port index.
+    let src_port_idx = {
+        let graph = state.graph.lock().unwrap();
+        let node_desc = match graph.node(&src_nid) {
+            Some(d) => d,
+            None => return json!({"error": format!("Source node not found: {source_node_str}")}),
+        };
+        match node_desc.outputs.iter().position(|p| p.name == source_port) {
+            Some(idx) => idx,
+            None => {
+                return json!({"error": format!(
+                    "Output port '{}' not found on node {}",
+                    source_port, source_node_str
+                )})
+            }
+        }
+    };
+
+    // Generate unique ID.
+    let mod_id = format!("mod-{:x}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos());
+
+    let route = chord_dsp_runtime::ModulationRoute {
+        id: mod_id.clone(),
+        source_node: src_nid,
+        source_port: src_port_idx,
+        target_node: tgt_nid,
+        target_param,
+        amount,
+        offset,
+    };
+
+    {
+        let mut mod_routes = state.modulation_routes.lock().unwrap();
+        mod_routes.push(route);
+    }
+
+    let _ = recompile_and_swap(state);
+
+    json!({"modulation_id": mod_id})
+}
+
+fn api_remove_modulation(args: Value, state: &AppState) -> Value {
+    let id = match args.get("id").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'id'"}),
+    };
+
+    {
+        let mut mod_routes = state.modulation_routes.lock().unwrap();
+        let before_len = mod_routes.len();
+        mod_routes.retain(|r| r.id != id);
+        if mod_routes.len() == before_len {
+            return json!({"error": format!("Modulation route not found: {id}")});
+        }
+    }
+
+    let _ = recompile_and_swap(state);
+
+    json!({"removed": id})
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -641,8 +741,13 @@ fn recompile_and_swap(state: &AppState) -> Result<(), String> {
     match GraphCompiler::compile(&graph) {
         Ok(compiled) => {
             let routing = compute_routing(&graph);
+            let mod_routes = state
+                .modulation_routes
+                .lock()
+                .map_err(|e| e.to_string())?
+                .clone();
             let engine = state.engine.lock().map_err(|e| e.to_string())?;
-            engine.swap_graph_with_routing(compiled, routing);
+            engine.swap_graph_with_routing_and_modulation(compiled, routing, mod_routes);
             Ok(())
         }
         Err(_) => Ok(()),

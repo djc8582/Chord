@@ -99,6 +99,20 @@ export const bridge: BridgeCommands = {
     return tauriInvoke<number[]>("get_waveform_data");
   },
 
+  // -- Audio file loading ---------------------------------------------------
+  loadAudioFile(nodeId: string, path: string): Promise<{ ok: boolean; samples: number; duration: number }> {
+    return tauriInvoke<{ ok: boolean; samples: number; duration: number }>("load_audio_file", { nodeId, path });
+  },
+
+  // -- Modulation routing ---------------------------------------------------
+  addModulation(sourceNode: string, sourcePort: string, targetNode: string, targetParam: string, amount: number, offset: number): Promise<string> {
+    return tauriInvoke<string>("add_modulation", { sourceNode, sourcePort, targetNode, targetParam, amount, offset });
+  },
+
+  removeModulation(id: string): Promise<void> {
+    return tauriInvoke<void>("remove_modulation", { id });
+  },
+
   // -- State ----------------------------------------------------------------
   loadPatch(path: string): Promise<void> {
     return tauriInvoke<void>("load_patch", { path });

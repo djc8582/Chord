@@ -67,6 +67,13 @@ export interface BridgeCommands {
   runDiagnostics(): Promise<DiagnosticReport>;
   getWaveformData(): Promise<number[]>;
 
+  // Audio file loading
+  loadAudioFile(nodeId: NodeId, path: string): Promise<{ ok: boolean; samples: number; duration: number }>;
+
+  // Modulation routing
+  addModulation(sourceNode: string, sourcePort: string, targetNode: string, targetParam: string, amount: number, offset: number): Promise<string>;
+  removeModulation(id: string): Promise<void>;
+
   // State
   loadPatch(path: string): Promise<void>;
   savePatch(path: string): Promise<void>;
