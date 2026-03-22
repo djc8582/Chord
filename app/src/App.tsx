@@ -15,6 +15,7 @@ import { Timeline, setTimelineBridge } from "./timeline/index.js";
 import { setVisualizerBridge } from "./visualizer/index.js";
 import { createPatchDocument } from "@chord/document-model";
 import { useBridge } from "./bridge/index.js";
+import { initMcpSync } from "./bridge/mcp-sync.js";
 
 function App() {
   const initialized = useRef(false);
@@ -33,6 +34,18 @@ function App() {
     setInspectorBridge(bridge);
     setTimelineBridge(bridge);
     setVisualizerBridge(bridge);
+
+    // Listen for MCP API server events so externally-created nodes appear on canvas
+    let mcpCleanup: (() => void) | undefined;
+    initMcpSync(doc, () => useCanvasStore.getState().syncFromDocument()).then(
+      (cleanup) => {
+        mcpCleanup = cleanup;
+      },
+    );
+
+    return () => {
+      mcpCleanup?.();
+    };
   }, [bridge]);
 
   return (

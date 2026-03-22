@@ -10,7 +10,7 @@ use crate::ChordMcpServer;
 
 #[test]
 fn list_tools_returns_all_expected_tools() {
-    let server = ChordMcpServer::new();
+    let server = ChordMcpServer::new_standalone();
     let tools = server.list_tools();
 
     let expected_names = [
@@ -53,7 +53,7 @@ fn list_tools_returns_all_expected_tools() {
 
 #[test]
 fn create_add_connect_compile_end_to_end() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     // Create a patch.
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
@@ -156,7 +156,7 @@ fn create_add_connect_compile_end_to_end() {
 
 #[test]
 fn set_parameter_changes_node_parameter() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -203,7 +203,7 @@ fn set_parameter_changes_node_parameter() {
 
 #[test]
 fn set_parameter_clamps_to_range() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -238,7 +238,7 @@ fn set_parameter_clamps_to_range() {
 
 #[test]
 fn get_patch_returns_complete_state() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -299,7 +299,7 @@ fn get_patch_returns_complete_state() {
 
 #[test]
 fn unknown_tool_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool("nonexistent_tool", json!({}));
     assert!(result.is_err());
@@ -316,7 +316,7 @@ fn unknown_tool_returns_error() {
 
 #[test]
 fn add_node_missing_patch_id_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool("add_node", json!({ "node_type": "oscillator" }));
     assert!(result.is_err());
@@ -328,7 +328,7 @@ fn add_node_missing_patch_id_returns_error() {
 
 #[test]
 fn add_node_unknown_type_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -346,7 +346,7 @@ fn add_node_unknown_type_returns_error() {
 
 #[test]
 fn set_parameter_nonexistent_param_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -377,7 +377,7 @@ fn set_parameter_nonexistent_param_returns_error() {
 
 #[test]
 fn remove_node_nonexistent_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -395,7 +395,7 @@ fn remove_node_nonexistent_returns_error() {
 
 #[test]
 fn disconnect_nonexistent_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -413,7 +413,7 @@ fn disconnect_nonexistent_returns_error() {
 
 #[test]
 fn connect_to_nonexistent_patch_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool(
         "connect",
@@ -438,7 +438,7 @@ fn connect_to_nonexistent_patch_returns_error() {
 
 #[test]
 fn round_trip_export_preserves_structure() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     // Build a patch with two nodes and a connection.
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
@@ -538,7 +538,7 @@ fn round_trip_export_preserves_structure() {
 
 #[test]
 fn handle_request_success_format() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let response = server.handle_request(&json!({
         "tool": "create_patch",
@@ -552,7 +552,7 @@ fn handle_request_success_format() {
 
 #[test]
 fn handle_request_error_format() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let response = server.handle_request(&json!({
         "tool": "nonexistent_tool",
@@ -565,7 +565,7 @@ fn handle_request_error_format() {
 
 #[test]
 fn handle_request_missing_tool_field() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let response = server.handle_request(&json!({
         "arguments": {}
@@ -581,7 +581,7 @@ fn handle_request_missing_tool_field() {
 
 #[test]
 fn list_node_types_returns_wave1_nodes() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool("list_node_types", json!({})).unwrap();
     let node_types = result["node_types"].as_array().unwrap();
@@ -631,7 +631,7 @@ fn list_node_types_returns_wave1_nodes() {
 
 #[test]
 fn run_diagnostics_returns_report() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -652,7 +652,7 @@ fn run_diagnostics_returns_report() {
 
 #[test]
 fn remove_node_also_removes_connections() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -712,7 +712,7 @@ fn remove_node_also_removes_connections() {
 
 #[test]
 fn compile_empty_patch_succeeds() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -732,7 +732,7 @@ fn compile_empty_patch_succeeds() {
 
 #[test]
 fn multiple_patches_are_independent() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let patch1 = server.call_tool("create_patch", json!({})).unwrap();
     let pid1 = patch1["patch_id"].as_str().unwrap().to_string();
@@ -766,7 +766,7 @@ fn get_signal_stats_returns_stats_after_processing() {
     use chord_diagnostics::{AudioBuffer, NodeId, PortId};
     use chord_dsp_runtime::DiagnosticProbe;
 
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -827,7 +827,7 @@ fn get_signal_stats_returns_stats_after_processing() {
 
 #[test]
 fn get_signal_stats_returns_null_for_unprocessed_port() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -859,7 +859,7 @@ fn get_signal_stats_returns_null_for_unprocessed_port() {
 
 #[test]
 fn get_signal_stats_unknown_patch_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool(
         "get_signal_stats",
@@ -885,7 +885,7 @@ fn find_problems_returns_problems_for_clipping_signal() {
     use chord_diagnostics::{AudioBuffer, NodeId, PortId};
     use chord_dsp_runtime::DiagnosticProbe;
 
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -937,7 +937,7 @@ fn find_problems_returns_problems_for_clipping_signal() {
 
 #[test]
 fn find_problems_returns_empty_for_clean_patch() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -952,7 +952,7 @@ fn find_problems_returns_empty_for_clean_patch() {
 
 #[test]
 fn find_problems_unknown_patch_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool(
         "find_problems",
@@ -974,7 +974,7 @@ fn get_cpu_profile_returns_timing_data_after_processing() {
     use chord_diagnostics::NodeId;
     use std::time::Duration;
 
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -1021,7 +1021,7 @@ fn get_cpu_profile_returns_timing_data_after_processing() {
 
 #[test]
 fn get_cpu_profile_returns_empty_profile_without_processing() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -1038,7 +1038,7 @@ fn get_cpu_profile_returns_empty_profile_without_processing() {
 
 #[test]
 fn get_cpu_profile_unknown_patch_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool(
         "get_cpu_profile",
@@ -1057,7 +1057,7 @@ fn get_cpu_profile_unknown_patch_returns_error() {
 
 #[test]
 fn auto_fix_insert_gain_adds_gain_node() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -1141,7 +1141,7 @@ fn auto_fix_insert_gain_adds_gain_node() {
 
 #[test]
 fn auto_fix_mute_node_inserts_zero_gain() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -1196,7 +1196,7 @@ fn auto_fix_mute_node_inserts_zero_gain() {
 
 #[test]
 fn auto_fix_bypass_node_reconnects() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -1290,7 +1290,7 @@ fn auto_fix_bypass_node_reconnects() {
 
 #[test]
 fn auto_fix_increase_buffer_size_returns_manual_fix() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -1314,7 +1314,7 @@ fn auto_fix_increase_buffer_size_returns_manual_fix() {
 
 #[test]
 fn auto_fix_unknown_patch_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let result = server.call_tool(
         "auto_fix",
@@ -1335,7 +1335,7 @@ fn auto_fix_unknown_patch_returns_error() {
 
 #[test]
 fn auto_fix_unknown_fix_type_returns_error() {
-    let mut server = ChordMcpServer::new();
+    let mut server = ChordMcpServer::new_standalone();
 
     let create_result = server.call_tool("create_patch", json!({})).unwrap();
     let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
@@ -1365,7 +1365,7 @@ fn auto_fix_unknown_fix_type_returns_error() {
 
 #[test]
 fn tool_definitions_include_diagnostic_tools() {
-    let server = ChordMcpServer::new();
+    let server = ChordMcpServer::new_standalone();
     let tools = server.list_tools();
 
     let diagnostic_tools = ["get_signal_stats", "find_problems", "get_cpu_profile", "auto_fix"];

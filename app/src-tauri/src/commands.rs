@@ -15,6 +15,10 @@ use chord_audio_io::StreamConfig;
 
 use crate::state::{build_node_descriptor, AppState};
 
+/// Shorthand: all commands receive `State<'_, Arc<AppState>>` because the
+/// AppState is shared with the API server thread via `Arc`.
+type AppArc = Arc<AppState>;
+
 // ---------------------------------------------------------------------------
 // Types mirroring the frontend BridgeCommands interface
 // ---------------------------------------------------------------------------
@@ -64,7 +68,7 @@ pub struct ExportOptions {
 pub fn add_node(
     node_type: String,
     position: Vec2,
-    state: State<'_, AppState>,
+    state: State<'_, AppArc>,
 ) -> Result<String, String> {
     log::info(
         "add_node",
@@ -111,7 +115,7 @@ pub fn add_node(
 
 /// Remove a node from the graph and clean up its DSP instance.
 #[tauri::command]
-pub fn remove_node(id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn remove_node(id: String, state: State<'_, AppArc>) -> Result<(), String> {
     log::info("remove_node", &format!("id={id}"));
 
     let node_id = parse_node_id(&id)?;
@@ -145,7 +149,7 @@ pub fn remove_node(id: String, state: State<'_, AppState>) -> Result<(), String>
 /// Looks up ports by name, connects them in the graph, recompiles, and hot-swaps
 /// the engine graph so the new connection is immediately audible.
 #[tauri::command]
-pub fn connect_ports(from: PortRef, to: PortRef, state: State<'_, AppState>) -> Result<String, String> {
+pub fn connect_ports(from: PortRef, to: PortRef, state: State<'_, AppArc>) -> Result<String, String> {
     log::info(
         "connect_ports",
         &format!("{}:{} -> {}:{}", from.node_id, from.port, to.node_id, to.port),
@@ -182,7 +186,7 @@ pub fn connect_ports(from: PortRef, to: PortRef, state: State<'_, AppState>) -> 
 
 /// Disconnect (remove) a connection by its ID string.
 #[tauri::command]
-pub fn disconnect(id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn disconnect(id: String, state: State<'_, AppArc>) -> Result<(), String> {
     log::info("disconnect", &format!("id={id}"));
 
     let conn_id = {
@@ -217,7 +221,7 @@ pub fn set_parameter(
     node_id: String,
     param: String,
     value: f64,
-    state: State<'_, AppState>,
+    state: State<'_, AppArc>,
 ) -> Result<(), String> {
     log::info(
         "set_parameter",
@@ -245,7 +249,7 @@ pub fn set_parameter(
 /// 3. Swap the compiled graph into the engine.
 /// 4. Open a CPAL audio stream that calls engine.process() in its callback.
 #[tauri::command]
-pub fn play(state: State<'_, AppState>) -> Result<(), String> {
+pub fn play(state: State<'_, AppArc>) -> Result<(), String> {
     log::info("play", "transport started");
 
     // 1. Compile the graph and grab connections.
@@ -299,7 +303,7 @@ pub fn play(state: State<'_, AppState>) -> Result<(), String> {
 
 /// Stop audio playback.
 #[tauri::command]
-pub fn stop(state: State<'_, AppState>) -> Result<(), String> {
+pub fn stop(state: State<'_, AppArc>) -> Result<(), String> {
     log::info("stop", "transport stopped");
 
     // Stop the transport.
@@ -335,7 +339,7 @@ pub fn stop(state: State<'_, AppState>) -> Result<(), String> {
 
 /// Set the transport tempo in beats per minute.
 #[tauri::command]
-pub fn set_tempo(bpm: f64, state: State<'_, AppState>) -> Result<(), String> {
+pub fn set_tempo(bpm: f64, state: State<'_, AppArc>) -> Result<(), String> {
     log::info("set_tempo", &format!("bpm={bpm}"));
 
     let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
@@ -353,7 +357,7 @@ pub fn set_tempo(bpm: f64, state: State<'_, AppState>) -> Result<(), String> {
 pub fn get_signal_stats(
     node_id: String,
     port: String,
-    state: State<'_, AppState>,
+    state: State<'_, AppArc>,
 ) -> Result<SignalStats, String> {
     log::info("get_signal_stats", &format!("node={node_id} port={port}"));
 
@@ -391,7 +395,7 @@ pub fn get_signal_stats(
 
 /// Run a full diagnostic report on the audio engine.
 #[tauri::command]
-pub fn run_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticReport, String> {
+pub fn run_diagnostics(state: State<'_, AppArc>) -> Result<DiagnosticReport, String> {
     log::info("run_diagnostics", "running");
 
     let graph = state.graph.lock().map_err(|e| e.to_string())?;
@@ -412,7 +416,7 @@ pub fn run_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticReport, S
 
 /// Load a patch (graph) from a JSON file.
 #[tauri::command]
-pub fn load_patch(path: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn load_patch(path: String, state: State<'_, AppArc>) -> Result<(), String> {
     log::info("load_patch", &format!("path={path}"));
 
     let contents = std::fs::read_to_string(&path)
@@ -444,7 +448,7 @@ pub fn load_patch(path: String, state: State<'_, AppState>) -> Result<(), String
 
 /// Save the current patch (graph) to a JSON file.
 #[tauri::command]
-pub fn save_patch(path: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn save_patch(path: String, state: State<'_, AppArc>) -> Result<(), String> {
     log::info("save_patch", &format!("path={path}"));
 
     let graph = state.graph.lock().map_err(|e| e.to_string())?;
@@ -460,7 +464,7 @@ pub fn save_patch(path: String, state: State<'_, AppState>) -> Result<(), String
 pub fn export_patch(
     target: String,
     options: ExportOptions,
-    state: State<'_, AppState>,
+    state: State<'_, AppArc>,
 ) -> Result<String, String> {
     log::info(
         "export_patch",

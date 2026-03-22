@@ -45,6 +45,7 @@ export {
   generateId,
   // Mutation helpers
   addNode,
+  addNodeWithId,
   removeNode,
   connect,
   disconnect,

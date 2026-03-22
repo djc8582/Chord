@@ -133,6 +133,35 @@ export function addNode(
 }
 
 /**
+ * Add a node with an explicit ID (used by MCP sync to match backend IDs).
+ *
+ * @returns The id of the newly created node.
+ */
+export function addNodeWithId(
+  doc: Y.Doc,
+  id: string,
+  type: string,
+  position: Vec2,
+  name?: string,
+): string {
+  const nodes = doc.getMap<NodeData>(NODES_KEY);
+
+  const nodeData: NodeData = {
+    id,
+    type,
+    position: { x: position.x, y: position.y },
+    parameters: {},
+    name: name ?? type,
+  };
+
+  doc.transact(() => {
+    nodes.set(id, nodeData);
+  });
+
+  return id;
+}
+
+/**
  * Remove a node and all connections that reference it.
  */
 export function removeNode(doc: Y.Doc, nodeId: string): void {

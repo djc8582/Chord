@@ -1,6 +1,13 @@
 //! The MCP server implementation — routes tool calls to graph operations.
+//!
+//! Supports two modes:
+//! - **Standalone**: manages its own in-memory graphs (default)
+//! - **Proxy**: forwards mutations to a running Chord app via HTTP on port 19475
 
 use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::time::Duration;
 
 use chord_audio_graph::{
     CompileError, ConnectionId, Graph, GraphCompiler, NodeDescriptor, NodeId, ParameterDescriptor,
@@ -13,6 +20,9 @@ use serde_json::{json, Value};
 use crate::tools::all_tool_definitions;
 use crate::types::{McpError, McpResult, ToolDefinition};
 
+/// Well-known port for the Chord app's API server.
+const APP_API_PORT: u16 = 19475;
+
 /// Holds one patch (graph) along with its associated diagnostic engine.
 struct PatchState {
     graph: Graph,
@@ -23,6 +33,11 @@ struct PatchState {
 ///
 /// Manages patches (audio graphs), routes tool calls, and returns JSON results.
 /// Thread-safe access is the caller's responsibility; this struct is `Send` but not `Sync`.
+///
+/// When a running Chord app is detected on `localhost:19475`, the server
+/// operates in **proxy mode**: graph mutations and transport commands are
+/// forwarded to the app, so nodes appear on canvas and audio plays through
+/// the app's audio engine.
 pub struct ChordMcpServer {
     /// Active patches keyed by patch ID.
     patches: HashMap<String, PatchState>,
@@ -30,6 +45,11 @@ pub struct ChordMcpServer {
     registry: NodeRegistry,
     /// Counter for generating unique patch IDs.
     next_patch_id: u64,
+    /// If true, the Chord app is running and we forward mutations to it.
+    proxy_mode: bool,
+    /// Maps MCP node IDs (from standalone graph) to app node IDs (strings)
+    /// returned by the running app. Used in proxy mode.
+    app_node_ids: HashMap<u64, String>,
 }
 
 impl Default for ChordMcpServer {
@@ -40,12 +60,77 @@ impl Default for ChordMcpServer {
 
 impl ChordMcpServer {
     /// Create a new MCP server with the default Wave 1 node registry.
+    ///
+    /// Automatically detects whether the Chord app is running on the API port
+    /// and enters proxy mode if so.
     pub fn new() -> Self {
+        let proxy_mode = Self::check_app_running();
+        if proxy_mode {
+            eprintln!("[chord-mcp] App detected on port {APP_API_PORT} — proxy mode enabled");
+        }
         Self {
             patches: HashMap::new(),
             registry: NodeRegistry::with_wave1(),
             next_patch_id: 1,
+            proxy_mode,
+            app_node_ids: HashMap::new(),
         }
+    }
+
+    /// Create a new MCP server in standalone mode (no proxy), for testing.
+    pub fn new_standalone() -> Self {
+        Self {
+            patches: HashMap::new(),
+            registry: NodeRegistry::with_wave1(),
+            next_patch_id: 1,
+            proxy_mode: false,
+            app_node_ids: HashMap::new(),
+        }
+    }
+
+    /// Check if the Chord app is running by attempting to connect to the API port.
+    fn check_app_running() -> bool {
+        TcpStream::connect_timeout(
+            &format!("127.0.0.1:{APP_API_PORT}").parse().unwrap(),
+            Duration::from_millis(200),
+        )
+        .is_ok()
+    }
+
+    /// Send a POST request to the running Chord app's API server.
+    fn app_post(&self, endpoint: &str, body: &Value) -> McpResult<Value> {
+        let body_str = body.to_string();
+        let request = format!(
+            "POST /api/v1/{endpoint} HTTP/1.1\r\n\
+             Host: 127.0.0.1\r\n\
+             Content-Type: application/json\r\n\
+             Content-Length: {}\r\n\
+             Connection: close\r\n\
+             \r\n\
+             {body_str}",
+            body_str.len()
+        );
+
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{APP_API_PORT}"))
+            .map_err(|e| McpError::Internal(format!("App connection failed: {e}")))?;
+
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|e| McpError::Internal(format!("Write failed: {e}")))?;
+
+        let mut response = String::new();
+        stream
+            .read_to_string(&mut response)
+            .map_err(|e| McpError::Internal(format!("Read failed: {e}")))?;
+
+        // Extract body after \r\n\r\n.
+        let body = response
+            .find("\r\n\r\n")
+            .map(|idx| &response[idx + 4..])
+            .unwrap_or(&response);
+
+        serde_json::from_str(body.trim())
+            .map_err(|e| McpError::Internal(format!("Invalid JSON response: {e}")))
     }
 
     /// Return all available tool definitions.
@@ -66,8 +151,39 @@ impl ChordMcpServer {
 
     /// Dispatch a tool call by name with the given JSON arguments.
     ///
-    /// Returns `Ok(Value)` on success or `Err(McpError)` on failure.
+    /// In proxy mode, mutation and transport tools are forwarded to the running
+    /// Chord app. Read-only tools (list_node_types, get_patch, diagnostics)
+    /// are also forwarded when the app is running.
     pub fn call_tool(&mut self, name: &str, args: Value) -> McpResult<Value> {
+        // Re-check for the app on each call (it may have started after us).
+        if !self.proxy_mode {
+            self.proxy_mode = Self::check_app_running();
+            if self.proxy_mode {
+                eprintln!("[chord-mcp] App detected on port {APP_API_PORT} — proxy mode enabled");
+            }
+        }
+
+        // In proxy mode, forward supported tools to the app.
+        if self.proxy_mode {
+            match name {
+                "create_patch" => {
+                    return Ok(json!({
+                        "patch_id": "app",
+                        "message": "Using running Chord app (proxy mode). Patch is managed by the app."
+                    }));
+                }
+                "add_node" => return self.proxy_add_node(&args),
+                "remove_node" => return self.proxy_remove_node(&args),
+                "connect" => return self.proxy_connect(&args),
+                "disconnect" => return self.proxy_disconnect(&args),
+                "set_parameter" => return self.proxy_set_parameter(&args),
+                "compile_patch" => return self.app_post("compile", &json!({})),
+                "get_patch" => return self.app_post("get_patch", &json!({})),
+                // list_node_types falls through to local handling (same data).
+                _ => {}
+            }
+        }
+
         match name {
             "list_node_types" => self.tool_list_node_types(),
             "create_patch" => self.tool_create_patch(),
@@ -86,6 +202,149 @@ impl ChordMcpServer {
             "auto_fix" => self.tool_auto_fix(&args),
             _ => Err(McpError::UnknownTool(name.to_string())),
         }
+    }
+
+    // ────────────────────────────────────────────
+    // Proxy mode tool handlers
+    // ────────────────────────────────────────────
+
+    fn proxy_add_node(&mut self, args: &Value) -> McpResult<Value> {
+        let node_type = get_string(args, "node_type")?;
+        let position = args.get("position").cloned().unwrap_or(json!({"x": 0, "y": 0}));
+
+        let result = self.app_post("add_node", &json!({
+            "node_type": node_type,
+            "position": position,
+        }))?;
+
+        // Store the app's node ID so we can map MCP numeric IDs in subsequent calls.
+        if let Some(app_id) = result.get("node_id").and_then(|v| v.as_str()) {
+            // Also run the local standalone logic so diagnostics/export still work.
+            let local_result = self.tool_add_node(args);
+            if let Ok(ref local) = local_result {
+                if let Some(local_id) = local.get("node_id").and_then(|v| v.as_u64()) {
+                    self.app_node_ids.insert(local_id, app_id.to_string());
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn proxy_remove_node(&mut self, args: &Value) -> McpResult<Value> {
+        let node_id_val = get_u64(args, "node_id")?;
+        let app_id = self
+            .app_node_ids
+            .get(&node_id_val)
+            .cloned()
+            .unwrap_or_else(|| node_id_val.to_string());
+
+        let result = self.app_post("remove_node", &json!({"id": app_id}))?;
+        // Also remove from local graph.
+        let _ = self.tool_remove_node(args);
+        self.app_node_ids.remove(&node_id_val);
+
+        Ok(result)
+    }
+
+    fn proxy_connect(&mut self, args: &Value) -> McpResult<Value> {
+        let from_node = get_u64(args, "from_node")?;
+        let to_node = get_u64(args, "to_node")?;
+
+        // Map MCP numeric IDs to app IDs.
+        let from_app_id = self
+            .app_node_ids
+            .get(&from_node)
+            .cloned()
+            .unwrap_or_else(|| from_node.to_string());
+        let to_app_id = self
+            .app_node_ids
+            .get(&to_node)
+            .cloned()
+            .unwrap_or_else(|| to_node.to_string());
+
+        // Resolve port names: look up port names from the local graph.
+        let from_port_id = get_u64(args, "from_port")?;
+        let to_port_id = get_u64(args, "to_port")?;
+
+        // Find port names from the local graph's node descriptors.
+        let (from_port_name, to_port_name) = {
+            let patch_id = args
+                .get("patch_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("app");
+            let patch = self.patches.get(patch_id);
+
+            let from_name = patch
+                .and_then(|p| p.graph.node(&NodeId(from_node)))
+                .and_then(|n| {
+                    n.outputs
+                        .iter()
+                        .find(|p| p.id == PortId(from_port_id))
+                        .map(|p| p.name.clone())
+                })
+                .unwrap_or_else(|| format!("{from_port_id}"));
+
+            let to_name = patch
+                .and_then(|p| p.graph.node(&NodeId(to_node)))
+                .and_then(|n| {
+                    n.inputs
+                        .iter()
+                        .find(|p| p.id == PortId(to_port_id))
+                        .map(|p| p.name.clone())
+                })
+                .unwrap_or_else(|| format!("{to_port_id}"));
+
+            (from_name, to_name)
+        };
+
+        let result = self.app_post(
+            "connect",
+            &json!({
+                "from_node": from_app_id,
+                "from_port": from_port_name,
+                "to_node": to_app_id,
+                "to_port": to_port_name,
+            }),
+        )?;
+
+        // Also connect in local graph.
+        let _ = self.tool_connect(args);
+
+        Ok(result)
+    }
+
+    fn proxy_disconnect(&mut self, args: &Value) -> McpResult<Value> {
+        let conn_id = get_u64(args, "connection_id")?;
+        let result = self.app_post("disconnect", &json!({"id": conn_id.to_string()}))?;
+        let _ = self.tool_disconnect(args);
+        Ok(result)
+    }
+
+    fn proxy_set_parameter(&mut self, args: &Value) -> McpResult<Value> {
+        let node_id_val = get_u64(args, "node_id")?;
+        let param = get_string(args, "parameter")?;
+        let value = get_f64(args, "value")?;
+
+        let app_id = self
+            .app_node_ids
+            .get(&node_id_val)
+            .cloned()
+            .unwrap_or_else(|| node_id_val.to_string());
+
+        let result = self.app_post(
+            "set_parameter",
+            &json!({
+                "node_id": app_id,
+                "param": param,
+                "value": value,
+            }),
+        )?;
+
+        // Also update local graph.
+        let _ = self.tool_set_parameter(args);
+
+        Ok(result)
     }
 
     /// Handle the full MCP protocol request/response format.

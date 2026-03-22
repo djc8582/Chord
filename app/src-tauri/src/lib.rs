@@ -1,12 +1,17 @@
+mod api_server;
 mod commands;
 mod state;
+
+use std::sync::Arc;
 
 use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize the shared application state.
-    let app_state = AppState::new();
+    // Initialize the shared application state behind an Arc so it can be
+    // shared between Tauri commands and the API server thread.
+    let app_state = Arc::new(AppState::new());
+    let api_state = Arc::clone(&app_state);
 
     tauri::Builder::default()
         .manage(app_state)
@@ -29,6 +34,11 @@ pub fn run() {
             commands::save_patch,
             commands::export_patch,
         ])
+        .setup(move |app| {
+            let handle = app.handle().clone();
+            api_server::start(api_state, handle);
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running Chord");
 }
