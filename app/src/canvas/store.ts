@@ -587,12 +587,25 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     );
     // The Yjs observer will update the edges
     store.syncFromDocument();
-    // Sync to Rust backend — pass Yjs IDs directly.
-    // The backend resolves them to NodeIds via the frontend_id_map.
-    _bridge?.connect(
-      { nodeId: connection.source, port: fromPort },
-      { nodeId: connection.target, port: toPort },
-    ).catch((e) => console.error("[chord] connect error:", e));
+    // Wait for any pending addNode calls to complete before connecting.
+    // Without this, connect fires before the backend knows the node's frontend ID.
+    const waitFor = [
+      _pendingBackendIds.get(connection.source),
+      _pendingBackendIds.get(connection.target),
+    ].filter(Boolean);
+
+    const doConnect = () => {
+      _bridge?.connect(
+        { nodeId: connection.source, port: fromPort },
+        { nodeId: connection.target, port: toPort },
+      ).catch((e) => console.error("[chord] connect error:", e));
+    };
+
+    if (waitFor.length > 0) {
+      Promise.all(waitFor).then(doConnect);
+    } else {
+      doConnect();
+    }
   },
 
   addNode: (type, position, name) => {
@@ -600,9 +613,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const id = dmAddNode(store.ydoc, type, { x: position.x, y: position.y }, name);
     store.syncFromDocument();
     // Pass the frontend Yjs ID to the backend so it can map it.
-    // The backend stores frontendId → NodeId, so all subsequent calls
-    // (connect, setParameter) can use the Yjs ID directly.
-    _bridge?.addNode(type, { x: position.x, y: position.y }, id).catch(() => {});
+    // Store the promise so connect() can await it if needed.
+    if (_bridge) {
+      const p = _bridge.addNode(type, { x: position.x, y: position.y }, id).catch(() => {});
+      _pendingBackendIds.set(id, p.then(() => id));
+    }
     return id;
   },
 
@@ -630,10 +645,23 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       { nodeId: toNodeId, port: toPort },
     );
     store.syncFromDocument();
-    _bridge?.connect(
-      { nodeId: fromNodeId, port: fromPort },
-      { nodeId: toNodeId, port: toPort },
-    ).catch(() => {});
+    const waitFor = [
+      _pendingBackendIds.get(fromNodeId),
+      _pendingBackendIds.get(toNodeId),
+    ].filter(Boolean);
+
+    const doConnect = () => {
+      _bridge?.connect(
+        { nodeId: fromNodeId, port: fromPort },
+        { nodeId: toNodeId, port: toPort },
+      ).catch(() => {});
+    };
+
+    if (waitFor.length > 0) {
+      Promise.all(waitFor).then(doConnect);
+    } else {
+      doConnect();
+    }
     return id;
   },
 
