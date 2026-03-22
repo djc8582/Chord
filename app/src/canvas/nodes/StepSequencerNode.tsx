@@ -86,12 +86,12 @@ function StepSequencerNodeComponent(props: NodeProps) {
             style={{
               width: stepSize,
               height: stepSize * 1.5,
-              background: isActive ? "#f97316" : "#2a2a2a",
-              border: `1.5px solid ${isCurrent ? "#3b82f6" : isActive ? "#f9731680" : "#444"}`,
-              borderRadius: 2,
+              background: isActive ? "#00ff41" : "#2a2a2a",
+              border: `1.5px solid ${isCurrent ? "#ff1493" : isActive ? "#00ff4180" : "#444"}`,
+              borderRadius: 0,
               opacity: isActive ? (isCurrent ? 1 : 0.7) : 0.3,
               transition: "opacity 0.05s, background 0.05s",
-              boxShadow: isCurrent ? "0 0 6px #3b82f6" : "none",
+              boxShadow: isCurrent ? "0 0 6px #ff1493" : "none",
             }}
           />
         );
@@ -116,17 +116,18 @@ function StepSequencerNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a1a",
-        border: `2px solid ${isSelected ? "#60a5fa" : "#333"}`,
-        borderRadius: 8,
+        background: "#1a1a2e",
+        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
+        borderRadius: 0,
         width: nodeWidth,
         height: nodeHeight,
-        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         fontSize: 11,
-        color: "#e0e0e0",
+        color: "#ffffff",
         boxShadow: isSelected
-          ? "0 0 0 2px rgba(96, 165, 250, 0.3)"
-          : "0 2px 8px rgba(0, 0, 0, 0.4)",
+          ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
+          : "4px 4px 0px #000",
+        transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
         flexDirection: "column",
@@ -135,14 +136,15 @@ function StepSequencerNodeComponent(props: NodeProps) {
       {/* Title bar */}
       <div
         style={{
-          background: "#f97316",
-          padding: "5px 10px",
-          borderRadius: "6px 6px 0 0",
-          fontWeight: 600,
-          fontSize: 10,
+          background: "#8b5cf6",
+          padding: "6px 12px",
+          borderRadius: 0,
+          borderBottom: "3px solid #000",
+          fontWeight: 800,
+          fontSize: 12,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#fff",
+          letterSpacing: "0.1em",
+          color: "#000",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -150,7 +152,7 @@ function StepSequencerNodeComponent(props: NodeProps) {
         }}
       >
         <span>{label}</span>
-        <span style={{ opacity: 0.7, fontSize: 9 }}>
+        <span style={{ opacity: 0.7, fontSize: 9, fontWeight: 700, marginLeft: 8 }}>
           {activePitch !== null ? midiToNoteName(activePitch) : "--"}
         </span>
       </div>
@@ -166,15 +168,15 @@ function StepSequencerNodeComponent(props: NodeProps) {
         </div>
       </div>
 
-      {/* Input handles (left) — use pixel values for React Flow compatibility */}
+      {/* Input handles (left) */}
       <Handle type="target" position={Position.Left} id="clock"
-        style={{ top: 75, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
+        style={{ top: 75, width: 14, height: 14, background: PORT_COLORS.audio, border: "2px solid #000", borderRadius: "50%" }} />
 
       {/* Output handles (right) */}
       <Handle type="source" position={Position.Right} id="freq"
-        style={{ top: 60, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
+        style={{ top: 60, width: 14, height: 14, background: PORT_COLORS.audio, border: "2px solid #000", borderRadius: "50%" }} />
       <Handle type="source" position={Position.Right} id="gate"
-        style={{ top: 90, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
+        style={{ top: 90, width: 14, height: 14, background: PORT_COLORS.audio, border: "2px solid #000", borderRadius: "50%" }} />
     </div>
   );
 }

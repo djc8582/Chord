@@ -466,10 +466,10 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
 // ---------------------------------------------------------------------------
 
 export const PORT_COLORS: Record<string, string> = {
-  audio: "#f97316",   // orange
-  control: "#3b82f6", // blue
-  midi: "#a855f7",    // purple
-  trigger: "#22c55e", // green
+  audio: "#ff6b6b",   // coral red
+  control: "#7c3aed", // purple
+  midi: "#f472b6",    // pink
+  trigger: "#c8ff00", // lime green
 };
 
 // ---------------------------------------------------------------------------

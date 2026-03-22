@@ -159,7 +159,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             padding: "4px 6px",
             border: "3px solid #000",
             borderRadius: 0,
-            background: "#0a0a0a",
+            background: "#fffef0",
             color: "#ffffff",
             fontSize: 14,
             fontWeight: 800,
@@ -187,7 +187,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           <div
             style={{
               fontSize: 11,
-              color: "#00ff41",
+              color: "#7c3aed",
               textTransform: "uppercase",
               letterSpacing: 1,
               marginBottom: 8,
@@ -271,7 +271,7 @@ export const Inspector: React.FC<InspectorProps> = ({
               fontWeight: 800,
               fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
               color: "#000",
-              backgroundColor: "#00ff41",
+              backgroundColor: "#c8ff00",
               border: "3px solid #000",
               borderRadius: 0,
               cursor: "pointer",
@@ -282,7 +282,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             Load Audio File
           </button>
           {loadedFileName && (
-            <div style={{ fontSize: 11, color: "#00ff41", marginTop: 4, fontWeight: 700 }}>
+            <div style={{ fontSize: 11, color: "#7c3aed", marginTop: 4, fontWeight: 700 }}>
               {loadedFileName}
             </div>
           )}
@@ -295,7 +295,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           <div
             style={{
               fontSize: 11,
-              color: "#00d4ff",
+              color: "#ff6b6b",
               textTransform: "uppercase",
               letterSpacing: 1,
               marginBottom: 8,
@@ -334,10 +334,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                         port.type === "audio"
                           ? "#ff6b00"
                           : port.type === "control"
-                            ? "#00d4ff"
+                            ? "#7c3aed"
                             : port.type === "midi"
                               ? "#a855f7"
-                              : "#00ff41",
+                              : "#34d399",
                       display: "inline-block",
                     }}
                   />
@@ -378,10 +378,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                         port.type === "audio"
                           ? "#ff6b00"
                           : port.type === "control"
-                            ? "#00d4ff"
+                            ? "#7c3aed"
                             : port.type === "midi"
                               ? "#a855f7"
-                              : "#00ff41",
+                              : "#34d399",
                       display: "inline-block",
                     }}
                   />

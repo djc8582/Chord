@@ -37,11 +37,17 @@ import "@xyflow/react/dist/style.css";
 
 import { useCanvasStore } from "./store";
 import { ChordNode } from "./ChordNode";
+import { StepSequencerNode, GravitySequencerNode, GameOfLifeNode, MarkovChainNode, PolyrhythmNode } from "./nodes";
 import { NodeSearchPalette } from "./NodeSearchPalette";
 
 // Register custom node types
 const nodeTypes: NodeTypes = {
   chordNode: ChordNode,
+  stepSequencerNode: StepSequencerNode,
+  gravitySequencerNode: GravitySequencerNode,
+  gameOfLifeNode: GameOfLifeNode,
+  markovChainNode: MarkovChainNode,
+  polyrhythmNode: PolyrhythmNode,
 };
 
 // Default viewport
@@ -49,8 +55,8 @@ const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
 
 // Minimap style
 const minimapStyle = {
-  background: "#0a0a0a",
-  maskColor: "rgba(10, 10, 10, 0.7)",
+  background: "#ede9fe",
+  maskColor: "rgba(124, 58, 237, 0.15)",
 };
 
 function CanvasInner() {
@@ -202,7 +208,7 @@ function CanvasInner() {
       style={{
         width: "100%",
         height: "100%",
-        background: "#0a0a0a",
+        background: "#ede9fe",
       }}
     >
       <ReactFlow
@@ -225,20 +231,20 @@ function CanvasInner() {
         snapGrid={[10, 10]}
         minZoom={0.1}
         maxZoom={4}
-        connectionLineStyle={{ stroke: "#00ff41", strokeWidth: 3 }}
+        connectionLineStyle={{ stroke: "#000", strokeWidth: 3 }}
         proOptions={{ hideAttribution: true }}
-        style={{ background: "#0a0a0a" }}
+        style={{ background: "#ede9fe" }}
       >
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
-          size={1}
-          color="#1a1a2e"
+          size={1.5}
+          color="#c4b5fd"
         />
         <MiniMap
           style={minimapStyle}
-          nodeColor="#1a1a2e"
-          nodeStrokeWidth={0}
+          nodeColor="#c8ff00"
+          nodeStrokeWidth={2}
           pannable
           zoomable
         />

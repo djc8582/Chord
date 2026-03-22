@@ -103,17 +103,18 @@ function MarkovChainNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a1a",
-        border: `2px solid ${isSelected ? "#60a5fa" : "#333"}`,
-        borderRadius: 8,
+        background: "#1a1a2e",
+        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
+        borderRadius: 0,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
-        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         fontSize: 11,
-        color: "#e0e0e0",
+        color: "#ffffff",
         boxShadow: isSelected
-          ? "0 0 0 2px rgba(96, 165, 250, 0.3)"
-          : "0 2px 8px rgba(0, 0, 0, 0.4)",
+          ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
+          : "4px 4px 0px #000",
+        transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
         flexDirection: "column",
@@ -122,14 +123,15 @@ function MarkovChainNodeComponent(props: NodeProps) {
       {/* Title bar */}
       <div
         style={{
-          background: "#ec4899",
-          padding: "5px 10px",
-          borderRadius: "6px 6px 0 0",
-          fontWeight: 600,
-          fontSize: 10,
+          background: "#8b5cf6",
+          padding: "6px 12px",
+          borderRadius: 0,
+          borderBottom: "3px solid #000",
+          fontWeight: 800,
+          fontSize: 12,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#fff",
+          letterSpacing: "0.1em",
+          color: "#000",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -137,7 +139,7 @@ function MarkovChainNodeComponent(props: NodeProps) {
         }}
       >
         <span>{label}</span>
-        <span style={{ opacity: 0.7, fontSize: 9 }}>
+        <span style={{ opacity: 0.7, fontSize: 9, fontWeight: 700, marginLeft: 8 }}>
           {DEGREE_LABELS[currentNote]}
         </span>
       </div>
@@ -148,9 +150,9 @@ function MarkovChainNodeComponent(props: NodeProps) {
           width={170}
           height={110}
           style={{
-            background: "#111",
-            borderRadius: 4,
-            border: "1px solid #333",
+            background: "#0a0a1a",
+            borderRadius: 0,
+            border: "2px solid #000",
           }}
         >
           {/* Transition arrows from current note to neighbors */}
@@ -166,7 +168,7 @@ function MarkovChainNodeComponent(props: NodeProps) {
                 y1={CENTER_Y}
                 x2={pos.x}
                 y2={pos.y}
-                stroke="#f9731680"
+                stroke="#ff149380"
                 strokeWidth={strokeWidth}
                 opacity={Math.min(1, opacity)}
                 strokeLinecap="round"
@@ -181,7 +183,7 @@ function MarkovChainNodeComponent(props: NodeProps) {
               y1={neighborPositions[prevNote].y}
               x2={CENTER_X}
               y2={CENTER_Y}
-              stroke="#fbbf24"
+              stroke="#ffd700"
               strokeWidth={2.5}
               opacity={0.8}
               strokeLinecap="round"
@@ -197,8 +199,8 @@ function MarkovChainNodeComponent(props: NodeProps) {
                   cx={pos.x}
                   cy={pos.y}
                   r={isCurrent ? 14 : 10}
-                  fill={isCurrent ? "#f97316" : "#2a2a2a"}
-                  stroke={isCurrent ? "#fbbf24" : "#555"}
+                  fill={isCurrent ? "#ff1493" : "#2a2a2a"}
+                  stroke={isCurrent ? "#ffd700" : "#555"}
                   strokeWidth={isCurrent ? 2 : 1}
                   opacity={isCurrent ? 1 : 0.7}
                 />
@@ -230,10 +232,10 @@ function MarkovChainNodeComponent(props: NodeProps) {
         id="clock"
         style={{
           top: 75,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />
@@ -243,10 +245,10 @@ function MarkovChainNodeComponent(props: NodeProps) {
         id="freq"
         style={{
           top: 60,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />
@@ -256,10 +258,10 @@ function MarkovChainNodeComponent(props: NodeProps) {
         id="gate"
         style={{
           top: 90,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />

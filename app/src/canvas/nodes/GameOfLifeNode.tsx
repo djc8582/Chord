@@ -107,17 +107,18 @@ function GameOfLifeNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a1a",
-        border: `2px solid ${isSelected ? "#60a5fa" : "#333"}`,
-        borderRadius: 8,
+        background: "#1a1a2e",
+        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
+        borderRadius: 0,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
-        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         fontSize: 11,
-        color: "#e0e0e0",
+        color: "#ffffff",
         boxShadow: isSelected
-          ? "0 0 0 2px rgba(96, 165, 250, 0.3)"
-          : "0 2px 8px rgba(0, 0, 0, 0.4)",
+          ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
+          : "4px 4px 0px #000",
+        transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
         flexDirection: "column",
@@ -126,14 +127,15 @@ function GameOfLifeNodeComponent(props: NodeProps) {
       {/* Title bar */}
       <div
         style={{
-          background: "#22c55e",
-          padding: "5px 10px",
-          borderRadius: "6px 6px 0 0",
-          fontWeight: 600,
-          fontSize: 10,
+          background: "#8b5cf6",
+          padding: "6px 12px",
+          borderRadius: 0,
+          borderBottom: "3px solid #000",
+          fontWeight: 800,
+          fontSize: 12,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#fff",
+          letterSpacing: "0.1em",
+          color: "#000",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -141,7 +143,7 @@ function GameOfLifeNodeComponent(props: NodeProps) {
         }}
       >
         <span>{label}</span>
-        <span style={{ opacity: 0.7, fontSize: 9 }}>
+        <span style={{ opacity: 0.7, fontSize: 9, fontWeight: 700, marginLeft: 8 }}>
           Gen {generationRef.current}
         </span>
       </div>
@@ -154,19 +156,19 @@ function GameOfLifeNodeComponent(props: NodeProps) {
             gridTemplateColumns: `repeat(${COLS}, ${cellW}px)`,
             gridTemplateRows: `repeat(${ROWS}, ${cellH}px)`,
             gap: 1,
-            background: "#111",
-            borderRadius: 3,
+            background: "#0a0a1a",
+            borderRadius: 0,
             padding: 2,
-            border: "1px solid #333",
+            border: "2px solid #000",
           }}
         >
           {grid.map((row, r) =>
             row.map((alive, c) => {
               const isPlayhead = c === playheadCol;
-              let bg = "#1a1a1a";
-              if (alive && isPlayhead) bg = "#fbbf24";
-              else if (alive) bg = "#22c55e";
-              else if (isPlayhead) bg = "#22c55e20";
+              let bg = "#1a1a2e";
+              if (alive && isPlayhead) bg = "#ffd700";
+              else if (alive) bg = "#00ff41";
+              else if (isPlayhead) bg = "#00ff4120";
 
               return (
                 <div
@@ -175,7 +177,7 @@ function GameOfLifeNodeComponent(props: NodeProps) {
                     width: cellW,
                     height: cellH,
                     background: bg,
-                    borderRadius: 1,
+                    borderRadius: 0,
                     opacity: alive ? (isPlayhead ? 1 : 0.6) : (isPlayhead ? 0.4 : 0.15),
                     transition: "background 0.06s",
                   }}
@@ -197,10 +199,10 @@ function GameOfLifeNodeComponent(props: NodeProps) {
         id="clock"
         style={{
           top: 75,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />
@@ -210,10 +212,10 @@ function GameOfLifeNodeComponent(props: NodeProps) {
         id="freq"
         style={{
           top: 60,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />
@@ -223,10 +225,10 @@ function GameOfLifeNodeComponent(props: NodeProps) {
         id="gate"
         style={{
           top: 90,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />

@@ -135,17 +135,18 @@ function GravitySequencerNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a1a",
-        border: `2px solid ${isSelected ? "#60a5fa" : "#333"}`,
-        borderRadius: 8,
+        background: "#1a1a2e",
+        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
+        borderRadius: 0,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
-        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         fontSize: 11,
-        color: "#e0e0e0",
+        color: "#ffffff",
         boxShadow: isSelected
-          ? "0 0 0 2px rgba(96, 165, 250, 0.3)"
-          : "0 2px 8px rgba(0, 0, 0, 0.4)",
+          ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
+          : "4px 4px 0px #000",
+        transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
         flexDirection: "column",
@@ -155,13 +156,14 @@ function GravitySequencerNodeComponent(props: NodeProps) {
       <div
         style={{
           background: "#8b5cf6",
-          padding: "5px 10px",
-          borderRadius: "6px 6px 0 0",
-          fontWeight: 600,
-          fontSize: 10,
+          padding: "6px 12px",
+          borderRadius: 0,
+          borderBottom: "3px solid #000",
+          fontWeight: 800,
+          fontSize: 12,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#fff",
+          letterSpacing: "0.1em",
+          color: "#000",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -173,7 +175,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
           style={{
             fontSize: 12,
             fontWeight: 700,
-            color: activeNote ? "#fbbf24" : "#ffffff80",
+            color: activeNote ? "#ffd700" : "#00000080",
             transition: "color 0.1s",
           }}
         >
@@ -187,9 +189,9 @@ function GravitySequencerNodeComponent(props: NodeProps) {
           width={FIELD_WIDTH}
           height={FIELD_HEIGHT}
           style={{
-            background: "#111",
-            borderRadius: 4,
-            border: "1px solid #333",
+            background: "#0a0a1a",
+            borderRadius: 0,
+            border: "2px solid #000",
           }}
         >
           {/* Attractors */}
@@ -201,7 +203,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
                 cy={att.y}
                 r={10}
                 fill="none"
-                stroke="#3b82f620"
+                stroke="#8b5cf620"
                 strokeWidth={1}
               />
               {/* Attractor dot */}
@@ -209,7 +211,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
                 cx={att.x}
                 cy={att.y}
                 r={4}
-                fill={att.note === activeNote ? "#fbbf24" : "#3b82f6"}
+                fill={att.note === activeNote ? "#ffd700" : "#8b5cf6"}
                 opacity={att.note === activeNote ? 1 : 0.6}
               />
               {/* Label */}
@@ -233,7 +235,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
               cx={p.x}
               cy={p.y}
               r={3}
-              fill="#f97316"
+              fill="#00ff41"
               opacity={0.9}
             >
               {/* Glow */}
@@ -253,10 +255,10 @@ function GravitySequencerNodeComponent(props: NodeProps) {
         id="clock"
         style={{
           top: 75,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />
@@ -266,10 +268,10 @@ function GravitySequencerNodeComponent(props: NodeProps) {
         id="freq"
         style={{
           top: 60,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />
@@ -279,10 +281,10 @@ function GravitySequencerNodeComponent(props: NodeProps) {
         id="gate"
         style={{
           top: 90,
-          width: 10,
-          height: 10,
+          width: 14,
+          height: 14,
           background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
+          border: "2px solid #000",
           borderRadius: "50%",
         }}
       />
