@@ -347,13 +347,17 @@ impl AudioEngine {
 
                 // Gather input buffers for this node from upstream node outputs.
                 // First, find the max input port index to size the buffer correctly.
+                // IMPORTANT: Unconnected ports get empty (zero-length) buffers so
+                // nodes can distinguish "not connected" from "connected but silent"
+                // via `ctx.inputs[port].is_empty()`.
                 let max_input_idx = routing
                     .iter()
                     .filter(|&&(_, _, to_node, _)| to_node == node_id)
                     .map(|&(_, _, _, to_port)| to_port)
                     .max();
                 let mut input_buffers: Vec<Vec<f32>> = if let Some(max_idx) = max_input_idx {
-                    vec![vec![0.0f32; buffer_size]; max_idx + 1]
+                    // Start with empty buffers — only connected ports get data.
+                    vec![Vec::new(); max_idx + 1]
                 } else {
                     Vec::new()
                 };
