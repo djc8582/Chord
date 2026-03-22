@@ -93,6 +93,43 @@ export const PARAMETER_DEFINITIONS: Record<string, ParameterDescriptor[]> = {
   noise: [
     { id: "color", label: "Color", min: 0, max: 2, step: 1, defaultValue: 0, unit: "" },
   ],
+  step_sequencer: [
+    { id: "steps", label: "Steps", min: 1, max: 32, step: 1, defaultValue: 8, unit: "" },
+    { id: "gate_length", label: "Gate Length", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+  ],
+  gravity_sequencer: [
+    { id: "gravity", label: "Gravity", min: 0.01, max: 10, step: 0.01, defaultValue: 1, unit: "" },
+    { id: "num_particles", label: "Particles", min: 1, max: 16, step: 1, defaultValue: 4, unit: "" },
+    { id: "scale", label: "Scale", min: 0, max: 11, step: 1, defaultValue: 0, unit: "" },
+  ],
+  game_of_life_sequencer: [
+    { id: "width", label: "Width", min: 4, max: 32, step: 1, defaultValue: 16, unit: "" },
+    { id: "height", label: "Height", min: 4, max: 16, step: 1, defaultValue: 8, unit: "" },
+    { id: "density", label: "Density", min: 0, max: 1, step: 0.01, defaultValue: 0.3, unit: "" },
+  ],
+  markov_sequencer: [
+    { id: "randomness", label: "Randomness", min: 0, max: 1, step: 0.01, defaultValue: 0.3, unit: "" },
+    { id: "root_note", label: "Root Note", min: 0, max: 127, step: 1, defaultValue: 60, unit: "" },
+    { id: "scale_type", label: "Scale", min: 0, max: 3, step: 1, defaultValue: 0, unit: "" },
+  ],
+  polyrhythm: [
+    { id: "pattern_a", label: "Pattern A", min: 2, max: 16, step: 1, defaultValue: 3, unit: "" },
+    { id: "pattern_b", label: "Pattern B", min: 2, max: 16, step: 1, defaultValue: 4, unit: "" },
+    { id: "pattern_c", label: "Pattern C", min: 2, max: 16, step: 1, defaultValue: 5, unit: "" },
+  ],
+  euclidean: [],
+  chorus: [],
+  phaser: [],
+  waveshaper: [],
+  ring_modulator: [],
+  pitch_shifter: [],
+  limiter: [],
+  gate: [],
+  crossfader: [],
+  sample_and_hold: [],
+  quantizer: [],
+  stereo: [],
+  dc_blocker: [],
 };
 
 // ---------------------------------------------------------------------------

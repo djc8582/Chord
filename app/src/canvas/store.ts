@@ -196,6 +196,156 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     inputs: [],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
+  // --- Sequencers ---
+  step_sequencer: {
+    type: "step_sequencer",
+    label: "Step Sequencer",
+    category: "sequencers",
+    inputs: [{ id: "clock", label: "Clock", type: "audio" }],
+    outputs: [
+      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "gate", label: "Gate", type: "audio" },
+    ],
+  },
+  gravity_sequencer: {
+    type: "gravity_sequencer",
+    label: "Gravity Sequencer",
+    category: "sequencers",
+    inputs: [{ id: "clock", label: "Clock", type: "audio" }],
+    outputs: [
+      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "gate", label: "Gate", type: "audio" },
+    ],
+  },
+  game_of_life_sequencer: {
+    type: "game_of_life_sequencer",
+    label: "Game of Life",
+    category: "sequencers",
+    inputs: [{ id: "clock", label: "Clock", type: "audio" }],
+    outputs: [
+      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "gate", label: "Gate", type: "audio" },
+    ],
+  },
+  markov_sequencer: {
+    type: "markov_sequencer",
+    label: "Markov Chain",
+    category: "sequencers",
+    inputs: [{ id: "clock", label: "Clock", type: "audio" }],
+    outputs: [
+      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "gate", label: "Gate", type: "audio" },
+    ],
+  },
+  polyrhythm: {
+    type: "polyrhythm",
+    label: "Polyrhythm",
+    category: "sequencers",
+    inputs: [{ id: "clock", label: "Clock", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  euclidean: {
+    type: "euclidean",
+    label: "Euclidean",
+    category: "sequencers",
+    inputs: [{ id: "clock", label: "Clock", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  // --- Additional effects ---
+  chorus: {
+    type: "chorus",
+    label: "Chorus",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  phaser: {
+    type: "phaser",
+    label: "Phaser",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  waveshaper: {
+    type: "waveshaper",
+    label: "Waveshaper",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  ring_modulator: {
+    type: "ring_modulator",
+    label: "Ring Mod",
+    category: "effects",
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "mod", label: "Mod", type: "audio" },
+    ],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  pitch_shifter: {
+    type: "pitch_shifter",
+    label: "Pitch Shifter",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  limiter: {
+    type: "limiter",
+    label: "Limiter",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  gate: {
+    type: "gate",
+    label: "Gate",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  crossfader: {
+    type: "crossfader",
+    label: "Crossfader",
+    category: "utilities",
+    inputs: [
+      { id: "a", label: "A", type: "audio" },
+      { id: "b", label: "B", type: "audio" },
+    ],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  // --- Utility ---
+  sample_and_hold: {
+    type: "sample_and_hold",
+    label: "S&H",
+    category: "utilities",
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "trigger", label: "Trig", type: "audio" },
+    ],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  quantizer: {
+    type: "quantizer",
+    label: "Quantizer",
+    category: "utilities",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  stereo: {
+    type: "stereo",
+    label: "Stereo",
+    category: "utilities",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  dc_blocker: {
+    type: "dc_blocker",
+    label: "DC Blocker",
+    category: "utilities",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
 };
 
 // ---------------------------------------------------------------------------
