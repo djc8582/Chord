@@ -243,7 +243,11 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     label: "Polyrhythm",
     category: "sequencers",
     inputs: [{ id: "clock", label: "Clock", type: "audio" }],
-    outputs: [{ id: "out", label: "Out", type: "audio" }],
+    outputs: [
+      { id: "a", label: "A", type: "audio" },
+      { id: "b", label: "B", type: "audio" },
+      { id: "c", label: "C", type: "audio" },
+    ],
   },
   euclidean: {
     type: "euclidean",

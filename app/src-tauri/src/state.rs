@@ -262,7 +262,9 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "polyrhythm" => NodeDescriptor::new("polyrhythm")
             .with_input(PortDescriptor::new("clock", PortDataType::Audio))
-            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_output(PortDescriptor::new("a", PortDataType::Audio))
+            .with_output(PortDescriptor::new("b", PortDataType::Audio))
+            .with_output(PortDescriptor::new("c", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("pattern_a", "Pattern A", 3.0, 2.0, 16.0))
             .with_parameter(ParameterDescriptor::new("pattern_b", "Pattern B", 4.0, 2.0, 16.0))
             .with_parameter(ParameterDescriptor::new("pattern_c", "Pattern C", 5.0, 2.0, 16.0)),

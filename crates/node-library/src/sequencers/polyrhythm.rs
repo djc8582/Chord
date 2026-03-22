@@ -19,20 +19,22 @@ use chord_dsp_runtime::{AudioNode, ProcessContext, ProcessResult, ProcessStatus}
 /// - `[0]` clock input: rising edge advances all pattern counters.
 ///
 /// ## Outputs
-/// - `[0]` combined trigger output: 1.0 when any pattern fires, 0.0 otherwise.
+/// - `[0]` pattern A trigger
+/// - `[1]` pattern B trigger
+/// - `[2]` pattern C trigger
 pub struct PolyrhythmEngine {
-    /// Clock counter for pattern A.
-    counter_a: u32,
-    /// Clock counter for pattern B.
-    counter_b: u32,
-    /// Clock counter for pattern C.
-    counter_c: u32,
+    /// Shared clock counter (all patterns advance together).
+    counter: u32,
     /// Whether the clock was high on the previous sample (for edge detection).
     clock_was_high: bool,
-    /// Current trigger output value.
-    trigger_value: f32,
-    /// Samples since last trigger (for trigger pulse timing).
-    samples_since_trigger: u64,
+    /// Current trigger values for each pattern.
+    trigger_a: f32,
+    trigger_b: f32,
+    trigger_c: f32,
+    /// Samples since last trigger for each pattern.
+    since_a: u64,
+    since_b: u64,
+    since_c: u64,
     /// Trigger pulse duration in samples.
     trigger_duration: u64,
 }
@@ -40,12 +42,14 @@ pub struct PolyrhythmEngine {
 impl PolyrhythmEngine {
     pub fn new() -> Self {
         Self {
-            counter_a: 0,
-            counter_b: 0,
-            counter_c: 0,
+            counter: 0,
             clock_was_high: false,
-            trigger_value: 0.0,
-            samples_since_trigger: 0,
+            trigger_a: 0.0,
+            trigger_b: 0.0,
+            trigger_c: 0.0,
+            since_a: u64::MAX,
+            since_b: u64::MAX,
+            since_c: u64::MAX,
             trigger_duration: 4800,
         }
     }
@@ -68,66 +72,75 @@ impl AudioNode for PolyrhythmEngine {
         }
 
         let has_clock = !ctx.inputs.is_empty();
-        let output = &mut ctx.outputs[0];
+        let has_out_b = ctx.outputs.len() > 1;
+        let has_out_c = ctx.outputs.len() > 2;
 
         for i in 0..ctx.buffer_size {
             let clock = if has_clock { ctx.inputs[0][i] > 0.5 } else { false };
 
-            // Detect rising edge of clock.
             if clock && !self.clock_was_high {
-                // Check if any pattern fires on this clock tick.
-                let fires_a = self.counter_a % pattern_a == 0;
-                let fires_b = self.counter_b % pattern_b == 0;
-                let fires_c = self.counter_c % pattern_c == 0;
-
-                if fires_a || fires_b || fires_c {
-                    self.trigger_value = 1.0;
-                    self.samples_since_trigger = 0;
-                    self.trigger_duration = (ctx.sample_rate * 0.05) as u64; // 50ms pulse
-                    if self.trigger_duration == 0 {
-                        self.trigger_duration = 1;
-                    }
+                self.trigger_duration = (ctx.sample_rate * 0.05) as u64;
+                if self.trigger_duration == 0 {
+                    self.trigger_duration = 1;
                 }
 
-                // Advance all counters.
-                self.counter_a = self.counter_a.wrapping_add(1);
-                self.counter_b = self.counter_b.wrapping_add(1);
-                self.counter_c = self.counter_c.wrapping_add(1);
+                // Each pattern fires independently.
+                if self.counter % pattern_a == 0 {
+                    self.trigger_a = 1.0;
+                    self.since_a = 0;
+                }
+                if self.counter % pattern_b == 0 {
+                    self.trigger_b = 1.0;
+                    self.since_b = 0;
+                }
+                if self.counter % pattern_c == 0 {
+                    self.trigger_c = 1.0;
+                    self.since_c = 0;
+                }
 
-                // Wrap counters at LCM-scale values to avoid u32 overflow over very long runs.
-                // Using a large common wrap point that is a multiple of all possible pattern values.
-                // LCM(2..16) = 720720, so we wrap there.
-                const WRAP_POINT: u32 = 720720;
-                if self.counter_a >= WRAP_POINT {
-                    self.counter_a -= WRAP_POINT;
-                }
-                if self.counter_b >= WRAP_POINT {
-                    self.counter_b -= WRAP_POINT;
-                }
-                if self.counter_c >= WRAP_POINT {
-                    self.counter_c -= WRAP_POINT;
+                self.counter = self.counter.wrapping_add(1);
+                const WRAP: u32 = 720720;
+                if self.counter >= WRAP {
+                    self.counter -= WRAP;
                 }
             }
             self.clock_was_high = clock;
 
-            // End the trigger pulse after duration.
-            if self.samples_since_trigger >= self.trigger_duration {
-                self.trigger_value = 0.0;
+            // End trigger pulses after duration.
+            if self.since_a >= self.trigger_duration {
+                self.trigger_a = 0.0;
+            }
+            if self.since_b >= self.trigger_duration {
+                self.trigger_b = 0.0;
+            }
+            if self.since_c >= self.trigger_duration {
+                self.trigger_c = 0.0;
             }
 
-            output[i] = self.trigger_value;
-            self.samples_since_trigger += 1;
+            ctx.outputs[0][i] = self.trigger_a;
+            if has_out_b {
+                ctx.outputs[1][i] = self.trigger_b;
+            }
+            if has_out_c {
+                ctx.outputs[2][i] = self.trigger_c;
+            }
+
+            self.since_a = self.since_a.saturating_add(1);
+            self.since_b = self.since_b.saturating_add(1);
+            self.since_c = self.since_c.saturating_add(1);
         }
 
         Ok(ProcessStatus::Ok)
     }
 
     fn reset(&mut self) {
-        self.counter_a = 0;
-        self.counter_b = 0;
-        self.counter_c = 0;
+        self.counter = 0;
         self.clock_was_high = false;
-        self.trigger_value = 0.0;
-        self.samples_since_trigger = 0;
+        self.trigger_a = 0.0;
+        self.trigger_b = 0.0;
+        self.trigger_c = 0.0;
+        self.since_a = u64::MAX;
+        self.since_b = u64::MAX;
+        self.since_c = u64::MAX;
     }
 }

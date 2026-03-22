@@ -220,19 +220,12 @@ function PolyrhythmNodeComponent(props: NodeProps) {
           borderRadius: "50%",
         }}
       />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="out"
-        style={{
-          top: 75,
-          width: 10,
-          height: 10,
-          background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
-          borderRadius: "50%",
-        }}
-      />
+      <Handle type="source" position={Position.Right} id="a"
+        style={{ top: 50, width: 10, height: 10, background: "#f97316", border: "2px solid #0f172a", borderRadius: "50%" }} />
+      <Handle type="source" position={Position.Right} id="b"
+        style={{ top: 75, width: 10, height: 10, background: "#3b82f6", border: "2px solid #0f172a", borderRadius: "50%" }} />
+      <Handle type="source" position={Position.Right} id="c"
+        style={{ top: 100, width: 10, height: 10, background: "#22c55e", border: "2px solid #0f172a", borderRadius: "50%" }} />
     </div>
   );
 }
