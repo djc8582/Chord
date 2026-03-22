@@ -428,6 +428,8 @@ export function connectionDataToFlowEdge(data: ConnectionData): Edge {
     targetHandle: data.toPort,
     type: "smoothstep",
     animated: true,
+    selectable: true,
+    interactionWidth: 20,
     style: { stroke: strokeColor, strokeWidth: 2 },
   };
 }

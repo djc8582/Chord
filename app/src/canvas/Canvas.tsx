@@ -139,10 +139,16 @@ function CanvasInner() {
         return;
       }
 
-      // Delete/Backspace — remove selected
+      // Delete/Backspace — remove selected nodes AND edges
       if (e.key === "Delete" || e.key === "Backspace") {
         if (!searchOpen) {
           e.preventDefault();
+          // Remove selected edges first
+          const selectedEdges = useCanvasStore.getState().edges.filter((e) => e.selected);
+          for (const edge of selectedEdges) {
+            useCanvasStore.getState().disconnectEdge(edge.id);
+          }
+          // Then remove selected nodes
           removeSelectedNodes();
         }
         return;
@@ -233,6 +239,8 @@ function CanvasInner() {
         selectNodesOnDrag={false}
         multiSelectionKeyCode="Meta"
         deleteKeyCode={null} // We handle delete ourselves
+        edgesFocusable
+        edgesReconnectable
         snapToGrid
         snapGrid={[10, 10]}
         minZoom={0.1}
