@@ -13,6 +13,7 @@ mod phaser;
 mod pitch_shifter;
 mod reverb;
 mod ring_modulator;
+mod spectral;
 mod vocoder;
 mod waveshaper;
 
@@ -29,5 +30,6 @@ pub use phaser::Phaser;
 pub use pitch_shifter::PitchShifter;
 pub use reverb::ReverbNode;
 pub use ring_modulator::RingModulator;
+pub use spectral::SpectralNode;
 pub use vocoder::Vocoder;
 pub use waveshaper::{Waveshaper, WaveshaperMode};

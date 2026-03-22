@@ -11,7 +11,7 @@ use chord_scripting_runtime::ExpressionNode;
 use crate::control::{AdsrEnvelope, Lfo, NoteToFreq, QuantizerNode, SampleAndHoldNode};
 use crate::effects::{
     BiquadFilter, Chorus, CompressorNode, ConvolutionReverb, CrossFader, DelayNode, EqNode, Gate,
-    Limiter, Phaser, PitchShifter, ReverbNode, RingModulator, Vocoder, Waveshaper,
+    Limiter, Phaser, PitchShifter, ReverbNode, RingModulator, SpectralNode, Vocoder, Waveshaper,
 };
 use crate::midi::MidiToFreq;
 use crate::sequencers::{
@@ -141,6 +141,7 @@ impl NodeRegistry {
         self.register("stereo", || Box::new(Stereo::new()));
         self.register("dc_blocker", || Box::new(DCBlocker::new()));
         self.register("convolution_reverb", || Box::new(ConvolutionReverb::new()));
+        self.register("spectral", || Box::new(SpectralNode::new()));
     }
 
     /// Create a node instance by type name.
