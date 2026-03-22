@@ -131,8 +131,8 @@ impl AudioNode for SnareDrum {
             let snap_burst = white * self.snap_env * snap;
             self.snap_env *= 0.92;
 
-            // Apply overall amplitude envelope.
-            let out = (body + snap_burst) * self.amp_env;
+            // Apply overall amplitude envelope with output boost.
+            let out = (body + snap_burst) * self.amp_env * 4.0;
             self.amp_env *= 1.0 - amp_decay_rate;
 
             output[i] = out.clamp(-1.0, 1.0);

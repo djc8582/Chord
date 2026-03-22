@@ -157,8 +157,8 @@ impl AudioNode for Clap {
             self.bp_hp_state = hp_lp;
             let filtered = hp_in - hp_lp;
 
-            // Mix filtered and raw based on tone parameter.
-            let out = (filtered * tone + raw * (1.0 - tone) * 0.5) * self.amp_env;
+            // Mix filtered and raw based on tone parameter, with output boost.
+            let out = (filtered * tone + raw * (1.0 - tone) * 0.5) * self.amp_env * 8.0;
             self.amp_env *= 1.0 - amp_decay_rate;
 
             output[i] = out.clamp(-1.0, 1.0);

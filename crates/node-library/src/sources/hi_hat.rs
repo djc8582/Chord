@@ -127,8 +127,8 @@ impl AudioNode for HiHat {
             self.bp_hp_state = hp_lp;
             let bp_out = hp_in - hp_lp;
 
-            // Apply amplitude envelope.
-            let out = bp_out * self.amp_env;
+            // Apply amplitude envelope with output boost.
+            let out = bp_out * self.amp_env * 6.0;
             self.amp_env *= 1.0 - amp_decay_rate;
 
             output[i] = out.clamp(-1.0, 1.0);
