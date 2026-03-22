@@ -95,6 +95,7 @@ export const PianoRollPanel: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const sequencerRafRef = useRef<number>(0);
   const [size, setSize] = useState({ width: 900, height: 400 });
 
   // Responsive sizing via ResizeObserver
@@ -163,8 +164,72 @@ export const PianoRollPanel: React.FC = () => {
     };
   }, [shellIsPlaying, shellTempo, setPlayheadBeat]);
 
-  // Key preview callback — plays Web Audio preview AND sends MIDI to backend
+  // ── SEQUENCER: Trigger MIDI notes when playhead crosses note start/end ──
   const bridge = useBridge();
+  const activeNotesRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (!shellIsPlaying) {
+      // Stop all active notes when playback stops
+      for (const pitch of activeNotesRef.current) {
+        bridge.sendMidiNoteOff(pitch).catch(() => {});
+      }
+      activeNotesRef.current.clear();
+      return;
+    }
+
+    let prevBeat = usePianoRollStore.getState().playheadBeat;
+
+    const sequencerTick = () => {
+      const store = usePianoRollStore.getState();
+      const currentBeat = store.playheadBeat;
+      const notes = store.notes;
+
+      // Loop length: find the furthest note end, default 4 bars (16 beats)
+      const loopEnd = notes.length > 0
+        ? Math.max(...notes.map(n => n.start + n.duration), 16)
+        : 16;
+
+      // Wrap playhead for looping
+      const wrappedBeat = currentBeat % loopEnd;
+      const wrappedPrev = prevBeat % loopEnd;
+
+      for (const note of notes) {
+        const noteEnd = note.start + note.duration;
+
+        // Check note-on: playhead crossed the note start
+        const crossedStart = wrappedPrev < note.start && wrappedBeat >= note.start;
+        // Also trigger on loop wrap
+        const loopCrossed = wrappedBeat < wrappedPrev && note.start < wrappedBeat;
+
+        if (crossedStart || loopCrossed) {
+          if (!activeNotesRef.current.has(note.pitch)) {
+            bridge.sendMidiNoteOn(note.pitch, note.velocity).catch(() => {});
+            activeNotesRef.current.add(note.pitch);
+          }
+        }
+
+        // Check note-off: playhead crossed the note end
+        const crossedEnd = wrappedPrev < noteEnd && wrappedBeat >= noteEnd;
+        if (crossedEnd || (loopCrossed && noteEnd <= wrappedBeat)) {
+          if (activeNotesRef.current.has(note.pitch)) {
+            bridge.sendMidiNoteOff(note.pitch).catch(() => {});
+            activeNotesRef.current.delete(note.pitch);
+          }
+        }
+      }
+
+      prevBeat = currentBeat;
+      sequencerRafRef.current = requestAnimationFrame(sequencerTick);
+    };
+
+    sequencerRafRef.current = requestAnimationFrame(sequencerTick);
+    return () => {
+      if (sequencerRafRef.current) cancelAnimationFrame(sequencerRafRef.current);
+    };
+  }, [shellIsPlaying, bridge]);
+
+  // Key preview callback — plays Web Audio preview AND sends MIDI to backend
   const handleKeyClick = useCallback((pitch: number) => {
     playPreviewNote(pitch);
     // Send MIDI note-on to the backend engine so synth nodes hear it
