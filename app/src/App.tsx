@@ -11,7 +11,8 @@ import { Shell } from "./shell/index.js";
 import { Canvas, useCanvasStore, setCanvasBridge } from "./canvas/index.js";
 import { Inspector, setInspectorBridge } from "./inspector/index.js";
 import { Browser } from "./browser/index.js";
-import { Timeline } from "./timeline/index.js";
+import { Timeline, setTimelineBridge } from "./timeline/index.js";
+import { setVisualizerBridge } from "./visualizer/index.js";
 import { createPatchDocument } from "@chord/document-model";
 import { useBridge } from "./bridge/index.js";
 
@@ -27,9 +28,11 @@ function App() {
     const doc = createPatchDocument();
     useCanvasStore.getState().initDocument(doc);
 
-    // Give the canvas and inspector access to the bridge for backend sync
+    // Give the canvas, inspector, timeline, and visualizer access to the bridge for backend sync
     setCanvasBridge(bridge);
     setInspectorBridge(bridge);
+    setTimelineBridge(bridge);
+    setVisualizerBridge(bridge);
   }, [bridge]);
 
   return (

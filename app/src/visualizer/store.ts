@@ -6,6 +6,7 @@
  */
 
 import { create } from "zustand";
+import type { BridgeCommands } from "../bridge/types.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -258,3 +259,42 @@ export const useVisualizerStore = create<VisualizerStore>((set) => ({
       settings: { ...DEFAULT_SETTINGS, colorScheme: { ...DEFAULT_COLOR_SCHEME } },
     }),
 }));
+
+// ---------------------------------------------------------------------------
+// Bridge for Tauri backend sync
+// ---------------------------------------------------------------------------
+let _bridge: BridgeCommands | null = null;
+
+/** Provide a bridge instance for the visualizer to poll signal stats. */
+export function setVisualizerBridge(b: BridgeCommands) {
+  _bridge = b;
+}
+
+/**
+ * Poll signal stats for the current target node and update the store.
+ *
+ * Calls `bridge.getSignalStats(nodeId, port)` and feeds the peak/rms data
+ * into the waveform buffer as a simple two-element array. This is not real
+ * waveform data — it just keeps the peak/rms stats up to date.
+ *
+ * Can be called on an interval (e.g. requestAnimationFrame or setInterval)
+ * from a component. Accepts an optional bridge override for testing.
+ */
+export async function pollSignalStats(bridgeOverride?: BridgeCommands): Promise<void> {
+  const b = bridgeOverride ?? _bridge;
+  if (!b) return;
+
+  const state = useVisualizerStore.getState();
+  const { targetNodeId, targetPort, frozen } = state;
+  if (!targetNodeId || frozen) return;
+
+  try {
+    const stats = await b.getSignalStats(targetNodeId, targetPort);
+    // Feed peak and rms into the waveform buffer as a lightweight update.
+    useVisualizerStore.getState().setWaveformData(
+      new Float64Array([stats.peak, stats.rms]),
+    );
+  } catch {
+    // Silently ignore — node may not exist yet or engine may be stopped.
+  }
+}

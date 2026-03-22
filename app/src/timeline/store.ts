@@ -28,6 +28,17 @@ import {
   DEFAULT_ZOOM,
   DEFAULT_TEMPO,
 } from "./types.js";
+import type { BridgeCommands } from "../bridge/types.js";
+
+// ---------------------------------------------------------------------------
+// Bridge for Tauri backend sync
+// ---------------------------------------------------------------------------
+let _bridge: BridgeCommands | null = null;
+
+/** Set the bridge so timeline transport actions also notify the Rust backend. */
+export function setTimelineBridge(b: BridgeCommands) {
+  _bridge = b;
+}
 
 // ---------------------------------------------------------------------------
 // ID generation (matches document-model pattern)
@@ -182,11 +193,36 @@ export const useTimelineStore = create<TimelineStore>((set, get) => ({
   // --- Transport actions ---
   setPlayheadBeat: (beat) => set({ playheadBeat: Math.max(0, beat) }),
 
-  setIsPlaying: (playing) => set({ isPlaying: playing }),
+  setIsPlaying: (playing) => {
+    set({ isPlaying: playing });
+    if (_bridge) {
+      if (playing) {
+        _bridge.play().catch(console.error);
+      } else {
+        _bridge.stop().catch(console.error);
+      }
+    }
+  },
 
-  setTempo: (bpm) => set({ tempo: Math.max(1, Math.min(999, bpm)) }),
+  setTempo: (bpm) => {
+    const clamped = Math.max(1, Math.min(999, bpm));
+    set({ tempo: clamped });
+    if (_bridge) {
+      _bridge.setTempo(clamped).catch(console.error);
+    }
+  },
 
-  togglePlayback: () => set((state) => ({ isPlaying: !state.isPlaying })),
+  togglePlayback: () => {
+    const playing = !get().isPlaying;
+    set({ isPlaying: playing });
+    if (_bridge) {
+      if (playing) {
+        _bridge.play().catch(console.error);
+      } else {
+        _bridge.stop().catch(console.error);
+      }
+    }
+  },
 
   // --- Zoom & scroll actions ---
   setZoom: (zoom) => {

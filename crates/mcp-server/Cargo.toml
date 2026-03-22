@@ -3,6 +3,10 @@ name = "chord-mcp-server"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "chord-mcp-server"
+path = "src/main.rs"
+
 [dependencies]
 chord-audio-graph = { path = "../audio-graph" }
 chord-node-library = { path = "../node-library" }

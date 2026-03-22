@@ -8,6 +8,7 @@ export { LaneComponent } from "./Lane.js";
 export { ClipComponent } from "./Clip.js";
 export {
   useTimelineStore,
+  setTimelineBridge,
   snapToGrid,
   beatToPixel,
   pixelToBeat,

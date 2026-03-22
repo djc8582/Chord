@@ -14,7 +14,7 @@ export type { WaveformProps } from "./Waveform.js";
 export { Spectrum } from "./Spectrum.js";
 export type { SpectrumProps } from "./Spectrum.js";
 
-export { useVisualizerStore } from "./store.js";
+export { useVisualizerStore, setVisualizerBridge, pollSignalStats } from "./store.js";
 export type {
   VisualizerStore,
   VisualizerMode,
