@@ -59,6 +59,7 @@ export interface BridgeCommands {
   // Audio engine
   getSignalStats(nodeId: NodeId, port: PortId): Promise<SignalStats>;
   runDiagnostics(): Promise<DiagnosticReport>;
+  getWaveformData(): Promise<number[]>;
 
   // State
   loadPatch(path: string): Promise<void>;

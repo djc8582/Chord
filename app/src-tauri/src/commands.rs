@@ -416,6 +416,13 @@ pub fn run_diagnostics(state: State<'_, AppArc>) -> Result<DiagnosticReport, Str
     })
 }
 
+/// Get the last output buffer for the visualizer.
+#[tauri::command]
+pub fn get_waveform_data(state: State<'_, AppArc>) -> Result<Vec<f32>, String> {
+    let engine = state.engine.lock().map_err(|e| e.to_string())?;
+    Ok(engine.get_last_output_buffer())
+}
+
 // ---------------------------------------------------------------------------
 // Tauri Commands — File / State
 // ---------------------------------------------------------------------------

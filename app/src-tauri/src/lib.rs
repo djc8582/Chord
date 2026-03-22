@@ -29,6 +29,7 @@ pub fn run() {
             // Audio engine / diagnostics
             commands::get_signal_stats,
             commands::run_diagnostics,
+            commands::get_waveform_data,
             // File / state
             commands::load_patch,
             commands::save_patch,

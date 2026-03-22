@@ -78,6 +78,10 @@ export const bridge: BridgeCommands = {
     return tauriInvoke<DiagnosticReport>("run_diagnostics");
   },
 
+  getWaveformData(): Promise<number[]> {
+    return tauriInvoke<number[]>("get_waveform_data");
+  },
+
   // -- State ----------------------------------------------------------------
   loadPatch(path: string): Promise<void> {
     return tauriInvoke<void>("load_patch", { path });

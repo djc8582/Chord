@@ -95,6 +95,9 @@ pub struct AudioEngine {
     midi_output_buf: Vec<MidiMessage>,
     /// Pre-allocated single-channel AudioBuffer for diagnostics.
     diagnostic_buffer: AudioBuffer,
+    /// Snapshot of the last output buffer (for visualizer). Updated via try_lock
+    /// on the audio thread so it never blocks.
+    last_output_buffer: Arc<std::sync::Mutex<Vec<f32>>>,
     /// Number of worker threads.
     _worker_threads: usize,
 }
@@ -124,6 +127,7 @@ impl AudioEngine {
             diagnostic_probe: None,
             midi_output_buf: Vec::with_capacity(256),
             diagnostic_buffer: AudioBuffer::new(1, buffer_size),
+            last_output_buffer: Arc::new(std::sync::Mutex::new(Vec::new())),
             _worker_threads: config.worker_threads,
         }
     }
@@ -131,6 +135,11 @@ impl AudioEngine {
     /// Get the sample rate.
     pub fn sample_rate(&self) -> f64 {
         self.sample_rate
+    }
+
+    /// Get a copy of the last output buffer (for visualizer display).
+    pub fn get_last_output_buffer(&self) -> Vec<f32> {
+        self.last_output_buffer.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// Get the buffer size.
@@ -428,13 +437,21 @@ impl AudioEngine {
                     }
                 }
 
-                // If this is the last node, copy its output to the engine output.
+                // If this is the last node, copy its output to the engine output
+                // and snapshot it for the visualizer.
                 if execution_order.last() == Some(&node_id) {
                     let num_ch = output.num_channels().min(output_data.len());
                     for (ch_idx, src) in output_data.iter().enumerate().take(num_ch) {
                         let out_ch = output.channel_mut(ch_idx);
                         let copy_len = out_ch.len().min(src.len());
                         out_ch[..copy_len].copy_from_slice(&src[..copy_len]);
+                    }
+                    // Snapshot first channel for the visualizer (non-blocking).
+                    if let Some(first_ch) = output_data.first() {
+                        if let Ok(mut buf) = self.last_output_buffer.try_lock() {
+                            buf.clear();
+                            buf.extend_from_slice(first_ch);
+                        }
                     }
                 }
 
