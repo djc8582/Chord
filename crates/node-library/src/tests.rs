@@ -2205,11 +2205,11 @@ fn test_registry_wave3_nodes() {
 fn test_registry_with_all() {
     let registry = NodeRegistry::with_all();
 
-    // Wave 1: 8, Wave 2: 4, Wave 3: 4, Wave 4: 5, Wave 5: 5 = 26 total.
+    // Wave 1: 8, Wave 2: 4, Wave 3: 9, Wave 4: 5, Wave 5: 5 = 31 total.
     assert_eq!(
         registry.len(),
-        26,
-        "with_all() should register 26 nodes, got {}",
+        31,
+        "with_all() should register 31 nodes, got {}",
         registry.len()
     );
 
@@ -2217,6 +2217,7 @@ fn test_registry_with_all() {
         "oscillator", "filter", "gain", "envelope", "lfo", "mixer", "output", "midi_to_freq",
         "delay", "reverb", "compressor", "eq",
         "euclidean", "noise", "sample_and_hold", "quantizer",
+        "step_sequencer", "gravity_sequencer", "game_of_life_sequencer", "markov_sequencer", "polyrhythm",
         "crossfader", "waveshaper", "ring_modulator", "chorus", "phaser",
         "pitch_shifter", "limiter", "gate", "stereo", "dc_blocker",
     ];

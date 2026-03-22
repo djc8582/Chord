@@ -13,7 +13,10 @@ use crate::effects::{
     PitchShifter, ReverbNode, RingModulator, Waveshaper,
 };
 use crate::midi::MidiToFreq;
-use crate::sequencers::EuclideanNode;
+use crate::sequencers::{
+    EuclideanNode, GameOfLifeSequencer, GravitySequencer, MarkovSequencer, PolyrhythmEngine,
+    StepSequencer,
+};
 use crate::sources::{NoiseNode, Oscillator};
 use crate::utility::{DCBlocker, GainNode, MixerNode, OutputNode, Stereo};
 
@@ -109,6 +112,11 @@ impl NodeRegistry {
         self.register("noise", || Box::new(NoiseNode::new()));
         self.register("sample_and_hold", || Box::new(SampleAndHoldNode::new()));
         self.register("quantizer", || Box::new(QuantizerNode::new()));
+        self.register("step_sequencer", || Box::new(StepSequencer::new()));
+        self.register("gravity_sequencer", || Box::new(GravitySequencer::new()));
+        self.register("game_of_life_sequencer", || Box::new(GameOfLifeSequencer::new()));
+        self.register("markov_sequencer", || Box::new(MarkovSequencer::new()));
+        self.register("polyrhythm", || Box::new(PolyrhythmEngine::new()));
     }
 
     /// Register all Wave 4 (advanced modulation & routing) nodes.
