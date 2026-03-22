@@ -56,6 +56,10 @@ export interface PianoRollStore {
   // --- Tool ---
   tool: Tool;
 
+  // --- Playhead ---
+  playheadBeat: number;
+  isPlaying: boolean;
+
   // --- Note CRUD ---
   addNote: (note: Omit<Note, "id">) => string;
   removeNote: (noteId: string) => void;
@@ -101,6 +105,10 @@ export interface PianoRollStore {
   // --- Tool ---
   setTool: (tool: Tool) => void;
 
+  // --- Playhead ---
+  setPlayheadBeat: (beat: number) => void;
+  setIsPlaying: (playing: boolean) => void;
+
   // --- Bulk ---
   setNotes: (notes: Note[]) => void;
   clear: () => void;
@@ -123,6 +131,8 @@ export const usePianoRollStore = create<PianoRollStore>((set, get) => ({
   snapValue: "1/4" as SnapValue,
   velocityEditMode: false,
   tool: "select" as Tool,
+  playheadBeat: 0,
+  isPlaying: false,
 
   // --- Note CRUD ---
 
@@ -369,6 +379,11 @@ export const usePianoRollStore = create<PianoRollStore>((set, get) => ({
   // --- Tool ---
 
   setTool: (tool) => set({ tool }),
+
+  // --- Playhead ---
+
+  setPlayheadBeat: (beat) => set({ playheadBeat: Math.max(0, beat) }),
+  setIsPlaying: (playing) => set({ isPlaying: playing }),
 
   // --- Bulk ---
 

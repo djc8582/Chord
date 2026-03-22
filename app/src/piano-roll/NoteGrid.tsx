@@ -41,6 +41,7 @@ export const NoteGrid: React.FC<NoteGridProps> = React.memo(
     const tool = usePianoRollStore((s) => s.tool);
     const snapEnabled = usePianoRollStore((s) => s.snapEnabled);
     const snapValue = usePianoRollStore((s) => s.snapValue);
+    const playheadBeat = usePianoRollStore((s) => s.playheadBeat);
 
     const addNote = usePianoRollStore((s) => s.addNote);
     const removeNote = usePianoRollStore((s) => s.removeNote);
@@ -412,6 +413,22 @@ export const NoteGrid: React.FC<NoteGridProps> = React.memo(
             }}
           />
         )}
+
+        {/* Playhead line */}
+        <div
+          data-testid="piano-roll-playhead"
+          style={{
+            position: "absolute",
+            left: beatToX(playheadBeat),
+            top: 0,
+            width: 2,
+            height: "100%",
+            backgroundColor: "#f43f5e",
+            pointerEvents: "none",
+            zIndex: 15,
+            boxShadow: "0 0 4px rgba(244, 63, 94, 0.5)",
+          }}
+        />
       </div>
     );
   },

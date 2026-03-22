@@ -443,6 +443,7 @@ dependencies = [
  "chord-audio-graph",
  "chord-dsp-runtime",
  "chord-midi-engine",
+ "chord-scripting-runtime",
  "chord-testing-framework",
 ]
 
@@ -458,6 +459,9 @@ dependencies = [
 [[package]]
 name = "chord-scripting-runtime"
 version = "0.1.0"
+dependencies = [
+ "chord-dsp-runtime",
+]
 
 [[package]]
 name = "chord-testing-framework"

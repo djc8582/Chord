@@ -8,6 +8,9 @@
 export { PianoRoll } from "./PianoRoll";
 export type { PianoRollProps } from "./PianoRoll";
 
+// Shell-integrated panel wrapper
+export { PianoRollPanel } from "./PianoRollPanel";
+
 // Sub-components
 export { PianoKeyboard } from "./PianoKeyboard";
 export type { PianoKeyboardProps } from "./PianoKeyboard";

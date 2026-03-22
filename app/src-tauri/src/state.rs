@@ -217,6 +217,16 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
                     .with_unit("dB"),
             ),
 
+        "expression" => NodeDescriptor::new("expression")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("freq", "Frequency", 440.0, 0.1, 20000.0).with_unit("Hz"),
+            )
+            .with_parameter(ParameterDescriptor::new("param1", "Param 1", 0.5, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("param2", "Param 2", 0.5, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("preset", "Preset", 0.0, 0.0, 7.0)),
+
         "note_to_freq" => NodeDescriptor::new("note_to_freq")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
             .with_output(PortDescriptor::new("freq", PortDataType::Audio))

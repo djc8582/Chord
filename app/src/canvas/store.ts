@@ -344,6 +344,13 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     inputs: [{ id: "in", label: "In", type: "audio" }],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
+  expression: {
+    type: "expression",
+    label: "Expression",
+    category: "generators",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
   note_to_freq: {
     type: "note_to_freq",
     label: "Note→Freq",
