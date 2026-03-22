@@ -95,20 +95,26 @@ pub fn add_node(
         .create(&node_type)
         .ok_or_else(|| format!("Unknown node type: {node_type}"))?;
 
-    // 4. Store the instance for later registration into the engine.
-    {
-        let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
-        instances.insert(node_id, audio_node);
-    }
-
-    // 5. Set default parameter values in the engine's parameter state.
+    // 4. Set default parameter values and register with the engine.
     {
         let desc = build_node_descriptor(&node_type);
-        let engine = state.engine.lock().map_err(|e| e.to_string())?;
+        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
         for param in &desc.parameters {
             engine.set_parameter(node_id, &param.id, param.default);
         }
+
+        // If transport is playing, register the node directly with the engine
+        // so it's available immediately. Otherwise, store it for later.
+        if engine.transport().playing {
+            engine.register_node(node_id, audio_node);
+        } else {
+            let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+            instances.insert(node_id, audio_node);
+        }
     }
+
+    // Recompile so the new node is included in the execution order.
+    recompile_and_swap(state.inner())?;
 
     Ok(node_id.0.to_string())
 }

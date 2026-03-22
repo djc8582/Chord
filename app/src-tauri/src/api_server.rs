@@ -205,20 +205,25 @@ fn api_add_node(args: Value, state: &AppState, handle: &AppHandle) -> Value {
         graph.add_node(descriptor);
     }
 
-    // Create DSP instance.
+    // Create DSP instance and register with engine.
     if let Some(audio_node) = state.registry.create(&node_type) {
-        let mut instances = state.node_instances.lock().unwrap();
-        instances.insert(node_id, audio_node);
-    }
-
-    // Set default parameter values.
-    {
         let desc = build_node_descriptor(&node_type);
-        let engine = state.engine.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap();
         for param in &desc.parameters {
             engine.set_parameter(node_id, &param.id, param.default);
         }
+
+        // If playing, register immediately so the node is live.
+        if engine.transport().playing {
+            engine.register_node(node_id, audio_node);
+        } else {
+            let mut instances = state.node_instances.lock().unwrap();
+            instances.insert(node_id, audio_node);
+        }
     }
+
+    // Recompile so the new node is in the execution order.
+    let _ = recompile_and_swap(state);
 
     // Emit event to frontend so canvas can update.
     let emit_result = handle.emit(
