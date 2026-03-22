@@ -81,7 +81,7 @@ pub use sources::GranularNode;
 pub use effects::{Chorus, CrossFader, Phaser, RingModulator, Vocoder, Waveshaper, WaveshaperMode};
 
 // Wave 5
-pub use effects::{Gate, Limiter, PitchShifter};
+pub use effects::{ConvolutionReverb, Gate, Limiter, PitchShifter};
 pub use utility::{DCBlocker, Stereo};
 
 #[cfg(test)]

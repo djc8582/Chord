@@ -8,7 +8,7 @@ use crate::{
     AdsrEnvelope, BiquadFilter, Chorus, CompressorNode, CrossFader, DCBlocker, DelayNode, EqNode,
     EuclideanNode, GainNode, Gate, GranularNode, Lfo, Limiter, MidiToFreq, MixerNode, NoiseNode,
     NodeRegistry, Oscillator, OutputNode, Phaser, PitchShifter, QuantizerNode, ReverbNode,
-    RingModulator, SampleAndHoldNode, Stereo, Vocoder, Waveshaper,
+    ConvolutionReverb, RingModulator, SampleAndHoldNode, Stereo, Vocoder, Waveshaper,
 };
 
 // ─── Test helpers ───────────────────────────────────────────────────────────
@@ -2207,11 +2207,11 @@ fn test_registry_wave3_nodes() {
 fn test_registry_with_all() {
     let registry = NodeRegistry::with_all();
 
-    // Wave 1: 10, Wave 2: 4, Wave 3: 9, Wave 4: 7, Wave 5: 5 = 35 total.
+    // Wave 1: 10, Wave 2: 4, Wave 3: 9, Wave 4: 7, Wave 5: 6 = 36 total.
     assert_eq!(
         registry.len(),
-        35,
-        "with_all() should register 35 nodes, got {}",
+        36,
+        "with_all() should register 36 nodes, got {}",
         registry.len()
     );
 
@@ -2221,7 +2221,7 @@ fn test_registry_with_all() {
         "euclidean", "noise", "sample_and_hold", "quantizer",
         "step_sequencer", "gravity_sequencer", "game_of_life_sequencer", "markov_sequencer", "polyrhythm",
         "crossfader", "waveshaper", "ring_modulator", "chorus", "phaser", "granular", "vocoder",
-        "pitch_shifter", "limiter", "gate", "stereo", "dc_blocker",
+        "pitch_shifter", "limiter", "gate", "stereo", "dc_blocker", "convolution_reverb",
     ];
     for type_name in &all_types {
         assert!(
@@ -3590,5 +3590,19 @@ fn full_validation_vocoder() {
             ("mix", 0.0, 1.0),
         ],
         "vocoder",
+    );
+}
+
+#[test]
+fn full_validation_convolution_reverb() {
+    full_validation(
+        &mut ConvolutionReverb::new(), 1, 1,
+        &[
+            ("decay", 0.1, 5.0),
+            ("brightness", 0.0, 1.0),
+            ("predelay", 0.0, 100.0),
+            ("mix", 0.0, 1.0),
+        ],
+        "convolution_reverb",
     );
 }

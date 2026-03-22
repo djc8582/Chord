@@ -2,6 +2,7 @@
 
 mod chorus;
 mod compressor;
+mod convolution_reverb;
 mod crossfader;
 mod delay;
 mod eq;
@@ -16,6 +17,7 @@ mod vocoder;
 mod waveshaper;
 
 pub use chorus::Chorus;
+pub use convolution_reverb::ConvolutionReverb;
 pub use compressor::CompressorNode;
 pub use crossfader::CrossFader;
 pub use delay::DelayNode;

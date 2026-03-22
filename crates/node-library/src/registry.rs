@@ -10,8 +10,8 @@ use chord_dsp_runtime::{AudioNode, NodeFactory};
 use chord_scripting_runtime::ExpressionNode;
 use crate::control::{AdsrEnvelope, Lfo, NoteToFreq, QuantizerNode, SampleAndHoldNode};
 use crate::effects::{
-    BiquadFilter, Chorus, CompressorNode, CrossFader, DelayNode, EqNode, Gate, Limiter, Phaser,
-    PitchShifter, ReverbNode, RingModulator, Vocoder, Waveshaper,
+    BiquadFilter, Chorus, CompressorNode, ConvolutionReverb, CrossFader, DelayNode, EqNode, Gate,
+    Limiter, Phaser, PitchShifter, ReverbNode, RingModulator, Vocoder, Waveshaper,
 };
 use crate::midi::MidiToFreq;
 use crate::sequencers::{
@@ -140,6 +140,7 @@ impl NodeRegistry {
         self.register("gate", || Box::new(Gate::new()));
         self.register("stereo", || Box::new(Stereo::new()));
         self.register("dc_blocker", || Box::new(DCBlocker::new()));
+        self.register("convolution_reverb", || Box::new(ConvolutionReverb::new()));
     }
 
     /// Create a node instance by type name.
