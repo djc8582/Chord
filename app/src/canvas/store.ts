@@ -32,6 +32,20 @@ export function setCanvasBridge(b: BridgeCommands) {
   _bridge = b;
 }
 
+/**
+ * Pending backend ID promises — when addNode is called, the bridge call
+ * is async. Connections drawn before it resolves need to wait.
+ */
+const _pendingBackendIds = new Map<string, Promise<string>>();
+
+/** Resolve the backend ID for a Yjs node ID, waiting if the bridge call is still pending. */
+async function resolveBackendId(yjsId: string): Promise<string> {
+  const pending = _pendingBackendIds.get(yjsId);
+  if (pending) return pending;
+  const store = useCanvasStore.getState();
+  return store.backendIds.get(yjsId) ?? yjsId;
+}
+
 // ---------------------------------------------------------------------------
 // Port type definitions for node rendering
 // ---------------------------------------------------------------------------
@@ -382,8 +396,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   onConnect: (connection) => {
     if (!connection.source || !connection.target) return;
     const store = get();
-    const fromPort = connection.sourceHandle ?? "output";
-    const toPort = connection.targetHandle ?? "input";
+    const fromPort = connection.sourceHandle ?? "out";
+    const toPort = connection.targetHandle ?? "in";
     dmConnect(
       store.ydoc,
       { nodeId: connection.source, port: fromPort },
@@ -391,11 +405,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     );
     // The Yjs observer will update the edges
     store.syncFromDocument();
-    // Sync to Rust backend using mapped numeric IDs
-    _bridge?.connect(
-      { nodeId: store.getBackendId(connection.source), port: fromPort },
-      { nodeId: store.getBackendId(connection.target), port: toPort },
-    ).catch(() => {});
+    // Sync to Rust backend — await pending backend IDs in case
+    // the node was just created and the bridge call hasn't resolved yet.
+    if (_bridge) {
+      Promise.all([
+        resolveBackendId(connection.source),
+        resolveBackendId(connection.target),
+      ]).then(([fromId, toId]) => {
+        _bridge?.connect(
+          { nodeId: fromId, port: fromPort },
+          { nodeId: toId, port: toPort },
+        ).catch(() => {});
+      });
+    }
   },
 
   addNode: (type, position, name) => {
@@ -403,11 +425,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const id = dmAddNode(store.ydoc, type, { x: position.x, y: position.y }, name);
     store.syncFromDocument();
     // Sync to Rust backend and capture the numeric ID it returns.
-    _bridge?.addNode(type, { x: position.x, y: position.y }).then((backendId) => {
-      if (backendId) {
-        get().backendIds.set(id, backendId);
-      }
-    }).catch(() => {});
+    // Store the promise so that connect() can await it if called before this resolves.
+    if (_bridge) {
+      const promise = _bridge.addNode(type, { x: position.x, y: position.y }).then((backendId) => {
+        if (backendId) {
+          get().backendIds.set(id, backendId);
+        }
+        _pendingBackendIds.delete(id);
+        return backendId;
+      }).catch(() => {
+        _pendingBackendIds.delete(id);
+        return id;
+      });
+      _pendingBackendIds.set(id, promise);
+    }
     return id;
   },
 
@@ -437,10 +468,17 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       { nodeId: toNodeId, port: toPort },
     );
     store.syncFromDocument();
-    _bridge?.connect(
-      { nodeId: store.getBackendId(fromNodeId), port: fromPort },
-      { nodeId: store.getBackendId(toNodeId), port: toPort },
-    ).catch(() => {});
+    if (_bridge) {
+      Promise.all([
+        resolveBackendId(fromNodeId),
+        resolveBackendId(toNodeId),
+      ]).then(([fromId, toId]) => {
+        _bridge?.connect(
+          { nodeId: fromId, port: fromPort },
+          { nodeId: toId, port: toPort },
+        ).catch(() => {});
+      });
+    }
     return id;
   },
 

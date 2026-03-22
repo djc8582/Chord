@@ -154,8 +154,7 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_output(PortDescriptor::new("out", PortDataType::Audio)),
 
         "output" => NodeDescriptor::new("output")
-            .with_input(PortDescriptor::new("in", PortDataType::Audio))
-            .with_output(PortDescriptor::new("out", PortDataType::Audio)),
+            .with_input(PortDescriptor::new("in", PortDataType::Audio)),
 
         "midi_to_freq" => NodeDescriptor::new("midi_to_freq")
             .with_input(PortDescriptor::new("midi", PortDataType::Midi))
