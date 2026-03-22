@@ -61,6 +61,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "generators",
     inputs: [
       { id: "fm", label: "FM", type: "audio" },
+      { id: "am", label: "AM", type: "audio" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },

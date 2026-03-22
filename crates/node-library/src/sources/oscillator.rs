@@ -35,7 +35,8 @@ impl Waveform {
 /// - `waveform` — 0=sine, 1=saw, 2=square, 3=triangle (default 0).
 ///
 /// ## Inputs
-/// - `[0]` frequency modulation (optional, added to base frequency).
+/// - `[0]` frequency modulation (optional, added to base frequency in Hz).
+/// - `[1]` amplitude modulation (optional, multiplied with output).
 ///
 /// ## Outputs
 /// - `[0]` audio output.
@@ -91,7 +92,8 @@ impl AudioNode for Oscillator {
         let detune_mult = (2.0_f64).powf(detune_cents / 1200.0);
 
         let sr = ctx.sample_rate;
-        let has_fm_input = !ctx.inputs.is_empty();
+        let has_fm_input = ctx.inputs.len() > 0 && !ctx.inputs[0].is_empty();
+        let has_am_input = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
 
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Ok);
@@ -142,7 +144,14 @@ impl AudioNode for Oscillator {
                 }
             };
 
-            output[i] = sample as f32;
+            // Apply amplitude modulation if connected.
+            let final_sample = if has_am_input {
+                sample as f32 * ctx.inputs[1][i]
+            } else {
+                sample as f32
+            };
+
+            output[i] = final_sample;
 
             // Advance phase.
             self.phase += phase_inc;
