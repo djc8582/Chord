@@ -76,6 +76,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     inputs: [
       { id: "fm", label: "FM", type: "audio" },
       { id: "am", label: "AM", type: "audio" },
+      { id: "freq", label: "Freq", type: "audio" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -338,6 +339,13 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "utilities",
     inputs: [{ id: "in", label: "In", type: "audio" }],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  note_to_freq: {
+    type: "note_to_freq",
+    label: "Note→Freq",
+    category: "utilities",
+    inputs: [{ id: "in", label: "Note", type: "audio" }],
+    outputs: [{ id: "freq", label: "Freq", type: "audio" }],
   },
   dc_blocker: {
     type: "dc_blocker",

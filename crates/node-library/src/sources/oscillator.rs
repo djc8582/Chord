@@ -37,6 +37,7 @@ impl Waveform {
 /// ## Inputs
 /// - `[0]` frequency modulation (optional, added to base frequency in Hz).
 /// - `[1]` amplitude modulation (optional, multiplied with output).
+/// - `[2]` frequency set (optional, overrides the frequency parameter in Hz).
 ///
 /// ## Outputs
 /// - `[0]` audio output.
@@ -94,6 +95,7 @@ impl AudioNode for Oscillator {
         let sr = ctx.sample_rate;
         let has_fm_input = ctx.inputs.len() > 0 && !ctx.inputs[0].is_empty();
         let has_am_input = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_freq_input = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Ok);
@@ -102,9 +104,17 @@ impl AudioNode for Oscillator {
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
+            // Frequency set from input port 2 (overrides parameter when > 0).
+            let effective_base = if has_freq_input {
+                let f = ctx.inputs[2][i] as f64;
+                if f > 0.0 { f } else { base_freq }
+            } else {
+                base_freq
+            };
+
             // Frequency modulation from input port 0 (additive Hz).
             let fm = if has_fm_input { ctx.inputs[0][i] as f64 } else { 0.0 };
-            let freq = (base_freq * detune_mult + fm).max(0.0);
+            let freq = (effective_base * detune_mult + fm).max(0.0);
 
             let phase_inc = freq / sr;
             self.last_phase_increment = phase_inc;

@@ -925,6 +925,7 @@ fn test_registry_creates_all_wave1_nodes() {
         "mixer",
         "output",
         "midi_to_freq",
+        "note_to_freq",
     ];
 
     for type_name in &expected_types {
@@ -964,7 +965,7 @@ fn test_registry_custom_registration() {
 fn test_registry_listed_types() {
     let registry = NodeRegistry::with_wave1();
     let types = registry.registered_types();
-    assert_eq!(types.len(), 8);
+    assert_eq!(types.len(), 9);
     assert!(types.contains(&"oscillator"));
     assert!(types.contains(&"filter"));
 }
@@ -2205,16 +2206,16 @@ fn test_registry_wave3_nodes() {
 fn test_registry_with_all() {
     let registry = NodeRegistry::with_all();
 
-    // Wave 1: 8, Wave 2: 4, Wave 3: 9, Wave 4: 5, Wave 5: 5 = 31 total.
+    // Wave 1: 9, Wave 2: 4, Wave 3: 9, Wave 4: 5, Wave 5: 5 = 32 total.
     assert_eq!(
         registry.len(),
-        31,
-        "with_all() should register 31 nodes, got {}",
+        32,
+        "with_all() should register 32 nodes, got {}",
         registry.len()
     );
 
     let all_types = [
-        "oscillator", "filter", "gain", "envelope", "lfo", "mixer", "output", "midi_to_freq",
+        "oscillator", "filter", "gain", "envelope", "lfo", "mixer", "output", "midi_to_freq", "note_to_freq",
         "delay", "reverb", "compressor", "eq",
         "euclidean", "noise", "sample_and_hold", "quantizer",
         "step_sequencer", "gravity_sequencer", "game_of_life_sequencer", "markov_sequencer", "polyrhythm",

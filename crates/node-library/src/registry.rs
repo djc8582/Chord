@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use chord_dsp_runtime::{AudioNode, NodeFactory};
 
-use crate::control::{AdsrEnvelope, Lfo, QuantizerNode, SampleAndHoldNode};
+use crate::control::{AdsrEnvelope, Lfo, NoteToFreq, QuantizerNode, SampleAndHoldNode};
 use crate::effects::{
     BiquadFilter, Chorus, CompressorNode, CrossFader, DelayNode, EqNode, Gate, Limiter, Phaser,
     PitchShifter, ReverbNode, RingModulator, Waveshaper,
@@ -96,6 +96,7 @@ impl NodeRegistry {
         self.register("mixer", || Box::new(MixerNode::new()));
         self.register("output", || Box::new(OutputNode::new()));
         self.register("midi_to_freq", || Box::new(MidiToFreq::new()));
+        self.register("note_to_freq", || Box::new(NoteToFreq::new()));
     }
 
     /// Register all Wave 2 (effects) nodes.

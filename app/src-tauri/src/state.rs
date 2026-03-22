@@ -92,6 +92,7 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
         "oscillator" => NodeDescriptor::new("oscillator")
             .with_input(PortDescriptor::new("fm", PortDataType::Audio))
             .with_input(PortDescriptor::new("am", PortDataType::Audio))
+            .with_input(PortDescriptor::new("freq", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(
                 ParameterDescriptor::new("frequency", "Frequency", 440.0, 0.1, 20000.0)
@@ -214,6 +215,14 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_parameter(
                 ParameterDescriptor::new("high_gain", "High Gain", 0.0, -24.0, 24.0)
                     .with_unit("dB"),
+            ),
+
+        "note_to_freq" => NodeDescriptor::new("note_to_freq")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_output(PortDescriptor::new("freq", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("a4_freq", "Concert A", 440.0, 400.0, 480.0)
+                    .with_unit("Hz"),
             ),
 
         "noise" => NodeDescriptor::new("noise")

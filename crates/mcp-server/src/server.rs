@@ -1158,6 +1158,7 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
         "oscillator" => NodeDescriptor::new("oscillator")
             .with_input(PortDescriptor::new("fm", PortDataType::Audio))
             .with_input(PortDescriptor::new("am", PortDataType::Audio))
+            .with_input(PortDescriptor::new("freq", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("frequency", "Frequency", 440.0, 0.1, 20000.0).with_unit("Hz"))
             .with_parameter(ParameterDescriptor::new("detune", "Detune", 0.0, -1200.0, 1200.0).with_unit("cents"))

@@ -129,6 +129,9 @@ export const PARAMETER_DEFINITIONS: Record<string, ParameterDescriptor[]> = {
   sample_and_hold: [],
   quantizer: [],
   stereo: [],
+  note_to_freq: [
+    { id: "a4_freq", label: "Concert A", min: 400, max: 480, step: 0.1, defaultValue: 440, unit: "Hz" },
+  ],
   dc_blocker: [],
 };
 
