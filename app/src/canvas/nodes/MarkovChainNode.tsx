@@ -240,7 +240,7 @@ function MarkovChainNodeComponent(props: NodeProps) {
       <Handle
         type="source"
         position={Position.Right}
-        id="pitch"
+        id="freq"
         style={{
           top: 60,
           width: 10,

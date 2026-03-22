@@ -204,7 +204,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "sequencers",
     inputs: [{ id: "clock", label: "Clock", type: "audio" }],
     outputs: [
-      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "freq", label: "Freq", type: "audio" },
       { id: "gate", label: "Gate", type: "audio" },
     ],
   },
@@ -214,7 +214,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "sequencers",
     inputs: [{ id: "clock", label: "Clock", type: "audio" }],
     outputs: [
-      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "freq", label: "Freq", type: "audio" },
       { id: "gate", label: "Gate", type: "audio" },
     ],
   },
@@ -224,7 +224,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "sequencers",
     inputs: [{ id: "clock", label: "Clock", type: "audio" }],
     outputs: [
-      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "freq", label: "Freq", type: "audio" },
       { id: "gate", label: "Gate", type: "audio" },
     ],
   },
@@ -234,7 +234,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "sequencers",
     inputs: [{ id: "clock", label: "Clock", type: "audio" }],
     outputs: [
-      { id: "pitch", label: "Pitch", type: "audio" },
+      { id: "freq", label: "Freq", type: "audio" },
       { id: "gate", label: "Gate", type: "audio" },
     ],
   },

@@ -218,7 +218,7 @@ impl AudioNode for GravitySequencer {
                 self.gate_value = 0.0;
             }
 
-            ctx.outputs[0][i] = self.pitch_value;
+            ctx.outputs[0][i] = super::midi_to_hz(self.pitch_value);
             if has_gate_output {
                 ctx.outputs[1][i] = self.gate_value;
             }

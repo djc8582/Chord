@@ -231,14 +231,14 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "step_sequencer" => NodeDescriptor::new("step_sequencer")
             .with_input(PortDescriptor::new("clock", PortDataType::Audio))
-            .with_output(PortDescriptor::new("pitch", PortDataType::Audio))
+            .with_output(PortDescriptor::new("freq", PortDataType::Audio))
             .with_output(PortDescriptor::new("gate", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("steps", "Steps", 8.0, 1.0, 32.0))
             .with_parameter(ParameterDescriptor::new("gate_length", "Gate Length", 0.5, 0.0, 1.0)),
 
         "gravity_sequencer" => NodeDescriptor::new("gravity_sequencer")
             .with_input(PortDescriptor::new("clock", PortDataType::Audio))
-            .with_output(PortDescriptor::new("pitch", PortDataType::Audio))
+            .with_output(PortDescriptor::new("freq", PortDataType::Audio))
             .with_output(PortDescriptor::new("gate", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("gravity", "Gravity", 1.0, 0.01, 10.0))
             .with_parameter(ParameterDescriptor::new("num_particles", "Particles", 4.0, 1.0, 16.0))
@@ -246,7 +246,7 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "game_of_life_sequencer" => NodeDescriptor::new("game_of_life_sequencer")
             .with_input(PortDescriptor::new("clock", PortDataType::Audio))
-            .with_output(PortDescriptor::new("pitch", PortDataType::Audio))
+            .with_output(PortDescriptor::new("freq", PortDataType::Audio))
             .with_output(PortDescriptor::new("gate", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("width", "Width", 16.0, 4.0, 32.0))
             .with_parameter(ParameterDescriptor::new("height", "Height", 8.0, 4.0, 16.0))
@@ -254,7 +254,7 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "markov_sequencer" => NodeDescriptor::new("markov_sequencer")
             .with_input(PortDescriptor::new("clock", PortDataType::Audio))
-            .with_output(PortDescriptor::new("pitch", PortDataType::Audio))
+            .with_output(PortDescriptor::new("freq", PortDataType::Audio))
             .with_output(PortDescriptor::new("gate", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("randomness", "Randomness", 0.3, 0.0, 1.0))
             .with_parameter(ParameterDescriptor::new("root_note", "Root Note", 60.0, 0.0, 127.0))

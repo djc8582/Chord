@@ -171,7 +171,7 @@ function StepSequencerNodeComponent(props: NodeProps) {
         style={{ top: 75, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
 
       {/* Output handles (right) */}
-      <Handle type="source" position={Position.Right} id="pitch"
+      <Handle type="source" position={Position.Right} id="freq"
         style={{ top: 60, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
       <Handle type="source" position={Position.Right} id="gate"
         style={{ top: 90, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />

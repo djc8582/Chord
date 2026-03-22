@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "chord": {
+      "command": "/Users/dylan/Chord/target/debug/chord-mcp-server",
+      "args": []
+    }
+  }
+}
