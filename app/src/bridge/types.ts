@@ -53,6 +53,7 @@ export interface BridgeCommands {
   setParameter(nodeId: NodeId, param: string, value: number): Promise<void>;
 
   // Transport
+  syncAndPlay(nodes: Array<{id: string; node_type: string; x: number; y: number; parameters: Record<string, number>}>, connections: Array<{from_node: string; from_port: string; to_node: string; to_port: string}>): Promise<void>;
   play(): Promise<void>;
   stop(): Promise<void>;
   setTempo(bpm: number): Promise<void>;

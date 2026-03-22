@@ -24,6 +24,7 @@ pub fn run() {
             commands::disconnect,
             commands::set_parameter,
             // Transport
+            commands::sync_and_play,
             commands::play,
             commands::stop,
             commands::set_tempo,

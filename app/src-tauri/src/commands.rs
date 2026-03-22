@@ -293,6 +293,151 @@ pub fn clear_graph(state: State<'_, AppArc>) -> Result<(), String> {
     Ok(())
 }
 
+/// Rebuild the backend graph from frontend state and start playback.
+///
+/// This is the nuclear option for sync: the frontend sends its entire
+/// document state (all nodes and connections) and the backend rebuilds
+/// everything from scratch. Guarantees the backend matches the canvas.
+#[tauri::command]
+pub fn sync_and_play(
+    nodes: Vec<SyncNode>,
+    connections: Vec<SyncConnection>,
+    state: State<'_, AppArc>,
+) -> Result<(), String> {
+    log::info("sync_and_play", &format!("{} nodes, {} connections", nodes.len(), connections.len()));
+
+    // Stop current playback.
+    {
+        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+        engine.transport_mut().stop();
+        engine.reset_all_nodes();
+    }
+    {
+        let mut stream_guard = state.audio_stream.lock().map_err(|e| e.to_string())?;
+        if let Some(stream) = stream_guard.take() {
+            stream.stop();
+        }
+    }
+
+    // Clear everything.
+    {
+        let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
+        *graph = Graph::new();
+    }
+    {
+        let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+        instances.clear();
+    }
+    {
+        let mut conn_ids = state.connection_ids.lock().map_err(|e| e.to_string())?;
+        conn_ids.clear();
+    }
+    {
+        let mut id_map = state.frontend_id_map.lock().map_err(|e| e.to_string())?;
+        id_map.clear();
+    }
+
+    // Rebuild: add all nodes.
+    for n in &nodes {
+        let mut descriptor = build_node_descriptor(&n.node_type);
+        descriptor.position = (n.x, n.y);
+        let node_id = descriptor.id;
+
+        {
+            let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
+            graph.add_node(descriptor);
+        }
+
+        // Store frontend ID mapping.
+        {
+            let mut id_map = state.frontend_id_map.lock().map_err(|e| e.to_string())?;
+            id_map.insert(n.id.clone(), node_id);
+        }
+
+        // Create DSP instance.
+        if let Some(audio_node) = state.registry.create(&n.node_type) {
+            let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+            instances.insert(node_id, audio_node);
+        }
+
+        // Set default parameters + any provided values.
+        {
+            let desc = build_node_descriptor(&n.node_type);
+            let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+            for param in &desc.parameters {
+                engine.set_parameter(node_id, &param.id, param.default);
+            }
+            for (k, v) in &n.parameters {
+                engine.set_parameter(node_id, k, *v);
+            }
+        }
+    }
+
+    // Rebuild: add all connections.
+    for c in &connections {
+        let from_nid = resolve_node_id(&c.from_node, &state)?;
+        let to_nid = resolve_node_id(&c.to_node, &state)?;
+
+        let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
+        let from_port_id = find_output_port_by_name(&graph, &from_nid, &c.from_port)?;
+        let to_port_id = find_input_port_by_name(&graph, &to_nid, &c.to_port)?;
+        let _ = graph.connect(from_nid, from_port_id, to_nid, to_port_id);
+    }
+
+    // Now play (same as the play command).
+    let (compiled, routing) = {
+        let graph = state.graph.lock().map_err(|e| e.to_string())?;
+        let compiled = GraphCompiler::compile(&graph).map_err(|e| e.to_string())?;
+        let routing = compute_routing(&graph);
+        (compiled, routing)
+    };
+
+    {
+        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+        let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+        let node_ids: Vec<NodeId> = instances.keys().copied().collect();
+        for nid in node_ids {
+            if let Some(node) = instances.remove(&nid) {
+                engine.register_node(nid, node);
+            }
+        }
+        engine.transport_mut().play();
+        engine.swap_graph_with_routing(compiled, routing);
+    }
+
+    {
+        let mut stream_guard = state.audio_stream.lock().map_err(|e| e.to_string())?;
+        if let Some(existing) = stream_guard.take() {
+            existing.stop();
+        }
+        let audio_host = state.audio_host.lock().map_err(|e| e.to_string())?;
+        let stream_config = chord_audio_io::StreamConfig::default();
+        let stream = audio_host
+            .open_stream(stream_config, Arc::clone(&state.engine))
+            .map_err(|e| format!("Failed to open audio stream: {e}"))?;
+        *stream_guard = Some(stream);
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncNode {
+    pub id: String,
+    pub node_type: String,
+    pub x: f64,
+    pub y: f64,
+    pub parameters: std::collections::HashMap<String, f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncConnection {
+    pub from_node: String,
+    pub from_port: String,
+    pub to_node: String,
+    pub to_port: String,
+}
+
 /// Start audio playback.
 ///
 /// This is the critical path for hearing sound:

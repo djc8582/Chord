@@ -580,29 +580,43 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const store = get();
     const fromPort = connection.sourceHandle ?? "out";
     const toPort = connection.targetHandle ?? "in";
+
+    console.log(`[chord] onConnect called: ${connection.source}:${fromPort} → ${connection.target}:${toPort}`);
+    console.log(`[chord] _bridge exists: ${!!_bridge}`);
+
     dmConnect(
       store.ydoc,
       { nodeId: connection.source, port: fromPort },
       { nodeId: connection.target, port: toPort },
     );
-    // The Yjs observer will update the edges
     store.syncFromDocument();
+
+    if (!_bridge) {
+      console.error("[chord] NO BRIDGE — connection won't reach backend");
+      return;
+    }
+
     // Wait for any pending addNode calls to complete before connecting.
-    // Without this, connect fires before the backend knows the node's frontend ID.
-    const waitFor = [
-      _pendingBackendIds.get(connection.source),
-      _pendingBackendIds.get(connection.target),
-    ].filter(Boolean);
+    const pending1 = _pendingBackendIds.get(connection.source);
+    const pending2 = _pendingBackendIds.get(connection.target);
+    console.log(`[chord] pending source: ${!!pending1}, pending target: ${!!pending2}`);
 
     const doConnect = () => {
-      _bridge?.connect(
+      console.log(`[chord] doConnect firing: ${connection.source}:${fromPort} → ${connection.target}:${toPort}`);
+      _bridge!.connect(
         { nodeId: connection.source, port: fromPort },
         { nodeId: connection.target, port: toPort },
-      ).catch((e) => console.error("[chord] connect error:", e));
+      ).then((r) => console.log("[chord] connect SUCCESS:", r))
+       .catch((e) => console.error("[chord] connect FAILED:", e));
     };
 
+    const waitFor = [pending1, pending2].filter(Boolean);
     if (waitFor.length > 0) {
-      Promise.all(waitFor).then(doConnect);
+      console.log(`[chord] waiting for ${waitFor.length} pending addNode(s)...`);
+      Promise.all(waitFor).then(() => {
+        console.log("[chord] pending resolved, connecting...");
+        doConnect();
+      }).catch((e) => console.error("[chord] pending FAILED:", e));
     } else {
       doConnect();
     }

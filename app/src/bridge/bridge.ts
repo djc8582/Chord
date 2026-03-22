@@ -61,6 +61,10 @@ export const bridge: BridgeCommands = {
   },
 
   // -- Transport ------------------------------------------------------------
+  syncAndPlay(nodes: Array<{id: string; node_type: string; x: number; y: number; parameters: Record<string, number>}>, connections: Array<{from_node: string; from_port: string; to_node: string; to_port: string}>): Promise<void> {
+    return tauriInvoke<void>("sync_and_play", { nodes, connections });
+  },
+
   play(): Promise<void> {
     return tauriInvoke<void>("play");
   },

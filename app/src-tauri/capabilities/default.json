@@ -8,7 +8,9 @@
     "core:event:allow-listen",
     "core:event:allow-emit",
     "core:window:default",
+    "core:window:allow-set-title",
     "core:webview:default",
-    "core:app:default"
+    "core:app:default",
+    "core:app:allow-version"
   ]
 }

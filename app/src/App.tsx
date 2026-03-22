@@ -38,6 +38,11 @@ function App() {
     // Clear the backend graph so it matches the empty canvas.
     bridge.clearGraph().catch(() => {});
 
+    // DEBUG: Expose bridge and store globally for console testing
+    (window as any).__bridge = bridge;
+    (window as any).__canvasStore = useCanvasStore;
+    console.log("[chord] Debug: window.__bridge and window.__canvasStore available");
+
     // Give the canvas, inspector, timeline, and visualizer access to the bridge for backend sync
     setCanvasBridge(bridge);
     setInspectorBridge(bridge);
