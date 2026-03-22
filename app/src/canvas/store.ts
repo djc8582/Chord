@@ -587,53 +587,30 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     );
     // The Yjs observer will update the edges
     store.syncFromDocument();
-    // Sync to Rust backend — await pending backend IDs in case
-    // the node was just created and the bridge call hasn't resolved yet.
-    if (_bridge) {
-      Promise.all([
-        resolveBackendId(connection.source),
-        resolveBackendId(connection.target),
-      ]).then(([fromId, toId]) => {
-        console.log(`[chord] connect: ${fromId}:${fromPort} → ${toId}:${toPort}`);
-        _bridge?.connect(
-          { nodeId: fromId, port: fromPort },
-          { nodeId: toId, port: toPort },
-        ).then((r) => console.log("[chord] connect result:", r))
-         .catch((e) => console.error("[chord] connect error:", e));
-      });
-    }
+    // Sync to Rust backend — pass Yjs IDs directly.
+    // The backend resolves them to NodeIds via the frontend_id_map.
+    _bridge?.connect(
+      { nodeId: connection.source, port: fromPort },
+      { nodeId: connection.target, port: toPort },
+    ).catch((e) => console.error("[chord] connect error:", e));
   },
 
   addNode: (type, position, name) => {
     const store = get();
     const id = dmAddNode(store.ydoc, type, { x: position.x, y: position.y }, name);
     store.syncFromDocument();
-    // Sync to Rust backend and capture the numeric ID it returns.
-    // Store the promise so that connect() can await it if called before this resolves.
-    if (_bridge) {
-      const promise = _bridge.addNode(type, { x: position.x, y: position.y }).then((backendId) => {
-        console.log(`[chord] addNode ${type}: yjs=${id} backend=${backendId}`);
-        if (backendId) {
-          get().backendIds.set(id, backendId);
-        }
-        _pendingBackendIds.delete(id);
-        return backendId;
-      }).catch(() => {
-        _pendingBackendIds.delete(id);
-        return id;
-      });
-      _pendingBackendIds.set(id, promise);
-    }
+    // Pass the frontend Yjs ID to the backend so it can map it.
+    // The backend stores frontendId → NodeId, so all subsequent calls
+    // (connect, setParameter) can use the Yjs ID directly.
+    _bridge?.addNode(type, { x: position.x, y: position.y }, id).catch(() => {});
     return id;
   },
 
   removeNode: (nodeId) => {
     const store = get();
-    const backendId = store.getBackendId(nodeId);
     dmRemoveNode(store.ydoc, nodeId);
     store.syncFromDocument();
-    _bridge?.removeNode(backendId).catch(() => {});
-    store.backendIds.delete(nodeId);
+    _bridge?.removeNode(nodeId).catch(() => {});
   },
 
   removeSelectedNodes: () => {
@@ -653,17 +630,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       { nodeId: toNodeId, port: toPort },
     );
     store.syncFromDocument();
-    if (_bridge) {
-      Promise.all([
-        resolveBackendId(fromNodeId),
-        resolveBackendId(toNodeId),
-      ]).then(([fromId, toId]) => {
-        _bridge?.connect(
-          { nodeId: fromId, port: fromPort },
-          { nodeId: toId, port: toPort },
-        ).catch(() => {});
-      });
-    }
+    _bridge?.connect(
+      { nodeId: fromNodeId, port: fromPort },
+      { nodeId: toNodeId, port: toPort },
+    ).catch(() => {});
     return id;
   },
 

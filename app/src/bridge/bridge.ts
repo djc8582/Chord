@@ -40,8 +40,8 @@ export const bridge: BridgeCommands = {
     return tauriInvoke<void>("clear_graph");
   },
 
-  addNode(type: string, position: Vec2): Promise<NodeId> {
-    return tauriInvoke<NodeId>("add_node", { nodeType: type, position });
+  addNode(type: string, position: Vec2, frontendId?: string): Promise<NodeId> {
+    return tauriInvoke<NodeId>("add_node", { nodeType: type, position, frontendId });
   },
 
   removeNode(id: NodeId): Promise<void> {

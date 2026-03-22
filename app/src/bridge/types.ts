@@ -46,7 +46,7 @@ export interface ExportOptions {
 export interface BridgeCommands {
   // Graph manipulation
   clearGraph(): Promise<void>;
-  addNode(type: string, position: Vec2): Promise<NodeId>;
+  addNode(type: string, position: Vec2, frontendId?: string): Promise<NodeId>;
   removeNode(id: NodeId): Promise<void>;
   connect(from: PortRef, to: PortRef): Promise<ConnectionId>;
   disconnect(id: ConnectionId): Promise<void>;

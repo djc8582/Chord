@@ -22,6 +22,10 @@ use chord_node_library::NodeRegistry;
 pub struct AppState {
     /// The abstract audio graph (nodes + connections).
     pub graph: Mutex<Graph>,
+    /// Maps frontend string IDs to backend NodeIds.
+    /// This eliminates the async race condition where the frontend needs
+    /// to know the backend ID before it can make connection/parameter calls.
+    pub frontend_id_map: Mutex<HashMap<String, NodeId>>,
     /// The real-time DSP engine, shared with the audio callback via Arc.
     pub engine: Arc<Mutex<AudioEngine>>,
     /// Registry of all available node types.
@@ -72,6 +76,7 @@ impl AppState {
 
         Self {
             graph: Mutex::new(Graph::new()),
+            frontend_id_map: Mutex::new(HashMap::new()),
             engine,
             registry,
             audio_host: Mutex::new(audio_host),

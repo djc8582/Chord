@@ -68,6 +68,8 @@ pub struct ExportOptions {
 pub fn add_node(
     node_type: String,
     position: Vec2,
+    #[allow(non_snake_case)]
+    frontendId: Option<String>,
     state: State<'_, AppArc>,
 ) -> Result<String, String> {
     log::info(
@@ -87,6 +89,12 @@ pub fn add_node(
     {
         let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
         graph.add_node(descriptor);
+    }
+
+    // Store frontend ID → backend NodeId mapping if provided.
+    if let Some(ref fid) = frontendId {
+        let mut id_map = state.frontend_id_map.lock().map_err(|e| e.to_string())?;
+        id_map.insert(fid.clone(), node_id);
     }
 
     // 3. Instantiate the DSP AudioNode via the registry.
@@ -124,7 +132,7 @@ pub fn add_node(
 pub fn remove_node(id: String, state: State<'_, AppArc>) -> Result<(), String> {
     log::info("remove_node", &format!("id={id}"));
 
-    let node_id = parse_node_id(&id)?;
+    let node_id = resolve_node_id(&id, &state)?;
 
     // Remove from graph (also removes all connections to/from this node).
     {
@@ -161,8 +169,8 @@ pub fn connect_ports(from: PortRef, to: PortRef, state: State<'_, AppArc>) -> Re
         &format!("{}:{} -> {}:{}", from.node_id, from.port, to.node_id, to.port),
     );
 
-    let from_node_id = parse_node_id(&from.node_id)?;
-    let to_node_id = parse_node_id(&to.node_id)?;
+    let from_node_id = resolve_node_id(&from.node_id, &state)?;
+    let to_node_id = resolve_node_id(&to.node_id, &state)?;
 
     let conn_id: ConnectionId;
     {
@@ -234,7 +242,7 @@ pub fn set_parameter(
         &format!("node={node_id} param={param} value={value}"),
     );
 
-    let nid = parse_node_id(&node_id)?;
+    let nid = resolve_node_id(&node_id, &state)?;
 
     // Send the parameter change to the engine (lock-free ring buffer push).
     let engine = state.engine.lock().map_err(|e| e.to_string())?;
@@ -405,7 +413,7 @@ pub fn get_signal_stats(
 ) -> Result<SignalStats, String> {
     log::info("get_signal_stats", &format!("node={node_id} port={port}"));
 
-    let nid = parse_node_id(&node_id)?;
+    let nid = resolve_node_id(&node_id, &state)?;
 
     // Try to find the port ID by name.
     let port_id = {
@@ -537,12 +545,31 @@ pub fn export_patch(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Parse a node ID string (e.g., "42") into a `NodeId`.
+/// Resolve a node ID string to a `NodeId`.
+/// Accepts either a numeric string ("42") or a frontend Yjs ID ("mn26z15d-0-7bzmz1").
+/// Frontend IDs are looked up in the `frontend_id_map`.
 fn parse_node_id(id: &str) -> Result<NodeId, String> {
-    let n: u64 = id
-        .parse()
-        .map_err(|_| format!("Invalid node ID: {id}"))?;
-    Ok(NodeId(n))
+    // Try numeric parse first (fast path for API calls).
+    if let Ok(n) = id.parse::<u64>() {
+        return Ok(NodeId(n));
+    }
+    // Not numeric — must be resolved via the state's frontend_id_map.
+    // This function doesn't have state access, so the caller must use resolve_node_id instead.
+    Err(format!("Invalid node ID: {id} (use resolve_node_id for frontend IDs)"))
+}
+
+/// Resolve a frontend or numeric node ID to a `NodeId` using the state's ID map.
+fn resolve_node_id(id: &str, state: &AppState) -> Result<NodeId, String> {
+    // Try numeric parse first.
+    if let Ok(n) = id.parse::<u64>() {
+        return Ok(NodeId(n));
+    }
+    // Look up in frontend ID map.
+    let id_map = state.frontend_id_map.lock().map_err(|e| e.to_string())?;
+    id_map
+        .get(id)
+        .copied()
+        .ok_or_else(|| format!("Unknown node ID: {id}"))
 }
 
 /// Find an output port by name on a given node.
