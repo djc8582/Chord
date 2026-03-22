@@ -35,6 +35,15 @@ pub fn run() {
             commands::export_patch,
         ])
         .setup(move |app| {
+            // Open devtools in debug builds so we can see console output.
+            #[cfg(debug_assertions)]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    window.open_devtools();
+                }
+            }
+
             let handle = app.handle().clone();
             api_server::start(api_state, handle);
             Ok(())
