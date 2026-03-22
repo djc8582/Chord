@@ -252,12 +252,12 @@ pub fn set_parameter(
 pub fn play(state: State<'_, AppArc>) -> Result<(), String> {
     log::info("play", "transport started");
 
-    // 1. Compile the graph and grab connections.
-    let (compiled, connections) = {
+    // 1. Compile the graph and compute routing.
+    let (compiled, routing) = {
         let graph = state.graph.lock().map_err(|e| e.to_string())?;
         let compiled = GraphCompiler::compile(&graph).map_err(|e| e.to_string())?;
-        let connections = graph.connections().to_vec();
-        (compiled, connections)
+        let routing = compute_routing(&graph);
+        (compiled, routing)
     };
 
     // 2. Move all node instances into the engine.
@@ -276,8 +276,8 @@ pub fn play(state: State<'_, AppArc>) -> Result<(), String> {
         // Start the transport.
         engine.transport_mut().play();
 
-        // 3. Swap in the compiled graph with connection routing.
-        engine.swap_graph_with_connections(compiled, &connections);
+        // 3. Swap in the compiled graph with proper port routing.
+        engine.swap_graph_with_routing(compiled, routing);
     }
 
     // 4. Open an audio stream (if not already running).
@@ -562,9 +562,9 @@ fn recompile_and_swap(state: &AppState) -> Result<(), String> {
 
     match GraphCompiler::compile(&graph) {
         Ok(compiled) => {
-            let connections = graph.connections().to_vec();
+            let routing = compute_routing(&graph);
             let engine = state.engine.lock().map_err(|e| e.to_string())?;
-            engine.swap_graph_with_connections(compiled, &connections);
+            engine.swap_graph_with_routing(compiled, routing);
             Ok(())
         }
         Err(e) => {
@@ -573,6 +573,33 @@ fn recompile_and_swap(state: &AppState) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+/// Compute routing tuples from the graph's connections and node descriptors.
+///
+/// Maps each connection's `PortId` to the port's positional index in the
+/// node's input/output list. This is critical for multi-port nodes like
+/// the oscillator (FM=0, AM=1).
+fn compute_routing(graph: &Graph) -> Vec<(NodeId, usize, NodeId, usize)> {
+    graph
+        .connections()
+        .iter()
+        .map(|c| {
+            // Find the source port's index in the source node's output list.
+            let from_idx = graph
+                .node(&c.from_node)
+                .and_then(|n| n.outputs.iter().position(|p| p.id == c.from_port))
+                .unwrap_or(0);
+
+            // Find the dest port's index in the dest node's input list.
+            let to_idx = graph
+                .node(&c.to_node)
+                .and_then(|n| n.inputs.iter().position(|p| p.id == c.to_port))
+                .unwrap_or(0);
+
+            (c.from_node, from_idx, c.to_node, to_idx)
+        })
+        .collect()
 }
 
 /// Minimal logging helper (keeps commands clean).

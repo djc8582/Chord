@@ -185,6 +185,11 @@ impl AudioEngine {
     ///
     /// Connections are used to route output buffers from upstream nodes to
     /// downstream nodes' inputs during processing.
+    ///
+    /// `connections` contains the raw connection data, and `port_index_lookup`
+    /// maps `(NodeId, PortId)` to the port's index in the node's input/output
+    /// list. The caller (which has access to the graph's node descriptors)
+    /// must provide this mapping.
     pub fn swap_graph_with_connections(
         &self,
         graph: CompiledGraph,
@@ -202,23 +207,34 @@ impl AudioEngine {
         }
     }
 
+    /// Swap in a new compiled graph with pre-computed routing.
+    ///
+    /// `routing` is a list of `(from_node, from_port_index, to_node, to_port_index)`
+    /// tuples where port indices are 0-based positions in the node's output/input lists.
+    pub fn swap_graph_with_routing(
+        &self,
+        compiled: CompiledGraph,
+        routing: Vec<(NodeId, usize, NodeId, usize)>,
+    ) -> Option<CompiledGraph> {
+        let engine_graph = EngineGraph { compiled, routing };
+        let new_ptr = Box::into_raw(Box::new(engine_graph));
+        let old_ptr = self.current_graph.swap(new_ptr, Ordering::AcqRel);
+
+        if old_ptr.is_null() {
+            None
+        } else {
+            let boxed = self.reclaim_engine_graph(old_ptr);
+            Some(boxed.compiled)
+        }
+    }
+
     /// Build an EngineGraph from a CompiledGraph and connections.
+    /// Falls back to port index 0 for both source and destination when
+    /// port descriptors are unavailable.
     fn build_engine_graph(&self, compiled: CompiledGraph, connections: &[Connection]) -> EngineGraph {
-        // Pre-compute routing as (from_node, from_port_index, to_node, to_port_index).
-        // Each node produces exactly 1 output buffer (index 0). For the destination,
-        // we count how many connections target the same node to assign input indices
-        // in order. This ensures multi-input nodes (e.g., oscillator with FM on port 0
-        // and AM on port 1) receive each connection's buffer at the correct index.
-        use std::collections::HashMap;
-        let mut dest_port_counters: HashMap<NodeId, usize> = HashMap::new();
         let routing: Vec<(NodeId, usize, NodeId, usize)> = connections
             .iter()
-            .map(|c| {
-                let to_port_idx = *dest_port_counters.entry(c.to_node).or_insert(0);
-                *dest_port_counters.get_mut(&c.to_node).unwrap() += 1;
-                // All nodes output on port 0 (single output buffer).
-                (c.from_node, 0_usize, c.to_node, to_port_idx)
-            })
+            .map(|c| (c.from_node, 0_usize, c.to_node, 0_usize))
             .collect();
         EngineGraph { compiled, routing }
     }

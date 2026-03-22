@@ -417,8 +417,8 @@ fn api_set_parameter(args: Value, state: &AppState, handle: &AppHandle) -> Value
 }
 
 fn api_play(state: &AppState) -> Value {
-    // Compile the graph.
-    let (compiled, connections) = {
+    // Compile the graph and compute proper port routing.
+    let (compiled, routing) = {
         let graph = match state.graph.lock() {
             Ok(g) => g,
             Err(e) => return json!({"error": e.to_string()}),
@@ -427,8 +427,8 @@ fn api_play(state: &AppState) -> Value {
             Ok(c) => c,
             Err(e) => return json!({"error": e.to_string()}),
         };
-        let connections = graph.connections().to_vec();
-        (compiled, connections)
+        let routing = compute_routing(&graph);
+        (compiled, routing)
     };
 
     // Move node instances into the engine.
@@ -444,7 +444,7 @@ fn api_play(state: &AppState) -> Value {
         }
 
         engine.transport_mut().play();
-        engine.swap_graph_with_connections(compiled, &connections);
+        engine.swap_graph_with_routing(compiled, routing);
     }
 
     // Open audio stream.
@@ -569,11 +569,30 @@ fn recompile_and_swap(state: &AppState) -> Result<(), String> {
     }
     match GraphCompiler::compile(&graph) {
         Ok(compiled) => {
-            let connections = graph.connections().to_vec();
+            let routing = compute_routing(&graph);
             let engine = state.engine.lock().map_err(|e| e.to_string())?;
-            engine.swap_graph_with_connections(compiled, &connections);
+            engine.swap_graph_with_routing(compiled, routing);
             Ok(())
         }
         Err(_) => Ok(()),
     }
+}
+
+/// Compute routing tuples from the graph's connections and node descriptors.
+fn compute_routing(graph: &chord_audio_graph::Graph) -> Vec<(NodeId, usize, NodeId, usize)> {
+    graph
+        .connections()
+        .iter()
+        .map(|c| {
+            let from_idx = graph
+                .node(&c.from_node)
+                .and_then(|n| n.outputs.iter().position(|p| p.id == c.from_port))
+                .unwrap_or(0);
+            let to_idx = graph
+                .node(&c.to_node)
+                .and_then(|n| n.inputs.iter().position(|p| p.id == c.to_port))
+                .unwrap_or(0);
+            (c.from_node, from_idx, c.to_node, to_idx)
+        })
+        .collect()
 }
