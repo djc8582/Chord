@@ -249,6 +249,11 @@ export interface CanvasStore {
   // Yjs document reference
   ydoc: Y.Doc;
 
+  // Maps frontend Yjs node IDs to backend numeric IDs (returned by Rust).
+  // Without this mapping, bridge calls like setParameter silently fail because
+  // the backend can't parse Yjs-style IDs as u64.
+  backendIds: Map<string, string>;
+
   // React Flow state
   nodes: Node[];
   edges: Edge[];
@@ -299,6 +304,11 @@ export interface CanvasStore {
 
   // Initialize with a Y.Doc
   initDocument: (doc: Y.Doc) => void;
+
+  // Look up the backend numeric ID for a frontend Yjs ID.
+  // Returns the Yjs ID as fallback if no mapping exists (e.g. MCP-created nodes
+  // where the Yjs ID IS the numeric ID).
+  getBackendId: (yjsId: string) => string;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +317,7 @@ export interface CanvasStore {
 
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   ydoc: createPatchDocument(),
+  backendIds: new Map<string, string>(),
   nodes: [],
   edges: [],
   selectedNodeIds: [],
@@ -367,10 +378,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     );
     // The Yjs observer will update the edges
     store.syncFromDocument();
-    // Sync to Rust backend
+    // Sync to Rust backend using mapped numeric IDs
     _bridge?.connect(
-      { nodeId: connection.source, port: fromPort },
-      { nodeId: connection.target, port: toPort },
+      { nodeId: store.getBackendId(connection.source), port: fromPort },
+      { nodeId: store.getBackendId(connection.target), port: toPort },
     ).catch(() => {});
   },
 
@@ -378,16 +389,22 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const store = get();
     const id = dmAddNode(store.ydoc, type, { x: position.x, y: position.y }, name);
     store.syncFromDocument();
-    // Sync to Rust backend
-    _bridge?.addNode(type, { x: position.x, y: position.y }).catch(() => {});
+    // Sync to Rust backend and capture the numeric ID it returns.
+    _bridge?.addNode(type, { x: position.x, y: position.y }).then((backendId) => {
+      if (backendId) {
+        get().backendIds.set(id, backendId);
+      }
+    }).catch(() => {});
     return id;
   },
 
   removeNode: (nodeId) => {
     const store = get();
+    const backendId = store.getBackendId(nodeId);
     dmRemoveNode(store.ydoc, nodeId);
     store.syncFromDocument();
-    _bridge?.removeNode(nodeId).catch(() => {});
+    _bridge?.removeNode(backendId).catch(() => {});
+    store.backendIds.delete(nodeId);
   },
 
   removeSelectedNodes: () => {
@@ -408,8 +425,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     );
     store.syncFromDocument();
     _bridge?.connect(
-      { nodeId: fromNodeId, port: fromPort },
-      { nodeId: toNodeId, port: toPort },
+      { nodeId: store.getBackendId(fromNodeId), port: fromPort },
+      { nodeId: store.getBackendId(toNodeId), port: toPort },
     ).catch(() => {});
     return id;
   },
@@ -548,6 +565,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     }
 
     set({ nodes, edges });
+  },
+
+  getBackendId: (yjsId) => {
+    return get().backendIds.get(yjsId) ?? yjsId;
   },
 
   initDocument: (doc) => {

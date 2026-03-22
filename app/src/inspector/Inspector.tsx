@@ -86,10 +86,11 @@ export const Inspector: React.FC<InspectorProps> = ({
     (param: string, value: number) => {
       setParam(param, value);
 
-      // Also notify the Rust backend
+      // Also notify the Rust backend using the mapped numeric ID.
       const nodeId = useInspectorStore.getState().inspectedNodeId;
       if (bridgeRef && nodeId) {
-        bridgeRef.setParameter(nodeId, param, value).catch(() => {
+        const backendId = useCanvasStore.getState().getBackendId(nodeId);
+        bridgeRef.setParameter(backendId, param, value).catch(() => {
           // Bridge call failed (e.g. engine not running) — silently ignore.
           // The Yjs document is already updated.
         });
