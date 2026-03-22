@@ -315,22 +315,16 @@ export const Inspector: React.FC<InspectorProps> = ({
               const nodeId = useInspectorStore.getState().inspectedNodeId;
               if (!nodeId) return;
               try {
-                // Use Tauri's file dialog
-                const { open } = await import("@tauri-apps/plugin-dialog");
-                const path = await open({
-                  filters: [{ name: "Audio", extensions: ["wav", "wave", "aif", "aiff"] }],
-                  multiple: false,
-                });
-                if (path) {
-                  const result = await bridgeRef.loadAudioFile(nodeId, path as string);
-                  if (result?.ok) {
-                    setLoadedFileName(
-                      (path as string).split("/").pop()?.split("\\").pop() ?? "loaded"
-                    );
-                  }
+                // Use Tauri command to open native file dialog + load in one step
+                const { invoke } = await import("@tauri-apps/api/core");
+                const result = await invoke<{ ok: boolean; path: string; samples: number; duration: number }>(
+                  "pick_and_load_audio", { nodeId }
+                );
+                if (result?.ok) {
+                  setLoadedFileName(result.path.split("/").pop()?.split("\\").pop() ?? "loaded");
                 }
-              } catch {
-                // Dialog plugin not available — try prompt fallback
+              } catch (e) {
+                // Fallback: prompt for path
                 const path = window.prompt("Enter path to WAV file:");
                 if (path) {
                   const result = await bridgeRef.loadAudioFile(nodeId, path);

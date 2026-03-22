@@ -40,6 +40,7 @@ pub fn run() {
             commands::get_waveform_data,
             // Audio file loading
             commands::load_audio_file,
+            commands::pick_and_load_audio,
             // File / state
             commands::load_patch,
             commands::save_patch,

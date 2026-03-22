@@ -750,6 +750,74 @@ pub fn load_audio_file(
     Err(format!("Node {node_id} does not support audio loading"))
 }
 
+/// Open a native file dialog, pick a WAV file, and load it into a node.
+#[tauri::command]
+pub fn pick_and_load_audio(
+    node_id: String,
+    state: State<'_, AppArc>,
+) -> Result<serde_json::Value, String> {
+    let path = rfd::FileDialog::new()
+        .add_filter("Audio", &["wav", "wave", "aif", "aiff"])
+        .set_title("Load Audio File")
+        .pick_file()
+        .ok_or_else(|| "No file selected".to_string())?;
+
+    let path_str = path.to_string_lossy().to_string();
+
+    // Reuse load_audio_file logic
+    let nid = resolve_node_id(&node_id, &state)?;
+
+    let reader = hound::WavReader::open(&path)
+        .map_err(|e| format!("Failed to open: {e}"))?;
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate as f64;
+
+    let samples: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Float => {
+            let all: Vec<f32> = reader.into_samples::<f32>().filter_map(|s| s.ok()).collect();
+            if spec.channels > 1 {
+                let ch = spec.channels as usize;
+                all.chunks(ch).map(|f| f.iter().sum::<f32>() / ch as f32).collect()
+            } else { all }
+        }
+        hound::SampleFormat::Int => {
+            let max_val = (1i64 << (spec.bits_per_sample - 1)) as f32;
+            let all: Vec<f32> = reader.into_samples::<i32>().filter_map(|s| s.ok()).map(|s| s as f32 / max_val).collect();
+            if spec.channels > 1 {
+                let ch = spec.channels as usize;
+                all.chunks(ch).map(|f| f.iter().sum::<f32>() / ch as f32).collect()
+            } else { all }
+        }
+    };
+
+    let sample_count = samples.len();
+
+    // Try engine first
+    {
+        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+        if engine.load_audio_into_node(nid, &samples, sample_rate) {
+            return Ok(serde_json::json!({
+                "ok": true, "path": path_str,
+                "samples": sample_count, "duration": sample_count as f64 / sample_rate,
+            }));
+        }
+    }
+    // Try pending instances
+    {
+        let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+        if let Some(node) = instances.get_mut(&nid) {
+            if node.load_audio_data(&samples, sample_rate) {
+                return Ok(serde_json::json!({
+                    "ok": true, "path": path_str,
+                    "samples": sample_count, "duration": sample_count as f64 / sample_rate,
+                }));
+            }
+        }
+    }
+
+    Err(format!("Node {node_id} does not support audio loading"))
+}
+
 /// Generate a simple UUID-like ID.
 fn uuid_v4() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
