@@ -38,10 +38,22 @@ import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "./store";
 import { ChordNode } from "./ChordNode";
 import { NodeSearchPalette } from "./NodeSearchPalette";
+import {
+  StepSequencerNode,
+  GravitySequencerNode,
+  GameOfLifeNode,
+  MarkovChainNode,
+  PolyrhythmNode,
+} from "./nodes";
 
 // Register custom node types
 const nodeTypes: NodeTypes = {
   chordNode: ChordNode,
+  stepSequencerNode: StepSequencerNode,
+  gravitySequencerNode: GravitySequencerNode,
+  gameOfLifeNode: GameOfLifeNode,
+  markovChainNode: MarkovChainNode,
+  polyrhythmNode: PolyrhythmNode,
 };
 
 // Default viewport

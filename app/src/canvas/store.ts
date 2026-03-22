@@ -363,12 +363,23 @@ export const PORT_COLORS: Record<string, string> = {
 // Conversion helpers
 // ---------------------------------------------------------------------------
 
+// Map sequencer node types to their custom React Flow node type identifiers.
+// These keys correspond to the nodeTypes registered in Canvas.tsx.
+const CUSTOM_NODE_TYPE_MAP: Record<string, string> = {
+  step_sequencer: "stepSequencerNode",
+  gravity_sequencer: "gravitySequencerNode",
+  game_of_life_sequencer: "gameOfLifeNode",
+  markov_sequencer: "markovChainNode",
+  polyrhythm: "polyrhythmNode",
+};
+
 /** Convert a document-model NodeData to a React Flow Node. */
 export function nodeDataToFlowNode(data: NodeData): Node {
   const typeDef = NODE_TYPE_REGISTRY[data.type];
+  const flowNodeType = CUSTOM_NODE_TYPE_MAP[data.type] ?? "chordNode";
   return {
     id: data.id,
-    type: "chordNode",
+    type: flowNodeType,
     position: { x: data.position.x, y: data.position.y },
     data: {
       label: data.name,

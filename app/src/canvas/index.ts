@@ -16,3 +16,10 @@ export {
 } from "./store";
 export { ChordNode } from "./ChordNode";
 export { NodeSearchPalette } from "./NodeSearchPalette";
+export {
+  StepSequencerNode,
+  GravitySequencerNode,
+  GameOfLifeNode,
+  MarkovChainNode,
+  PolyrhythmNode,
+} from "./nodes";
