@@ -122,6 +122,7 @@ impl ChordMcpServer {
 
         let mut stream = TcpStream::connect(format!("127.0.0.1:{APP_API_PORT}"))
             .map_err(|e| McpError::Internal(format!("App connection failed: {e}")))?;
+        stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
 
         stream
             .write_all(request.as_bytes())
@@ -176,6 +177,14 @@ impl ChordMcpServer {
         if self.proxy_mode {
             match name {
                 "create_patch" => {
+                    // Create a local patch so diagnostics/export tools work.
+                    self.patches.insert(
+                        "app".to_string(),
+                        PatchState {
+                            graph: Graph::new(),
+                            diagnostics: DiagnosticEngine::default(),
+                        },
+                    );
                     return Ok(json!({
                         "patch_id": "app",
                         "message": "Using running Chord app (proxy mode). Patch is managed by the app."
@@ -280,6 +289,8 @@ impl ChordMcpServer {
         // Also remove from local graph.
         let _ = self.tool_remove_node(args);
         self.app_node_ids.remove(&node_id_val);
+        // Clean up port name cache for removed node.
+        self.app_port_names.retain(|&(nid, _), _| nid != node_id_val);
 
         Ok(result)
     }

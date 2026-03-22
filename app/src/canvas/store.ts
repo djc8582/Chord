@@ -254,7 +254,10 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     label: "Euclidean",
     category: "sequencers",
     inputs: [{ id: "clock", label: "Clock", type: "audio" }],
-    outputs: [{ id: "out", label: "Out", type: "audio" }],
+    outputs: [
+      { id: "freq", label: "Freq", type: "audio" },
+      { id: "gate", label: "Gate", type: "audio" },
+    ],
   },
   // --- Additional effects ---
   chorus: {
@@ -380,6 +383,20 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
       { id: "carrier", label: "Carrier", type: "audio" },
       { id: "modulator", label: "Mod", type: "audio" },
     ],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  convolution_reverb: {
+    type: "convolution_reverb",
+    label: "Convolution Reverb",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  spectral: {
+    type: "spectral",
+    label: "Spectral",
+    category: "effects",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
 };
@@ -568,6 +585,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }
       if (change.type === "remove") {
         dmRemoveNode(store.ydoc, change.id);
+        // Notify backend so audio engine removes the node
+        _bridge?.removeNode(change.id).catch(() => {});
       }
     }
 
@@ -588,6 +607,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     for (const change of changes) {
       if (change.type === "remove") {
         dmDisconnect(store.ydoc, change.id);
+        // Notify backend so audio engine disconnects
+        _bridge?.disconnect(change.id).catch(() => {});
       }
     }
   },
@@ -664,6 +685,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const selected = store.selectedNodeIds;
     for (const id of selected) {
       dmRemoveNode(store.ydoc, id);
+      // Notify backend so audio engine removes the node
+      _bridge?.removeNode(id).catch(() => {});
     }
     store.syncFromDocument();
   },

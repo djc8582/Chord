@@ -30,6 +30,7 @@ pub struct Vec2 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PortRef {
     pub node_id: String,
     pub port: String,
