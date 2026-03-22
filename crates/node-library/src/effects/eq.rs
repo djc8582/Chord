@@ -168,20 +168,28 @@ impl Default for EqNode {
 impl AudioNode for EqNode {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
         let low_freq = (ctx.parameters.get("low_freq").unwrap_or(200.0) as f64).clamp(20.0, 20000.0);
-        let low_gain = (ctx.parameters.get("low_gain").unwrap_or(0.0) as f64).clamp(-24.0, 24.0);
+        let base_low_gain = (ctx.parameters.get("low_gain").unwrap_or(0.0) as f64).clamp(-24.0, 24.0);
         let low_q = (ctx.parameters.get("low_q").unwrap_or(1.0) as f64).max(0.1);
 
         let mid_freq = (ctx.parameters.get("mid_freq").unwrap_or(1000.0) as f64).clamp(20.0, 20000.0);
-        let mid_gain = (ctx.parameters.get("mid_gain").unwrap_or(0.0) as f64).clamp(-24.0, 24.0);
+        let base_mid_gain = (ctx.parameters.get("mid_gain").unwrap_or(0.0) as f64).clamp(-24.0, 24.0);
         let mid_q = (ctx.parameters.get("mid_q").unwrap_or(1.0) as f64).max(0.1);
 
         let high_freq = (ctx.parameters.get("high_freq").unwrap_or(5000.0) as f64).clamp(20.0, 20000.0);
-        let high_gain = (ctx.parameters.get("high_gain").unwrap_or(0.0) as f64).clamp(-24.0, 24.0);
+        let base_high_gain = (ctx.parameters.get("high_gain").unwrap_or(0.0) as f64).clamp(-24.0, 24.0);
         let high_q = (ctx.parameters.get("high_q").unwrap_or(1.0) as f64).max(0.1);
 
-        self.low.update(low_freq, low_gain, low_q, ctx.sample_rate);
-        self.mid.update(mid_freq, mid_gain, mid_q, ctx.sample_rate);
-        self.high.update(high_freq, high_gain, high_q, ctx.sample_rate);
+        // Check for modulation inputs: low_mod at [1], mid_mod at [2], high_mod at [3]
+        let has_low_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_mid_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
+        let has_high_mod = ctx.inputs.len() > 3 && !ctx.inputs[3].is_empty();
+        let has_any_mod = has_low_mod || has_mid_mod || has_high_mod;
+
+        if !has_any_mod {
+            self.low.update(low_freq, base_low_gain, low_q, ctx.sample_rate);
+            self.mid.update(mid_freq, base_mid_gain, mid_q, ctx.sample_rate);
+            self.high.update(high_freq, base_high_gain, high_q, ctx.sample_rate);
+        }
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -191,6 +199,19 @@ impl AudioNode for EqNode {
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
+            // Per-sample modulation of band gains (dB scale: mod * 24.0)
+            if has_any_mod {
+                let low_mod = if has_low_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+                let mid_mod = if has_mid_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+                let high_mod = if has_high_mod { ctx.inputs[3][i] as f64 } else { 0.0 };
+                let low_gain = (base_low_gain + low_mod * 24.0).clamp(-24.0, 24.0);
+                let mid_gain = (base_mid_gain + mid_mod * 24.0).clamp(-24.0, 24.0);
+                let high_gain = (base_high_gain + high_mod * 24.0).clamp(-24.0, 24.0);
+                self.low.update(low_freq, low_gain, low_q, ctx.sample_rate);
+                self.mid.update(mid_freq, mid_gain, mid_q, ctx.sample_rate);
+                self.high.update(high_freq, high_gain, high_q, ctx.sample_rate);
+            }
+
             let x = input[i] as f64;
             // Process through 3 bands in series.
             let y = self.low.process_sample(x);

@@ -96,17 +96,19 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         style={{
           width: 60,
           padding: "2px 4px",
-          border: "1px solid #555",
-          borderRadius: 3,
-          background: "#1a1a1a",
-          color: "#e0e0e0",
+          border: "3px solid #000",
+          borderRadius: 0,
+          background: "#0a0a0a",
+          color: "#ffffff",
           fontSize: 12,
+          fontWeight: 700,
+          fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
           textAlign: "right",
           outline: "none",
         }}
       />
       {unit ? (
-        <span style={{ fontSize: 11, color: "#888" }}>{unit}</span>
+        <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace' }}>{unit}</span>
       ) : null}
     </span>
   );

@@ -7,15 +7,15 @@ import type { Theme, ThemeMode } from "./types.js";
 export const darkTheme: Theme = {
   mode: "dark",
   colors: {
-    bg: "#0f172a",
-    bgPanel: "#1e293b",
-    bgSurface: "#334155",
-    border: "#475569",
-    text: "#e2e8f0",
+    bg: "#0a0a0a",
+    bgPanel: "#1a1a2e",
+    bgSurface: "#16213e",
+    border: "#000000",
+    text: "#ffffff",
     textMuted: "#94a3b8",
-    accent: "#3b82f6",
-    accentHover: "#2563eb",
-    danger: "#ef4444",
+    accent: "#00ff41",
+    accentHover: "#00cc33",
+    danger: "#ff1493",
   },
 };
 

@@ -66,10 +66,14 @@ impl Default for DelayNode {
 
 impl AudioNode for DelayNode {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let delay_time = (ctx.parameters.get("time").unwrap_or(0.5) as f64)
+        let base_delay_time = (ctx.parameters.get("time").unwrap_or(0.5) as f64)
             .clamp(0.001, MAX_DELAY_SECONDS);
-        let feedback = (ctx.parameters.get("feedback").unwrap_or(0.3) as f64).clamp(0.0, 0.99);
+        let base_feedback = (ctx.parameters.get("feedback").unwrap_or(0.3) as f64).clamp(0.0, 0.99);
         let mix = (ctx.parameters.get("mix").unwrap_or(0.5) as f64).clamp(0.0, 1.0);
+
+        // Check for modulation inputs: time_mod at [1], feedback_mod at [2]
+        let has_time_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_feedback_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         // Ensure buffers are large enough for the current sample rate.
         // This only reallocates if the sample rate increased significantly.
@@ -79,25 +83,22 @@ impl AudioNode for DelayNode {
             return Ok(ProcessStatus::Silent);
         }
 
-        let delay_samples = (delay_time * ctx.sample_rate) as usize;
         let buf_len = self.buffer_l.len();
 
         let has_left_input = !ctx.inputs.is_empty();
-        let has_right_input = ctx.inputs.len() > 1;
-        let has_right_output = ctx.outputs.len() > 1;
-
-        // Process both channels in a single per-sample loop so the right
-        // channel always reads from a consistent delay buffer state.
 
         for i in 0..ctx.buffer_size {
             let dry_l = if has_left_input { ctx.inputs[0][i] } else { 0.0 };
-            let dry_r = if has_right_input {
-                ctx.inputs[1][i]
-            } else {
-                dry_l
-            };
 
-            // Read from delay buffer — both channels from the same read position.
+            // Per-sample modulation
+            let time_mod = if has_time_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let fb_mod = if has_feedback_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+            let delay_time = (base_delay_time + time_mod * 2.0).clamp(0.001, MAX_DELAY_SECONDS);
+            let feedback = (base_feedback + fb_mod).clamp(0.0, 0.99);
+
+            let delay_samples = (delay_time * ctx.sample_rate) as usize;
+
+            // Read from delay buffer.
             let read_pos = if self.write_pos >= delay_samples {
                 self.write_pos - delay_samples
             } else {
@@ -105,22 +106,21 @@ impl AudioNode for DelayNode {
             };
 
             let wet_l = self.buffer_l[read_pos];
-            let wet_r = self.buffer_r[read_pos];
 
-            // Write new samples with feedback into both channels.
+            // Write new samples with feedback.
             self.buffer_l[self.write_pos] = dry_l + wet_l * feedback as f32;
-            self.buffer_r[self.write_pos] = dry_r + wet_r * feedback as f32;
+            self.buffer_r[self.write_pos] = dry_l + self.buffer_r[read_pos] * feedback as f32;
 
             // Advance write position.
             self.write_pos = (self.write_pos + 1) % buf_len;
 
-            // Mix dry and wet signals for both channels.
+            // Mix dry and wet signals.
             let out_l = dry_l * (1.0 - mix as f32) + wet_l * mix as f32;
-            let out_r = dry_r * (1.0 - mix as f32) + wet_r * mix as f32;
 
             ctx.outputs[0][i] = out_l;
-            if has_right_output {
-                ctx.outputs[1][i] = out_r;
+            if ctx.outputs.len() > 1 {
+                let wet_r = self.buffer_r[read_pos];
+                ctx.outputs[1][i] = dry_l * (1.0 - mix as f32) + wet_r * mix as f32;
             }
         }
 

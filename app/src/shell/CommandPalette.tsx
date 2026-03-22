@@ -114,10 +114,10 @@ export function CommandPalette() {
           width: 520,
           maxHeight: 400,
           background: theme.colors.bgPanel,
-          border: `1px solid ${theme.colors.border}`,
-          borderRadius: 8,
+          border: "3px solid #000",
+          borderRadius: 0,
           overflow: "hidden",
-          boxShadow: "0 16px 48px rgba(0,0,0,0.3)",
+          boxShadow: "4px 4px 0px #000",
           display: "flex",
           flexDirection: "column",
         }}
@@ -135,9 +135,11 @@ export function CommandPalette() {
             padding: "12px 16px",
             background: "transparent",
             border: "none",
-            borderBottom: `1px solid ${theme.colors.border}`,
+            borderBottom: "3px solid #000",
             color: theme.colors.text,
             fontSize: 14,
+            fontWeight: 700,
+            fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
             outline: "none",
           }}
         />
@@ -171,8 +173,10 @@ export function CommandPalette() {
                 padding: "8px 16px",
                 cursor: "pointer",
                 background: i === selectedIndex ? theme.colors.bgSurface : "transparent",
-                color: theme.colors.text,
+                color: i === selectedIndex ? "#00ff41" : theme.colors.text,
                 fontSize: 13,
+                fontWeight: 700,
+                borderLeft: i === selectedIndex ? "3px solid #00ff41" : "3px solid transparent",
               }}
             >
               <span>
@@ -190,8 +194,10 @@ export function CommandPalette() {
                     color: theme.colors.textMuted,
                     background: theme.colors.bgSurface,
                     padding: "2px 6px",
-                    borderRadius: 3,
-                    fontFamily: "monospace",
+                    borderRadius: 0,
+                    border: "2px solid #000",
+                    fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
+                    fontWeight: 700,
                   }}
                 >
                   {cmd.shortcut}

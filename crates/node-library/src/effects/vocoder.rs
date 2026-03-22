@@ -180,7 +180,10 @@ impl AudioNode for Vocoder {
         let bands = (ctx.parameters.get("bands").unwrap_or(16.0) as usize).clamp(1, NUM_BANDS);
         let attack = ctx.parameters.get("attack").unwrap_or(5.0).clamp(1.0, 100.0);
         let release = ctx.parameters.get("release").unwrap_or(50.0).clamp(10.0, 500.0);
-        let mix = ctx.parameters.get("mix").unwrap_or(1.0).clamp(0.0, 1.0);
+        let base_mix = ctx.parameters.get("mix").unwrap_or(1.0).clamp(0.0, 1.0);
+
+        // Check for modulation input: mix_mod at [2] (after carrier=0, modulator=1)
+        let has_mix_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -211,6 +214,11 @@ impl AudioNode for Vocoder {
         for i in 0..ctx.buffer_size {
             let carrier_sample = carrier_in[i];
             let modulator_sample = modulator_in[i];
+
+            // Per-sample modulation
+            let mix_mod = if has_mix_mod { ctx.inputs[2][i] } else { 0.0 };
+            let mix = (base_mix + mix_mod).clamp(0.0, 1.0);
+
             let mut sum = 0.0f32;
 
             for band in 0..bands {

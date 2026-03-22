@@ -59,45 +59,7 @@ export function Shell({ children, panelContent }: ShellProps) {
     const next = !isPlaying;
     setIsPlaying(next);
     if (next) {
-      // Sync the entire canvas state to the backend before playing.
-      // This guarantees the backend graph matches what the user sees.
-      try {
-        const { useCanvasStore } = require("../canvas/store.js");
-        const { getPatchDocument } = require("@chord/document-model");
-        const canvasState = useCanvasStore.getState();
-        const patch = getPatchDocument(canvasState.ydoc);
-
-        const nodes: Array<{id: string; node_type: string; x: number; y: number; parameters: Record<string, number>}> = [];
-        patch.nodes.forEach((n: any) => {
-          nodes.push({
-            id: n.id,
-            node_type: n.type,
-            x: n.position.x,
-            y: n.position.y,
-            parameters: n.parameters || {},
-          });
-        });
-
-        const connections: Array<{from_node: string; from_port: string; to_node: string; to_port: string}> = [];
-        const connArray = patch.connections.toArray();
-        for (const c of connArray) {
-          connections.push({
-            from_node: c.fromNode,
-            from_port: c.fromPort,
-            to_node: c.toNode,
-            to_port: c.toPort,
-          });
-        }
-
-        if (nodes.length > 0) {
-          _bridge.syncAndPlay(nodes, connections).catch(console.error);
-        } else {
-          _bridge.play().catch(console.error);
-        }
-      } catch (e) {
-        // Fallback to plain play if sync fails.
-        _bridge.play().catch(console.error);
-      }
+      _bridge.play().catch(console.error);
     } else {
       _bridge.stop().catch(console.error);
     }
@@ -164,7 +126,8 @@ export function Shell({ children, panelContent }: ShellProps) {
         height: "100%",
         background: theme.colors.bg,
         color: theme.colors.text,
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
+        fontWeight: 700,
         fontSize: 13,
       }}
     >

@@ -202,16 +202,23 @@ impl Default for GranularNode {
 
 impl AudioNode for GranularNode {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let grain_size = (ctx.parameters.get("grain_size").unwrap_or(0.05) as f64)
+        let base_grain_size = (ctx.parameters.get("grain_size").unwrap_or(0.05) as f64)
             .clamp(0.01, 0.2);
-        let density = (ctx.parameters.get("density").unwrap_or(10.0) as f64)
+        let base_density = (ctx.parameters.get("density").unwrap_or(10.0) as f64)
             .clamp(1.0, 50.0);
-        let pitch_semitones = (ctx.parameters.get("pitch").unwrap_or(0.0) as f64)
+        let base_pitch_semitones = (ctx.parameters.get("pitch").unwrap_or(0.0) as f64)
             .clamp(-24.0, 24.0);
-        let scatter = (ctx.parameters.get("scatter").unwrap_or(0.0))
+        let base_scatter = (ctx.parameters.get("scatter").unwrap_or(0.0))
             .clamp(0.0, 1.0);
         let mix = (ctx.parameters.get("mix").unwrap_or(1.0))
             .clamp(0.0, 1.0);
+
+        // Check for modulation inputs: pitch_mod at [1], grain_size_mod at [2],
+        // scatter_mod at [3], density_mod at [4]
+        let has_pitch_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_grain_size_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
+        let has_scatter_mod = ctx.inputs.len() > 3 && !ctx.inputs[3].is_empty();
+        let has_density_mod = ctx.inputs.len() > 4 && !ctx.inputs[4].is_empty();
 
         // Ensure buffers are large enough for the current sample rate.
         self.ensure_buffer_size(ctx.sample_rate);
@@ -224,18 +231,27 @@ impl AudioNode for GranularNode {
         let buf_len = self.buffer.len();
         let has_input = !ctx.inputs.is_empty() && !ctx.inputs[0].is_empty();
 
-        // Pitch shift via playback rate: semitones -> rate multiplier.
-        let playback_rate = (2.0_f64).powf(pitch_semitones / 12.0);
-
-        // Grain size in samples.
-        let grain_size_samples = ((grain_size * sr) as usize).max(1);
-
-        // Samples between grain triggers.
-        let spawn_interval = sr / density;
-
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
+            // Per-sample modulation
+            let pitch_mod = if has_pitch_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let gs_mod = if has_grain_size_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+            let scat_mod = if has_scatter_mod { ctx.inputs[3][i] } else { 0.0 };
+            let dens_mod = if has_density_mod { ctx.inputs[4][i] as f64 } else { 0.0 };
+            let pitch_semitones = (base_pitch_semitones + pitch_mod * 24.0).clamp(-24.0, 24.0);
+            let grain_size = (base_grain_size + gs_mod * 0.2).clamp(0.01, 0.5);
+            let scatter = (base_scatter + scat_mod).clamp(0.0, 1.0);
+            let density = (base_density + dens_mod * 50.0).clamp(1.0, 100.0);
+
+            // Pitch shift via playback rate: semitones -> rate multiplier.
+            let playback_rate = (2.0_f64).powf(pitch_semitones / 12.0);
+
+            // Grain size in samples.
+            let grain_size_samples = ((grain_size * sr) as usize).max(1);
+
+            // Samples between grain triggers.
+            let spawn_interval = sr / density;
             // 1. Record incoming audio into circular buffer (only when input is connected).
             // When no input is connected, preserve the buffer contents (e.g. loaded audio file).
             let dry = if has_input {

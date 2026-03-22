@@ -86,6 +86,8 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "effects",
     inputs: [
       { id: "in", label: "In", type: "audio" },
+      { id: "cutoff_mod", label: "Cut", type: "control" },
+      { id: "resonance_mod", label: "Res", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -95,6 +97,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "utilities",
     inputs: [
       { id: "in", label: "In", type: "audio" },
+      { id: "gain_mod", label: "Gain", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -102,14 +105,23 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     type: "envelope",
     label: "Envelope",
     category: "modulators",
-    inputs: [{ id: "gate", label: "Gate", type: "audio" }],
+    inputs: [
+      { id: "gate", label: "Gate", type: "audio" },
+      { id: "attack_mod", label: "Atk", type: "control" },
+      { id: "decay_mod", label: "Dec", type: "control" },
+      { id: "sustain_mod", label: "Sus", type: "control" },
+      { id: "release_mod", label: "Rel", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   lfo: {
     type: "lfo",
     label: "LFO",
     category: "modulators",
-    inputs: [],
+    inputs: [
+      { id: "rate_mod", label: "Rate", type: "control" },
+      { id: "depth_mod", label: "Dep", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   mixer: {
@@ -148,6 +160,8 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "effects",
     inputs: [
       { id: "in", label: "In", type: "audio" },
+      { id: "time_mod", label: "Time", type: "control" },
+      { id: "feedback_mod", label: "FB", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -157,6 +171,8 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "effects",
     inputs: [
       { id: "in", label: "In", type: "audio" },
+      { id: "room_mod", label: "Room", type: "control" },
+      { id: "mix_mod", label: "Mix", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -166,6 +182,8 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "effects",
     inputs: [
       { id: "in", label: "In", type: "audio" },
+      { id: "threshold_mod", label: "Thr", type: "control" },
+      { id: "ratio_mod", label: "Rat", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -175,6 +193,9 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "effects",
     inputs: [
       { id: "in", label: "In", type: "audio" },
+      { id: "low_mod", label: "Low", type: "control" },
+      { id: "mid_mod", label: "Mid", type: "control" },
+      { id: "high_mod", label: "High", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -264,21 +285,32 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     type: "chorus",
     label: "Chorus",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "rate_mod", label: "Rate", type: "control" },
+      { id: "depth_mod", label: "Dep", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   phaser: {
     type: "phaser",
     label: "Phaser",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "rate_mod", label: "Rate", type: "control" },
+      { id: "depth_mod", label: "Dep", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   waveshaper: {
     type: "waveshaper",
     label: "Waveshaper",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "drive_mod", label: "Drv", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   ring_modulator: {
@@ -288,6 +320,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     inputs: [
       { id: "in", label: "In", type: "audio" },
       { id: "mod", label: "Mod", type: "audio" },
+      { id: "mix_mod", label: "Mix", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -295,21 +328,30 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     type: "pitch_shifter",
     label: "Pitch Shifter",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "semitones_mod", label: "Semi", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   limiter: {
     type: "limiter",
     label: "Limiter",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "ceiling_mod", label: "Ceil", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   gate: {
     type: "gate",
     label: "Gate",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "threshold_mod", label: "Thr", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   crossfader: {
@@ -319,6 +361,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     inputs: [
       { id: "a", label: "A", type: "audio" },
       { id: "b", label: "B", type: "audio" },
+      { id: "position_mod", label: "Pos", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -344,7 +387,10 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     type: "stereo",
     label: "Stereo",
     category: "utilities",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "width_mod", label: "Wid", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   expression: {
@@ -372,7 +418,13 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     type: "granular",
     label: "Granular",
     category: "generators",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "pitch_mod", label: "Pit", type: "control" },
+      { id: "grain_size_mod", label: "Grn", type: "control" },
+      { id: "scatter_mod", label: "Sct", type: "control" },
+      { id: "density_mod", label: "Den", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   vocoder: {
@@ -382,6 +434,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     inputs: [
       { id: "carrier", label: "Carrier", type: "audio" },
       { id: "modulator", label: "Mod", type: "audio" },
+      { id: "mix_mod", label: "Mix", type: "control" },
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
@@ -389,14 +442,21 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     type: "convolution_reverb",
     label: "Convolution Reverb",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "mix_mod", label: "Mix", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   spectral: {
     type: "spectral",
     label: "Spectral",
     category: "effects",
-    inputs: [{ id: "in", label: "In", type: "audio" }],
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+      { id: "shift_mod", label: "Shft", type: "control" },
+      { id: "mix_mod", label: "Mix", type: "control" },
+    ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
 };

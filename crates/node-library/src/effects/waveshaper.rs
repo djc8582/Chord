@@ -84,9 +84,12 @@ fn sine_fold(x: f32) -> f32 {
 
 impl AudioNode for Waveshaper {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let drive = ctx.parameters.get("drive").unwrap_or(1.0).max(0.01);
+        let base_drive = ctx.parameters.get("drive").unwrap_or(1.0).max(0.01);
         let mix = ctx.parameters.get("mix").unwrap_or(1.0).clamp(0.0, 1.0);
         let mode = WaveshaperMode::from(ctx.parameters.get("mode").unwrap_or(0.0) as u32);
+
+        // Check for modulation input: drive_mod at [1]
+        let has_drive_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -97,6 +100,8 @@ impl AudioNode for Waveshaper {
 
         for i in 0..ctx.buffer_size {
             let dry = input[i];
+            let drive_mod = if has_drive_mod { ctx.inputs[1][i] } else { 0.0 };
+            let drive = (base_drive + drive_mod * 10.0).max(0.01);
             let driven = dry * drive;
 
             let wet = match mode {

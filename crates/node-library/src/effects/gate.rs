@@ -63,17 +63,19 @@ impl Default for Gate {
 
 impl AudioNode for Gate {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let threshold_db = (ctx.parameters.get("threshold").unwrap_or(-40.0) as f64).clamp(-80.0, 0.0);
+        let base_threshold_db = (ctx.parameters.get("threshold").unwrap_or(-40.0) as f64).clamp(-80.0, 0.0);
         let attack_ms = (ctx.parameters.get("attack").unwrap_or(1.0) as f64).clamp(0.01, 50.0);
         let hold_ms = (ctx.parameters.get("hold").unwrap_or(50.0) as f64).clamp(0.0, 500.0);
         let release_ms = (ctx.parameters.get("release").unwrap_or(50.0) as f64).clamp(1.0, 500.0);
 
-        let threshold_linear = 10.0_f64.powf(threshold_db / 20.0);
         let attack_samples = (attack_ms * 0.001 * ctx.sample_rate).max(1.0);
         let attack_inc = 1.0 / attack_samples;
         let hold_samples = (hold_ms * 0.001 * ctx.sample_rate) as usize;
         let release_samples = (release_ms * 0.001 * ctx.sample_rate).max(1.0);
         let release_dec = 1.0 / release_samples;
+
+        // Check for modulation input: threshold_mod at [1]
+        let has_threshold_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
 
         // Envelope follower coefficient for level detection (~5ms).
         let env_coeff = (-1.0 / (0.005 * ctx.sample_rate)).exp();
@@ -88,6 +90,11 @@ impl AudioNode for Gate {
         for i in 0..ctx.buffer_size {
             let sample = input[i] as f64;
             let abs_sample = sample.abs();
+
+            // Per-sample modulation (dB scale: mod * 40.0)
+            let thr_mod = if has_threshold_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let threshold_db = (base_threshold_db + thr_mod * 40.0).clamp(-80.0, 0.0);
+            let threshold_linear = 10.0_f64.powf(threshold_db / 20.0);
 
             // Update envelope follower.
             if abs_sample > self.envelope {

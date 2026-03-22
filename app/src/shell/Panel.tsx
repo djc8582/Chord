@@ -97,10 +97,11 @@ export function Panel({ id, title, position, minSize, children }: PanelProps) {
         display: "flex",
         flexDirection: "column",
         background: theme.colors.bgPanel,
-        borderLeft: position === "right" ? `1px solid ${theme.colors.border}` : undefined,
-        borderRight: position === "left" ? `1px solid ${theme.colors.border}` : undefined,
-        borderTop: position === "bottom" ? `1px solid ${theme.colors.border}` : undefined,
-        borderBottom: position === "top" ? `1px solid ${theme.colors.border}` : undefined,
+        borderLeft: position === "right" ? `3px solid ${theme.colors.border}` : undefined,
+        borderRight: position === "left" ? `3px solid ${theme.colors.border}` : undefined,
+        borderTop: position === "bottom" ? `3px solid ${theme.colors.border}` : undefined,
+        borderBottom: position === "top" ? `3px solid ${theme.colors.border}` : undefined,
+        borderRadius: 0,
         overflow: "hidden",
         flexShrink: 0,
       }}
@@ -115,13 +116,14 @@ export function Panel({ id, title, position, minSize, children }: PanelProps) {
           height: 28,
           minHeight: 28,
           background: theme.colors.bgSurface,
-          borderBottom: `1px solid ${theme.colors.border}`,
+          borderBottom: `3px solid ${theme.colors.border}`,
           fontSize: 11,
-          fontWeight: 600,
-          color: theme.colors.textMuted,
+          fontWeight: 800,
+          color: theme.colors.accent,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
+          letterSpacing: "0.1em",
           userSelect: "none",
+          fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         }}
       >
         <span>{title}</span>
@@ -130,9 +132,10 @@ export function Panel({ id, title, position, minSize, children }: PanelProps) {
           style={{
             background: "none",
             border: "none",
-            color: theme.colors.textMuted,
+            color: theme.colors.accent,
             cursor: "pointer",
-            fontSize: 12,
+            fontSize: 14,
+            fontWeight: 800,
             padding: "0 4px",
             lineHeight: 1,
           }}

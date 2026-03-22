@@ -53,7 +53,7 @@ export const Slider: React.FC<SliderProps> = ({
           alignItems: "center",
         }}
       >
-        <label style={{ fontSize: 12, color: "#ccc" }}>{label}</label>
+        <label style={{ fontSize: 12, color: "#ffffff", fontWeight: 700, fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace' }}>{label}</label>
         <NumberInput
           value={value}
           min={min}
@@ -73,7 +73,7 @@ export const Slider: React.FC<SliderProps> = ({
         onChange={handleSliderChange}
         aria-label={label}
         data-testid={testId ? `${testId}-range` : undefined}
-        style={{ width: "100%", cursor: "pointer" }}
+        style={{ width: "100%", cursor: "pointer", accentColor: "#00ff41" }}
       />
     </div>
   );

@@ -136,12 +136,13 @@ impl Default for ReverbNode {
 
 impl AudioNode for ReverbNode {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let room_size = (ctx.parameters.get("room_size").unwrap_or(0.5)).clamp(0.0, 1.0);
+        let base_room_size = (ctx.parameters.get("room_size").unwrap_or(0.5)).clamp(0.0, 1.0);
         let damping = (ctx.parameters.get("damping").unwrap_or(0.5)).clamp(0.0, 1.0);
-        let mix = (ctx.parameters.get("mix").unwrap_or(0.3)).clamp(0.0, 1.0);
+        let base_mix = (ctx.parameters.get("mix").unwrap_or(0.3)).clamp(0.0, 1.0);
 
-        // Map room_size to feedback (0.7 to 0.98 range for stability).
-        let feedback = 0.7 + room_size * 0.28;
+        // Check for modulation inputs: room_mod at [1], mix_mod at [2]
+        let has_room_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_mix_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -152,6 +153,15 @@ impl AudioNode for ReverbNode {
 
         for i in 0..ctx.buffer_size {
             let dry = input[i];
+
+            // Per-sample modulation
+            let room_mod = if has_room_mod { ctx.inputs[1][i] } else { 0.0 };
+            let mix_mod = if has_mix_mod { ctx.inputs[2][i] } else { 0.0 };
+            let room_size = (base_room_size + room_mod).clamp(0.0, 1.0);
+            let mix = (base_mix + mix_mod).clamp(0.0, 1.0);
+
+            // Map room_size to feedback (0.7 to 0.98 range for stability).
+            let feedback = 0.7 + room_size * 0.28;
 
             // Process parallel comb filters and sum their outputs.
             let mut wet = 0.0_f32;

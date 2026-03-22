@@ -45,12 +45,17 @@ impl AudioNode for GainNode {
             return Ok(ProcessStatus::Silent);
         }
 
+        // Check for modulation input: gain_mod at [1]
+        let has_gain_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+
         let input = ctx.inputs[0];
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
             let g = self.smoothed_gain.next_sample();
-            output[i] = input[i] * g;
+            let gain_mod = if has_gain_mod { ctx.inputs[1][i] } else { 0.0 };
+            let effective_gain = (g + gain_mod).max(0.0);
+            output[i] = input[i] * effective_gain;
         }
 
         Ok(ProcessStatus::Ok)

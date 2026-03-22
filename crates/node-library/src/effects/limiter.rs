@@ -36,11 +36,13 @@ impl Default for Limiter {
 
 impl AudioNode for Limiter {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let ceiling_db = (ctx.parameters.get("ceiling").unwrap_or(0.0) as f64).clamp(-24.0, 0.0);
+        let base_ceiling_db = (ctx.parameters.get("ceiling").unwrap_or(0.0) as f64).clamp(-24.0, 0.0);
         let release_ms = (ctx.parameters.get("release").unwrap_or(100.0) as f64).clamp(1.0, 1000.0);
 
-        let ceiling_linear = 10.0_f64.powf(ceiling_db / 20.0);
         let release_coeff = (-1.0 / (release_ms * 0.001 * ctx.sample_rate)).exp();
+
+        // Check for modulation input: ceiling_mod at [1]
+        let has_ceiling_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -52,6 +54,11 @@ impl AudioNode for Limiter {
         for i in 0..ctx.buffer_size {
             let sample = input[i] as f64;
             let abs_sample = sample.abs();
+
+            // Per-sample modulation (dB scale: mod * 24.0)
+            let ceil_mod = if has_ceiling_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let ceiling_db = (base_ceiling_db + ceil_mod * 24.0).clamp(-24.0, 0.0);
+            let ceiling_linear = 10.0_f64.powf(ceiling_db / 20.0);
 
             // Compute required gain reduction for this sample.
             let target_envelope = if abs_sample > ceiling_linear {

@@ -67,10 +67,6 @@ export const Inspector: React.FC<InspectorProps> = ({
   const setParam = useInspectorStore((s) => s.setParameter);
   const setNodeName = useInspectorStore((s) => s.setNodeName);
 
-  // -- MIDI Learn state ---
-  const [midiLearnActive, setMidiLearnActive] = useState(false);
-  const [midiLearnParam, setMidiLearnParam] = useState<string | null>(null);
-
   // -- Audio file loading state ---
   const [loadedFileName, setLoadedFileName] = useState<string | null>(null);
 
@@ -115,42 +111,6 @@ export const Inspector: React.FC<InspectorProps> = ({
     [setNodeName],
   );
 
-  // -- MIDI Learn handlers ---
-  const handleMidiLearnToggle = useCallback(() => {
-    if (midiLearnActive) {
-      // Cancel learn mode
-      setMidiLearnActive(false);
-      setMidiLearnParam(null);
-    } else {
-      // Enter learn mode — next parameter touch will activate listening
-      setMidiLearnActive(true);
-      setMidiLearnParam(null);
-    }
-  }, [midiLearnActive]);
-
-  const handleParameterTouch = useCallback(
-    (paramId: string) => {
-      if (midiLearnActive && !midiLearnParam) {
-        setMidiLearnParam(paramId);
-        // In a full implementation, this would create a MidiLearnSession
-        // and feed incoming MIDI messages to it. For now, just show the
-        // "waiting" state. Auto-cancel after 10 seconds.
-        setTimeout(() => {
-          setMidiLearnActive(false);
-          setMidiLearnParam(null);
-        }, 10000);
-      }
-    },
-    [midiLearnActive, midiLearnParam],
-  );
-
-  // Clear MIDI learn + file state when node selection changes
-  useEffect(() => {
-    setMidiLearnActive(false);
-    setMidiLearnParam(null);
-    setLoadedFileName(null);
-  }, [selectedNodeIds]);
-
   // ------- Empty state -------
   if (!inspectedNode) {
     return (
@@ -158,13 +118,15 @@ export const Inspector: React.FC<InspectorProps> = ({
         data-testid={testId}
         style={{
           padding: 16,
-          color: "#888",
+          color: "#94a3b8",
           fontSize: 13,
+          fontWeight: 700,
+          fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
           textAlign: "center",
         }}
       >
         <p data-testid={`${testId}-empty`}>No node selected</p>
-        <p style={{ fontSize: 11, marginTop: 8 }}>
+        <p style={{ fontSize: 11, marginTop: 8, fontWeight: 700 }}>
           Select a node on the canvas to view its parameters.
         </p>
       </div>
@@ -177,8 +139,10 @@ export const Inspector: React.FC<InspectorProps> = ({
       data-testid={testId}
       style={{
         padding: 12,
-        color: "#e0e0e0",
+        color: "#ffffff",
         fontSize: 13,
+        fontWeight: 700,
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         overflowY: "auto",
       }}
     >
@@ -193,23 +157,24 @@ export const Inspector: React.FC<InspectorProps> = ({
           style={{
             width: "100%",
             padding: "4px 6px",
-            border: "1px solid #555",
-            borderRadius: 3,
-            background: "#1a1a1a",
-            color: "#e0e0e0",
+            border: "3px solid #000",
+            borderRadius: 0,
+            background: "#0a0a0a",
+            color: "#ffffff",
             fontSize: 14,
-            fontWeight: 600,
+            fontWeight: 800,
+            fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
             outline: "none",
             boxSizing: "border-box",
           }}
         />
         <div
           data-testid={`${testId}-type`}
-          style={{ fontSize: 11, color: "#888", marginTop: 4 }}
+          style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontWeight: 700 }}
         >
           {nodeTypeDef?.label ?? inspectedNode.type}
           {nodeTypeDef?.category ? (
-            <span style={{ marginLeft: 6, color: "#666" }}>
+            <span style={{ marginLeft: 6, color: "#8b5cf6", fontWeight: 700 }}>
               ({nodeTypeDef.category})
             </span>
           ) : null}
@@ -222,10 +187,12 @@ export const Inspector: React.FC<InspectorProps> = ({
           <div
             style={{
               fontSize: 11,
-              color: "#666",
+              color: "#00ff41",
               textTransform: "uppercase",
               letterSpacing: 1,
               marginBottom: 8,
+              fontWeight: 800,
+              fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
             }}
           >
             Parameters
@@ -233,75 +200,40 @@ export const Inspector: React.FC<InspectorProps> = ({
           {parameterDescriptors.map((desc) => {
             const currentValue =
               inspectedNode.parameters[desc.id] ?? desc.defaultValue;
-            const isLearnTarget = midiLearnParam === desc.id;
-
-            const handleChange = (v: number) => {
-              handleParameterChange(desc.id, v);
-              // If MIDI learn is active and no param selected yet, select this one
-              handleParameterTouch(desc.id);
-            };
 
             if (shouldUseKnob(desc.min, desc.max, desc.step)) {
               return (
-                <div key={desc.id} style={{ position: "relative" }}>
-                  <Knob
-                    label={desc.label}
-                    value={currentValue}
-                    min={desc.min}
-                    max={desc.max}
-                    step={desc.step}
-                    unit={desc.unit}
-                    onChange={handleChange}
-                    data-testid={`${testId}-param-${desc.id}`}
-                  />
-                  {isLearnTarget && (
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: "#f59e0b",
-                        fontWeight: 600,
-                        marginTop: 2,
-                        marginBottom: 4,
-                      }}
-                    >
-                      Waiting for MIDI CC...
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            return (
-              <div key={desc.id} style={{ position: "relative" }}>
-                <Slider
+                <Knob
+                  key={desc.id}
                   label={desc.label}
                   value={currentValue}
                   min={desc.min}
                   max={desc.max}
                   step={desc.step}
                   unit={desc.unit}
-                  onChange={handleChange}
+                  onChange={(v) => handleParameterChange(desc.id, v)}
                   data-testid={`${testId}-param-${desc.id}`}
                 />
-                {isLearnTarget && (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "#f59e0b",
-                      fontWeight: 600,
-                      marginTop: 2,
-                      marginBottom: 4,
-                    }}
-                  >
-                    Waiting for MIDI CC...
-                  </div>
-                )}
-              </div>
+              );
+            }
+
+            return (
+              <Slider
+                key={desc.id}
+                label={desc.label}
+                value={currentValue}
+                min={desc.min}
+                max={desc.max}
+                step={desc.step}
+                unit={desc.unit}
+                onChange={(v) => handleParameterChange(desc.id, v)}
+                data-testid={`${testId}-param-${desc.id}`}
+              />
             );
           })}
         </div>
       ) : (
-        <div style={{ fontSize: 12, color: "#666", fontStyle: "italic" }}>
+        <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic", fontWeight: 700 }}>
           No parameters
         </div>
       )}
@@ -315,7 +247,6 @@ export const Inspector: React.FC<InspectorProps> = ({
               const nodeId = useInspectorStore.getState().inspectedNodeId;
               if (!nodeId) return;
               try {
-                // Use Tauri command to open native file dialog + load in one step
                 const { invoke } = await import("@tauri-apps/api/core");
                 const result = await invoke<{ ok: boolean; path: string; samples: number; duration: number }>(
                   "pick_and_load_audio", { nodeId }
@@ -323,8 +254,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 if (result?.ok) {
                   setLoadedFileName(result.path.split("/").pop()?.split("\\").pop() ?? "loaded");
                 }
-              } catch (e) {
-                // Fallback: prompt for path
+              } catch {
                 const path = window.prompt("Enter path to WAV file:");
                 if (path) {
                   const result = await bridgeRef.loadAudioFile(nodeId, path);
@@ -338,72 +268,22 @@ export const Inspector: React.FC<InspectorProps> = ({
               width: "100%",
               padding: "8px 12px",
               fontSize: 12,
-              fontWeight: 600,
-              color: "#e2e8f0",
-              backgroundColor: "#1e3a5f",
-              border: "1px solid #2563eb",
-              borderRadius: 4,
+              fontWeight: 800,
+              fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
+              color: "#000",
+              backgroundColor: "#00ff41",
+              border: "3px solid #000",
+              borderRadius: 0,
               cursor: "pointer",
+              textTransform: "uppercase",
+              letterSpacing: 1,
             }}
           >
             Load Audio File
           </button>
           {loadedFileName && (
-            <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: "#00ff41", marginTop: 4, fontWeight: 700 }}>
               {loadedFileName}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* MIDI Learn section */}
-      {parameterDescriptors.length > 0 && (
-        <div data-testid={`${testId}-midi-learn`} style={{ marginTop: 12 }}>
-          <button
-            onClick={handleMidiLearnToggle}
-            data-testid={`${testId}-midi-learn-btn`}
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              fontSize: 12,
-              fontWeight: 600,
-              color: midiLearnActive ? "#020617" : "#e2e8f0",
-              backgroundColor: midiLearnActive ? "#f59e0b" : "#334155",
-              border: midiLearnActive
-                ? "1px solid #d97706"
-                : "1px solid #475569",
-              borderRadius: 4,
-              cursor: "pointer",
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
-            {midiLearnActive ? "Cancel MIDI Learn" : "MIDI Learn"}
-          </button>
-          {midiLearnActive && !midiLearnParam && (
-            <div
-              data-testid={`${testId}-midi-learn-status`}
-              style={{
-                fontSize: 11,
-                color: "#f59e0b",
-                marginTop: 6,
-                textAlign: "center",
-              }}
-            >
-              Touch a parameter to assign MIDI control...
-            </div>
-          )}
-          {midiLearnParam && (
-            <div
-              data-testid={`${testId}-midi-learn-waiting`}
-              style={{
-                fontSize: 11,
-                color: "#f59e0b",
-                marginTop: 6,
-                textAlign: "center",
-              }}
-            >
-              Listening on "{midiLearnParam}" — move a MIDI controller...
             </div>
           )}
         </div>
@@ -415,10 +295,12 @@ export const Inspector: React.FC<InspectorProps> = ({
           <div
             style={{
               fontSize: 11,
-              color: "#666",
+              color: "#00d4ff",
               textTransform: "uppercase",
               letterSpacing: 1,
               marginBottom: 8,
+              fontWeight: 800,
+              fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
             }}
           >
             Ports
@@ -426,7 +308,7 @@ export const Inspector: React.FC<InspectorProps> = ({
 
           {nodeTypeDef.inputs.length > 0 ? (
             <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: "#ffd700", marginBottom: 4, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1 }}>
                 Inputs
               </div>
               {nodeTypeDef.inputs.map((port) => (
@@ -439,26 +321,28 @@ export const Inspector: React.FC<InspectorProps> = ({
                     gap: 6,
                     padding: "2px 0",
                     fontSize: 12,
+                    fontWeight: 700,
                   }}
                 >
                   <span
                     style={{
-                      width: 8,
-                      height: 8,
+                      width: 10,
+                      height: 10,
                       borderRadius: "50%",
+                      border: "2px solid #000",
                       background:
                         port.type === "audio"
-                          ? "#f97316"
+                          ? "#ff6b00"
                           : port.type === "control"
-                            ? "#3b82f6"
+                            ? "#00d4ff"
                             : port.type === "midi"
                               ? "#a855f7"
-                              : "#22c55e",
+                              : "#00ff41",
                       display: "inline-block",
                     }}
                   />
                   <span>{port.label}</span>
-                  <span style={{ color: "#666", fontSize: 10 }}>
+                  <span style={{ color: "#94a3b8", fontSize: 10, fontWeight: 700 }}>
                     ({port.type})
                   </span>
                 </div>
@@ -468,7 +352,7 @@ export const Inspector: React.FC<InspectorProps> = ({
 
           {nodeTypeDef.outputs.length > 0 ? (
             <div>
-              <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: "#ffd700", marginBottom: 4, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1 }}>
                 Outputs
               </div>
               {nodeTypeDef.outputs.map((port) => (
@@ -481,26 +365,28 @@ export const Inspector: React.FC<InspectorProps> = ({
                     gap: 6,
                     padding: "2px 0",
                     fontSize: 12,
+                    fontWeight: 700,
                   }}
                 >
                   <span
                     style={{
-                      width: 8,
-                      height: 8,
+                      width: 10,
+                      height: 10,
                       borderRadius: "50%",
+                      border: "2px solid #000",
                       background:
                         port.type === "audio"
-                          ? "#f97316"
+                          ? "#ff6b00"
                           : port.type === "control"
-                            ? "#3b82f6"
+                            ? "#00d4ff"
                             : port.type === "midi"
                               ? "#a855f7"
-                              : "#22c55e",
+                              : "#00ff41",
                       display: "inline-block",
                     }}
                   />
                   <span>{port.label}</span>
-                  <span style={{ color: "#666", fontSize: 10 }}>
+                  <span style={{ color: "#94a3b8", fontSize: 10, fontWeight: 700 }}>
                     ({port.type})
                   </span>
                 </div>

@@ -68,10 +68,14 @@ impl Default for Chorus {
 
 impl AudioNode for Chorus {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let rate = (ctx.parameters.get("rate").unwrap_or(1.0) as f64).clamp(0.01, 10.0);
-        let depth = (ctx.parameters.get("depth").unwrap_or(0.5) as f64).clamp(0.0, 1.0);
+        let base_rate = (ctx.parameters.get("rate").unwrap_or(1.0) as f64).clamp(0.01, 10.0);
+        let base_depth = (ctx.parameters.get("depth").unwrap_or(0.5) as f64).clamp(0.0, 1.0);
         let num_voices = (ctx.parameters.get("voices").unwrap_or(3.0) as usize).clamp(1, MAX_VOICES);
         let mix = ctx.parameters.get("mix").unwrap_or(0.5).clamp(0.0, 1.0);
+
+        // Check for modulation inputs: rate_mod at [1], depth_mod at [2]
+        let has_rate_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_depth_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         self.ensure_buffer_size(ctx.sample_rate);
 
@@ -86,11 +90,18 @@ impl AudioNode for Chorus {
 
         // Base delay in samples (center of modulation range).
         let base_delay = MAX_CHORUS_DELAY_SEC * sr * 0.5;
-        // Maximum modulation excursion in samples.
-        let mod_depth = base_delay * depth;
 
         for i in 0..ctx.buffer_size {
             let dry = input[i];
+
+            // Per-sample modulation
+            let rate_mod = if has_rate_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let depth_mod = if has_depth_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+            let rate = (base_rate + rate_mod * 10.0).clamp(0.01, 20.0);
+            let depth = (base_depth + depth_mod).clamp(0.0, 1.0);
+
+            // Maximum modulation excursion in samples.
+            let mod_depth = base_delay * depth;
 
             // Write dry input into the delay buffer.
             self.buffer[self.write_pos] = dry;

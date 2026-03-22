@@ -171,8 +171,12 @@ impl AudioNode for SpectralNode {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
         let freeze = ctx.parameters.get("freeze").unwrap_or(0.0) > 0.5;
         let blur = ctx.parameters.get("blur").unwrap_or(0.0).clamp(0.0, 1.0);
-        let shift = ctx.parameters.get("shift").unwrap_or(0.0) as i32;
-        let mix = ctx.parameters.get("mix").unwrap_or(1.0).clamp(0.0, 1.0);
+        let base_shift = ctx.parameters.get("shift").unwrap_or(0.0);
+        let base_mix = ctx.parameters.get("mix").unwrap_or(1.0).clamp(0.0, 1.0);
+
+        // Check for modulation inputs: shift_mod at [1], mix_mod at [2]
+        let has_shift_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_mix_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -192,6 +196,12 @@ impl AudioNode for SpectralNode {
 
         for i in 0..ctx.buffer_size {
             let dry = input[i];
+
+            // Per-sample modulation
+            let shift_mod = if has_shift_mod { ctx.inputs[1][i] } else { 0.0 };
+            let mix_mod = if has_mix_mod { ctx.inputs[2][i] } else { 0.0 };
+            let shift = (base_shift + shift_mod * 512.0) as i32;
+            let mix = (base_mix + mix_mod).clamp(0.0, 1.0);
 
             // Write to input buffer.
             self.input_buf[self.input_pos] = dry;

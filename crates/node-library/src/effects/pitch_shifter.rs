@@ -49,8 +49,11 @@ impl Default for PitchShifter {
 
 impl AudioNode for PitchShifter {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let shift_semitones = ctx.parameters.get("shift").unwrap_or(0.0).clamp(-24.0, 24.0) as f64;
+        let base_shift_semitones = ctx.parameters.get("shift").unwrap_or(0.0).clamp(-24.0, 24.0) as f64;
         let mix = ctx.parameters.get("mix").unwrap_or(1.0).clamp(0.0, 1.0);
+
+        // Check for modulation input: semitones_mod at [1]
+        let has_semitones_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -60,14 +63,17 @@ impl AudioNode for PitchShifter {
         let output = &mut ctx.outputs[0];
         let buf_len = self.buffer.len();
 
-        // Pitch ratio: 2^(semitones/12).
-        let ratio = (2.0_f64).powf(shift_semitones / 12.0);
-
         // Half buffer for grain overlap.
         let half_buf = buf_len as f64 * 0.5;
 
         for i in 0..ctx.buffer_size {
             let dry = input[i];
+
+            // Per-sample modulation
+            let semi_mod = if has_semitones_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let shift_semitones = (base_shift_semitones + semi_mod * 24.0).clamp(-48.0, 48.0);
+            // Pitch ratio: 2^(semitones/12).
+            let ratio = (2.0_f64).powf(shift_semitones / 12.0);
 
             // Write input to circular buffer.
             self.buffer[self.write_pos] = dry;

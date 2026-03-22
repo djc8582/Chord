@@ -91,7 +91,7 @@ export const Knob: React.FC<KnobProps> = ({
         userSelect: "none",
       }}
     >
-      <span style={{ fontSize: 11, color: "#aaa" }}>{label}</span>
+      <span style={{ fontSize: 11, color: "#ffffff", fontWeight: 700, fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace' }}>{label}</span>
       <div
         role="slider"
         aria-label={label}
@@ -107,13 +107,13 @@ export const Knob: React.FC<KnobProps> = ({
           width: size,
           height: size,
           borderRadius: "50%",
-          background: "conic-gradient(from 135deg, #3b82f6 0deg, #3b82f6 " +
+          background: "conic-gradient(from 135deg, #00ff41 0deg, #00ff41 " +
             ((rotation - START_ANGLE) + "deg") +
-            ", #333 " + ((rotation - START_ANGLE) + "deg") +
-            ", #333 270deg, transparent 270deg)",
+            ", #1a1a2e " + ((rotation - START_ANGLE) + "deg") +
+            ", #1a1a2e 270deg, transparent 270deg)",
           position: "relative",
           cursor: "grab",
-          border: "2px solid #555",
+          border: "3px solid #000",
           boxSizing: "border-box",
         }}
       >

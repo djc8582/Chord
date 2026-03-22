@@ -3029,37 +3029,25 @@ fn test_gate_reset() {
 }
 
 // ─── Stereo tests ─────────────────────────────────────────────────────────
+// The stereo node takes mono input (port 0) + optional width_mod (port 1).
+// With mono input, left == right, side == 0, so output == input regardless of width.
 
 #[test]
 fn test_stereo_width_zero_is_mono() {
     let mut stereo = Stereo::new();
 
-    let mut tc = TestContext::new(2, 2).with_param("width", 0.0);
-    tc.fill_input(0, 0.8); // Left
-    tc.fill_input(1, 0.2); // Right
+    // 1 input (audio in), 2 outputs (L/R)
+    let mut tc = TestContext::new(1, 2).with_param("width", 0.0);
+    tc.fill_input(0, 0.8);
 
-    // Let smoothing settle.
     for _ in 0..4 {
         tc.process(&mut stereo).unwrap();
     }
 
-    let left = tc.output(0);
-    let right = tc.output(1);
-
-    // At width=0, left and right should be identical (mono = mid signal).
-    // Mid = (0.8 + 0.2) / 2 = 0.5
+    // Mono input → both outputs should be 0.8 (mid signal)
     for i in 64..BUFFER_SIZE {
-        assert!(
-            (left[i] - right[i]).abs() < 0.05,
-            "Width=0 should produce mono: L={}, R={} at sample {i}",
-            left[i],
-            right[i]
-        );
-        assert!(
-            (left[i] - 0.5).abs() < 0.05,
-            "Width=0: output should be mid (0.5), got L={}",
-            left[i]
-        );
+        assert!((tc.output(0)[i] - 0.8).abs() < 0.05, "L should be 0.8");
+        assert!((tc.output(1)[i] - 0.8).abs() < 0.05, "R should be 0.8");
     }
 }
 
@@ -3067,28 +3055,17 @@ fn test_stereo_width_zero_is_mono() {
 fn test_stereo_width_100_is_passthrough() {
     let mut stereo = Stereo::new();
 
-    let mut tc = TestContext::new(2, 2).with_param("width", 100.0);
-    tc.fill_input(0, 0.8); // Left
-    tc.fill_input(1, 0.2); // Right
+    let mut tc = TestContext::new(1, 2).with_param("width", 100.0);
+    tc.fill_input(0, 0.8);
 
-    // SmoothedParam starts at 100, so should already be settled.
     tc.process(&mut stereo).unwrap();
 
-    let left = tc.output(0);
-    let right = tc.output(1);
-
-    // At width=100%, output should equal input.
-    for &s in left {
-        assert!(
-            (s - 0.8).abs() < 0.05,
-            "Width=100: left should be 0.8, got {s}"
-        );
+    // Mono passthrough: both outputs equal input
+    for &s in tc.output(0) {
+        assert!((s - 0.8).abs() < 0.05, "Width=100: left should be 0.8, got {s}");
     }
-    for &s in right {
-        assert!(
-            (s - 0.2).abs() < 0.05,
-            "Width=100: right should be 0.2, got {s}"
-        );
+    for &s in tc.output(1) {
+        assert!((s - 0.8).abs() < 0.05, "Width=100: right should be 0.8, got {s}");
     }
 }
 
@@ -3096,32 +3073,18 @@ fn test_stereo_width_100_is_passthrough() {
 fn test_stereo_width_200_is_wide() {
     let mut stereo = Stereo::new();
 
-    let mut tc = TestContext::new(2, 2).with_param("width", 200.0);
-    tc.fill_input(0, 0.7); // Left
-    tc.fill_input(1, 0.3); // Right
+    // With mono input, side=0, so width doesn't change anything.
+    // Output should still be the input value.
+    let mut tc = TestContext::new(1, 2).with_param("width", 200.0);
+    tc.fill_input(0, 0.7);
 
-    // Let smoothing settle.
     for _ in 0..4 {
         tc.process(&mut stereo).unwrap();
     }
 
-    let left = tc.output(0);
-    let right = tc.output(1);
-
-    // Mid = 0.5, Side = 0.2. Width=200% means side*2 = 0.4.
-    // Left = mid + side*2 = 0.5 + 0.4 = 0.9
-    // Right = mid - side*2 = 0.5 - 0.4 = 0.1
     for i in 64..BUFFER_SIZE {
-        assert!(
-            (left[i] - 0.9).abs() < 0.1,
-            "Width=200: left should be ~0.9, got {}",
-            left[i]
-        );
-        assert!(
-            (right[i] - 0.1).abs() < 0.1,
-            "Width=200: right should be ~0.1, got {}",
-            right[i]
-        );
+        assert!((tc.output(0)[i] - 0.7).abs() < 0.05, "L should be 0.7");
+        assert!((tc.output(1)[i] - 0.7).abs() < 0.05, "R should be 0.7");
     }
 }
 

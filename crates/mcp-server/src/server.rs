@@ -1195,6 +1195,8 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "filter" => NodeDescriptor::new("filter")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("cutoff_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("resonance_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("cutoff", "Cutoff", 1000.0, 20.0, 20000.0).with_unit("Hz"))
             .with_parameter(ParameterDescriptor::new("resonance", "Resonance", 0.707, 0.1, 30.0))
@@ -1202,11 +1204,16 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "gain" => NodeDescriptor::new("gain")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("gain_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("gain", "Gain", 1.0, 0.0, 10.0)),
 
         "envelope" => NodeDescriptor::new("envelope")
             .with_input(PortDescriptor::new("gate", PortDataType::Audio))
+            .with_input(PortDescriptor::new("attack_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("decay_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("sustain_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("release_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("attack", "Attack", 0.01, 0.0, 10.0).with_unit("s"))
             .with_parameter(ParameterDescriptor::new("decay", "Decay", 0.1, 0.0, 10.0).with_unit("s"))
@@ -1214,6 +1221,8 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_parameter(ParameterDescriptor::new("release", "Release", 0.3, 0.0, 30.0).with_unit("s")),
 
         "lfo" => NodeDescriptor::new("lfo")
+            .with_input(PortDescriptor::new("rate_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("depth_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("rate", "Rate", 1.0, 0.01, 100.0).with_unit("Hz"))
             .with_parameter(ParameterDescriptor::new("depth", "Depth", 1.0, 0.0, 1.0))
@@ -1236,6 +1245,8 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "delay" => NodeDescriptor::new("delay")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("time_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("feedback_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("time", "Delay Time", 0.5, 0.0, 5.0).with_unit("s"))
             .with_parameter(ParameterDescriptor::new("feedback", "Feedback", 0.3, 0.0, 0.99))
@@ -1243,6 +1254,8 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "reverb" => NodeDescriptor::new("reverb")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("room_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("mix_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("room_size", "Room Size", 0.5, 0.0, 1.0))
             .with_parameter(ParameterDescriptor::new("damping", "Damping", 0.5, 0.0, 1.0))
@@ -1250,6 +1263,8 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "compressor" => NodeDescriptor::new("compressor")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("threshold_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("ratio_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("threshold", "Threshold", -20.0, -60.0, 0.0).with_unit("dB"))
             .with_parameter(ParameterDescriptor::new("ratio", "Ratio", 4.0, 1.0, 20.0))
@@ -1258,6 +1273,9 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
 
         "eq" => NodeDescriptor::new("eq")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("low_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("mid_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("high_mod", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("low_gain", "Low Gain", 0.0, -24.0, 24.0).with_unit("dB"))
             .with_parameter(ParameterDescriptor::new("mid_gain", "Mid Gain", 0.0, -24.0, 24.0).with_unit("dB"))
@@ -1327,6 +1345,130 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_parameter(ParameterDescriptor::new("pattern_a", "Pattern A", 3.0, 2.0, 16.0))
             .with_parameter(ParameterDescriptor::new("pattern_b", "Pattern B", 4.0, 2.0, 16.0))
             .with_parameter(ParameterDescriptor::new("pattern_c", "Pattern C", 5.0, 2.0, 16.0)),
+
+        "granular" => NodeDescriptor::new("granular")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("pitch_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("grain_size_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("scatter_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("density_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("grain_size", "Grain Size", 0.05, 0.01, 0.2).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("density", "Density", 10.0, 1.0, 50.0))
+            .with_parameter(ParameterDescriptor::new("pitch", "Pitch", 0.0, -24.0, 24.0).with_unit("st"))
+            .with_parameter(ParameterDescriptor::new("scatter", "Scatter", 0.0, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
+        "vocoder" => NodeDescriptor::new("vocoder")
+            .with_input(PortDescriptor::new("carrier", PortDataType::Audio))
+            .with_input(PortDescriptor::new("modulator", PortDataType::Audio))
+            .with_input(PortDescriptor::new("mix_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("bands", "Bands", 16.0, 1.0, 16.0))
+            .with_parameter(ParameterDescriptor::new("attack", "Attack", 5.0, 1.0, 100.0).with_unit("ms"))
+            .with_parameter(ParameterDescriptor::new("release", "Release", 50.0, 10.0, 500.0).with_unit("ms"))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
+        "chorus" => NodeDescriptor::new("chorus")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("rate_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("depth_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("rate", "Rate", 1.0, 0.1, 10.0).with_unit("Hz"))
+            .with_parameter(ParameterDescriptor::new("depth", "Depth", 0.5, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 0.5, 0.0, 1.0)),
+
+        "phaser" => NodeDescriptor::new("phaser")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("rate_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("depth_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("rate", "Rate", 0.5, 0.1, 10.0).with_unit("Hz"))
+            .with_parameter(ParameterDescriptor::new("depth", "Depth", 0.5, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 0.5, 0.0, 1.0)),
+
+        "waveshaper" => NodeDescriptor::new("waveshaper")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("drive_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("drive", "Drive", 1.0, 0.0, 10.0))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
+        "ring_modulator" => NodeDescriptor::new("ring_modulator")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("mix_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
+        "crossfader" => NodeDescriptor::new("crossfader")
+            .with_input(PortDescriptor::new("a", PortDataType::Audio))
+            .with_input(PortDescriptor::new("b", PortDataType::Audio))
+            .with_input(PortDescriptor::new("position_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("position", "Position", 0.5, 0.0, 1.0)),
+
+        "pitch_shifter" => NodeDescriptor::new("pitch_shifter")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("semitones_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("semitones", "Semitones", 0.0, -24.0, 24.0).with_unit("st"))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
+        "limiter" => NodeDescriptor::new("limiter")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("ceiling_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("ceiling", "Ceiling", -0.3, -24.0, 0.0).with_unit("dB"))
+            .with_parameter(ParameterDescriptor::new("release", "Release", 0.1, 0.01, 2.0).with_unit("s")),
+
+        "gate" => NodeDescriptor::new("gate")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("threshold_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("threshold", "Threshold", -40.0, -80.0, 0.0).with_unit("dB"))
+            .with_parameter(ParameterDescriptor::new("attack", "Attack", 0.001, 0.0, 1.0).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("hold", "Hold", 0.01, 0.0, 1.0).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("release", "Release", 0.1, 0.0, 2.0).with_unit("s")),
+
+        "stereo" => NodeDescriptor::new("stereo")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("width_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("width", "Width", 1.0, 0.0, 2.0)),
+
+        "convolution_reverb" => NodeDescriptor::new("convolution_reverb")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("mix_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("decay", "Decay", 1.5, 0.1, 5.0).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("brightness", "Brightness", 0.5, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("predelay", "Pre-delay", 10.0, 0.0, 100.0).with_unit("ms"))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 0.3, 0.0, 1.0)),
+
+        "spectral" => NodeDescriptor::new("spectral")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("shift_mod", PortDataType::Audio))
+            .with_input(PortDescriptor::new("mix_mod", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("freeze", "Freeze", 0.0, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("blur", "Blur", 0.0, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("shift", "Shift", 0.0, -512.0, 512.0).with_unit("bins"))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
+        "sample_and_hold" => NodeDescriptor::new("sample_and_hold")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio)),
+
+        "quantizer" => NodeDescriptor::new("quantizer")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("scale", "Scale", 0.0, 0.0, 11.0)),
+
+        "dc_blocker" => NodeDescriptor::new("dc_blocker")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio)),
 
         // Fallback for unknown types — creates a minimal pass-through descriptor.
         other => NodeDescriptor::new(other)

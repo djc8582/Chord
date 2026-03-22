@@ -19,15 +19,18 @@ export function Toolbar() {
 
   const buttonStyle: React.CSSProperties = {
     background: "none",
-    border: `1px solid ${theme.colors.border}`,
+    border: `3px solid ${theme.colors.border}`,
     color: theme.colors.text,
     padding: "4px 10px",
-    borderRadius: 4,
+    borderRadius: 0,
     cursor: "pointer",
     fontSize: 12,
+    fontWeight: 700,
+    fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
     display: "flex",
     alignItems: "center",
     gap: 4,
+    textTransform: "uppercase" as const,
   };
 
   return (
@@ -36,25 +39,29 @@ export function Toolbar() {
       style={{
         display: "flex",
         alignItems: "center",
-        height: 40,
-        minHeight: 40,
+        height: 44,
+        minHeight: 44,
         padding: "0 12px",
         gap: 8,
         background: theme.colors.bgPanel,
-        borderBottom: `1px solid ${theme.colors.border}`,
+        borderBottom: `3px solid ${theme.colors.border}`,
         userSelect: "none",
       }}
     >
       {/* Logo / Brand */}
       <span
         style={{
-          fontWeight: 700,
-          fontSize: 14,
-          color: theme.colors.accent,
+          fontWeight: 900,
+          fontSize: 16,
+          color: "#00ff41",
           marginRight: 12,
+          textTransform: "uppercase",
+          letterSpacing: "0.15em",
+          fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
+          textShadow: "0 0 8px rgba(0, 255, 65, 0.4)",
         }}
       >
-        Chord
+        CHORD
       </span>
 
       {/* File operations */}
@@ -83,8 +90,8 @@ export function Toolbar() {
       {/* Separator */}
       <div
         style={{
-          width: 1,
-          height: 20,
+          width: 3,
+          height: 24,
           background: theme.colors.border,
           margin: "0 4px",
         }}
@@ -95,10 +102,11 @@ export function Toolbar() {
         data-testid="transport-toggle"
         style={{
           ...buttonStyle,
-          background: isPlaying ? theme.colors.accent : "transparent",
-          color: isPlaying ? "#fff" : theme.colors.text,
+          background: isPlaying ? "#00ff41" : "transparent",
+          color: isPlaying ? "#000" : theme.colors.text,
           minWidth: 60,
           justifyContent: "center",
+          boxShadow: isPlaying ? "0 0 12px rgba(0, 255, 65, 0.4)" : "none",
         }}
         onClick={() => executeCommand("transport.toggle")}
         title={isPlaying ? "Stop (Space)" : "Play (Space)"}
@@ -109,8 +117,9 @@ export function Toolbar() {
       <span
         style={{
           fontSize: 12,
-          color: theme.colors.textMuted,
-          fontFamily: "monospace",
+          fontWeight: 700,
+          color: "#ffd700",
+          fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
           minWidth: 60,
           textAlign: "center",
         }}

@@ -228,7 +228,8 @@ export const Waveform: React.FC<WaveformProps> = ({
         width,
         height,
         display: "block",
-        borderRadius: 4,
+        borderRadius: 0,
+        border: "3px solid #000",
       }}
     />
   );

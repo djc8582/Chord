@@ -46,19 +46,23 @@ impl AudioNode for Stereo {
             self.smoothed_width.set_target(target_width, 64);
         }
 
+        // Check for modulation input: width_mod at [1]
+        let has_width_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
         }
 
         let has_left = !ctx.inputs.is_empty();
-        let has_right = ctx.inputs.len() > 1;
         let has_right_output = ctx.outputs.len() > 1;
 
         for i in 0..ctx.buffer_size {
-            let width = self.smoothed_width.next_sample() / 100.0; // Normalize to 0..2 range.
+            let base_width = self.smoothed_width.next_sample() / 100.0; // Normalize to 0..2 range.
+            let width_mod = if has_width_mod { ctx.inputs[1][i] } else { 0.0 };
+            let width = (base_width + width_mod * 2.0).clamp(0.0, 2.0);
 
             let left = if has_left { ctx.inputs[0][i] } else { 0.0 };
-            let right = if has_right { ctx.inputs[1][i] } else { left };
+            let right = left; // Mono input (single "in" port).
 
             // Mid-side encoding.
             let mid = (left + right) * 0.5;

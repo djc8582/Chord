@@ -32,9 +32,13 @@ impl Default for Lfo {
 
 impl AudioNode for Lfo {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let rate = (ctx.parameters.get("rate").unwrap_or(1.0) as f64).max(0.001);
-        let depth = ctx.parameters.get("depth").unwrap_or(1.0) as f64;
+        let base_rate = (ctx.parameters.get("rate").unwrap_or(1.0) as f64).max(0.001);
+        let base_depth = ctx.parameters.get("depth").unwrap_or(1.0) as f64;
         let waveform = ctx.parameters.get("waveform").unwrap_or(0.0) as u32;
+
+        // Check for modulation inputs: rate_mod at [0], depth_mod at [1]
+        let has_rate_mod = !ctx.inputs.is_empty() && !ctx.inputs[0].is_empty();
+        let has_depth_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
 
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -44,6 +48,12 @@ impl AudioNode for Lfo {
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
+            // Per-sample modulation
+            let rate_mod = if has_rate_mod { ctx.inputs[0][i] as f64 } else { 0.0 };
+            let depth_mod = if has_depth_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let rate = (base_rate + rate_mod * 100.0).max(0.001);
+            let depth = (base_depth + depth_mod).clamp(0.0, 1.0);
+
             let sample = match waveform {
                 0 => {
                     // Sine.
@@ -69,7 +79,7 @@ impl AudioNode for Lfo {
 
             // Output unipolar (0..1) scaled by depth. This is more useful for
             // amplitude modulation (tremolo) and most modulation destinations.
-            // Bipolar destinations can subtract 0.5 and scale ×2 if needed.
+            // Bipolar destinations can subtract 0.5 and scale x2 if needed.
             output[i] = ((sample * 0.5 + 0.5) * depth) as f32;
 
             // Advance phase.

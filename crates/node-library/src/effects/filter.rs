@@ -157,21 +157,28 @@ impl Default for BiquadFilter {
 
 impl AudioNode for BiquadFilter {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let cutoff = ctx.parameters.get("cutoff").unwrap_or(1000.0) as f64;
-        let resonance = (ctx.parameters.get("resonance").unwrap_or(0.707) as f64).clamp(0.1, 30.0);
+        let base_cutoff = ctx.parameters.get("cutoff").unwrap_or(1000.0) as f64;
+        let base_resonance = (ctx.parameters.get("resonance").unwrap_or(0.707) as f64).clamp(0.1, 30.0);
         let mode = FilterMode::from_param(ctx.parameters.get("mode").unwrap_or(0.0));
 
-        // Recompute coefficients only if parameters changed.
-        if cutoff != self.cached_cutoff
-            || resonance != self.cached_resonance
-            || mode != self.cached_mode
-            || ctx.sample_rate != self.cached_sample_rate
-        {
-            self.coeffs = BiquadCoeffs::compute(mode, cutoff, resonance, ctx.sample_rate);
-            self.cached_cutoff = cutoff;
-            self.cached_resonance = resonance;
-            self.cached_mode = mode;
-            self.cached_sample_rate = ctx.sample_rate;
+        // Check for modulation inputs: cutoff_mod at [1], resonance_mod at [2]
+        let has_cutoff_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_resonance_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
+        let has_any_mod = has_cutoff_mod || has_resonance_mod;
+
+        // When no modulation is present, use cached coefficients for efficiency.
+        if !has_any_mod {
+            if base_cutoff != self.cached_cutoff
+                || base_resonance != self.cached_resonance
+                || mode != self.cached_mode
+                || ctx.sample_rate != self.cached_sample_rate
+            {
+                self.coeffs = BiquadCoeffs::compute(mode, base_cutoff, base_resonance, ctx.sample_rate);
+                self.cached_cutoff = base_cutoff;
+                self.cached_resonance = base_resonance;
+                self.cached_mode = mode;
+                self.cached_sample_rate = ctx.sample_rate;
+            }
         }
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
@@ -180,10 +187,19 @@ impl AudioNode for BiquadFilter {
 
         let input = ctx.inputs[0];
         let output = &mut ctx.outputs[0];
-        let c = &self.coeffs;
 
         for i in 0..ctx.buffer_size {
+            // Per-sample modulation: recompute coefficients when modulated.
+            if has_any_mod {
+                let cutoff_mod = if has_cutoff_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+                let res_mod = if has_resonance_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+                let effective_cutoff = (base_cutoff + cutoff_mod * 10000.0).clamp(20.0, 20000.0);
+                let effective_resonance = (base_resonance + res_mod * 10.0).clamp(0.1, 30.0);
+                self.coeffs = BiquadCoeffs::compute(mode, effective_cutoff, effective_resonance, ctx.sample_rate);
+            }
+
             let x = input[i] as f64;
+            let c = &self.coeffs;
 
             // Direct Form II Transposed.
             let y = c.b0 * x + self.z1;

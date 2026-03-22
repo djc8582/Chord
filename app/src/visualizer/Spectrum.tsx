@@ -334,7 +334,8 @@ export const Spectrum: React.FC<SpectrumProps> = ({
         width,
         height,
         display: "block",
-        borderRadius: 4,
+        borderRadius: 0,
+        border: "3px solid #000",
       }}
     />
   );

@@ -64,8 +64,8 @@ fn time_constant(time_ms: f64, sample_rate: f64) -> f64 {
 
 impl AudioNode for CompressorNode {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let threshold_db = (ctx.parameters.get("threshold").unwrap_or(-20.0) as f64).clamp(-60.0, 0.0);
-        let ratio = (ctx.parameters.get("ratio").unwrap_or(4.0) as f64).max(1.0);
+        let base_threshold_db = (ctx.parameters.get("threshold").unwrap_or(-20.0) as f64).clamp(-60.0, 0.0);
+        let base_ratio = (ctx.parameters.get("ratio").unwrap_or(4.0) as f64).max(1.0);
         let attack_ms = (ctx.parameters.get("attack").unwrap_or(10.0) as f64).clamp(0.1, 100.0);
         let release_ms = (ctx.parameters.get("release").unwrap_or(100.0) as f64).clamp(10.0, 1000.0);
         let makeup_db = (ctx.parameters.get("makeup").unwrap_or(0.0) as f64).clamp(0.0, 40.0);
@@ -73,6 +73,10 @@ impl AudioNode for CompressorNode {
         let attack_coeff = time_constant(attack_ms, ctx.sample_rate);
         let release_coeff = time_constant(release_ms, ctx.sample_rate);
         let makeup_linear = db_to_linear(makeup_db);
+
+        // Check for modulation inputs: threshold_mod at [1], ratio_mod at [2]
+        let has_threshold_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_ratio_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -84,6 +88,12 @@ impl AudioNode for CompressorNode {
         for i in 0..ctx.buffer_size {
             let sample = input[i] as f64;
             let abs_sample = sample.abs();
+
+            // Per-sample modulation
+            let thr_mod = if has_threshold_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let rat_mod = if has_ratio_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+            let threshold_db = (base_threshold_db + thr_mod * 40.0).clamp(-60.0, 0.0);
+            let ratio = (base_ratio + rat_mod * 20.0).max(1.0);
 
             // Envelope follower (peak detector with attack/release).
             if abs_sample > self.envelope {

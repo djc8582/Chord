@@ -42,6 +42,9 @@ impl AudioNode for CrossFader {
             self.smoothed_position.set_target(target_pos, 64);
         }
 
+        // Check for modulation input: position_mod at [2] (after a=0, b=1)
+        let has_position_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
+
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
         }
@@ -51,7 +54,10 @@ impl AudioNode for CrossFader {
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
-            let pos = self.smoothed_position.next_sample();
+            let base_pos = self.smoothed_position.next_sample();
+            let pos_mod = if has_position_mod { ctx.inputs[2][i] } else { 0.0 };
+            let pos = (base_pos + pos_mod).clamp(0.0, 1.0);
+
             let a = if has_a { ctx.inputs[0][i] } else { 0.0 };
             let b = if has_b { ctx.inputs[1][i] } else { 0.0 };
 

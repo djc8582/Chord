@@ -83,11 +83,15 @@ impl Default for Phaser {
 
 impl AudioNode for Phaser {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let rate = (ctx.parameters.get("rate").unwrap_or(0.5) as f64).clamp(0.01, 10.0);
-        let depth = (ctx.parameters.get("depth").unwrap_or(0.7) as f64).clamp(0.0, 1.0);
+        let base_rate = (ctx.parameters.get("rate").unwrap_or(0.5) as f64).clamp(0.01, 10.0);
+        let base_depth = (ctx.parameters.get("depth").unwrap_or(0.7) as f64).clamp(0.0, 1.0);
         let num_stages = (ctx.parameters.get("stages").unwrap_or(4.0) as usize).clamp(2, MAX_STAGES);
         let feedback = (ctx.parameters.get("feedback").unwrap_or(0.3) as f64).clamp(-0.95, 0.95);
         let mix = ctx.parameters.get("mix").unwrap_or(0.5).clamp(0.0, 1.0);
+
+        // Check for modulation inputs: rate_mod at [1], depth_mod at [2]
+        let has_rate_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_depth_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 
         if ctx.inputs.is_empty() || ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -102,6 +106,12 @@ impl AudioNode for Phaser {
         let max_freq = 4000.0_f64;
 
         for i in 0..ctx.buffer_size {
+            // Per-sample modulation
+            let rate_mod = if has_rate_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let depth_mod = if has_depth_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+            let rate = (base_rate + rate_mod * 10.0).clamp(0.01, 20.0);
+            let depth = (base_depth + depth_mod).clamp(0.0, 1.0);
+
             // LFO produces a unipolar 0..1 value.
             let lfo = ((self.lfo_phase * std::f64::consts::TAU).sin() + 1.0) * 0.5;
             let sweep = lfo * depth;

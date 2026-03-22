@@ -136,19 +136,19 @@ export function NodeSearchPalette({ spawnPosition }: NodeSearchPaletteProps) {
     >
       <div
         style={{
-          background: "#1e293b",
-          border: "1px solid #334155",
-          borderRadius: 12,
+          background: "#1a1a2e",
+          border: "3px solid #000",
+          borderRadius: 0,
           width: 400,
           maxHeight: 480,
           overflow: "hidden",
-          boxShadow: "0 25px 50px rgba(0, 0, 0, 0.5)",
+          boxShadow: "4px 4px 0px #000",
           display: "flex",
           flexDirection: "column",
         }}
       >
         {/* Search input */}
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #334155" }}>
+        <div style={{ padding: "12px 16px", borderBottom: "3px solid #000" }}>
           <input
             ref={inputRef}
             type="text"
@@ -158,14 +158,15 @@ export function NodeSearchPalette({ spawnPosition }: NodeSearchPaletteProps) {
             onKeyDown={handleKeyDown}
             style={{
               width: "100%",
-              background: "#0f172a",
-              border: "1px solid #475569",
-              borderRadius: 8,
+              background: "#0a0a0a",
+              border: "3px solid #000",
+              borderRadius: 0,
               padding: "10px 14px",
-              color: "#e2e8f0",
+              color: "#ffffff",
               fontSize: 14,
+              fontWeight: 700,
+              fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
               outline: "none",
-              fontFamily: "inherit",
             }}
           />
         </div>
@@ -183,8 +184,9 @@ export function NodeSearchPalette({ spawnPosition }: NodeSearchPaletteProps) {
               style={{
                 padding: "16px",
                 textAlign: "center",
-                color: "#64748b",
+                color: "#94a3b8",
                 fontSize: 13,
+                fontWeight: 700,
               }}
             >
               No matching nodes
@@ -197,10 +199,11 @@ export function NodeSearchPalette({ spawnPosition }: NodeSearchPaletteProps) {
                 style={{
                   padding: "4px 16px",
                   fontSize: 10,
-                  fontWeight: 600,
+                  fontWeight: 800,
                   textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  color: "#64748b",
+                  letterSpacing: "0.15em",
+                  color: "#00ff41",
+                  fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
                 }}
               >
                 {CATEGORY_LABELS[category] ?? category}
@@ -217,7 +220,8 @@ export function NodeSearchPalette({ spawnPosition }: NodeSearchPaletteProps) {
                     style={{
                       padding: "8px 16px",
                       cursor: "pointer",
-                      background: isActive ? "#334155" : "transparent",
+                      background: isActive ? "#16213e" : "transparent",
+                      borderLeft: isActive ? "3px solid #00ff41" : "3px solid transparent",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -226,17 +230,18 @@ export function NodeSearchPalette({ spawnPosition }: NodeSearchPaletteProps) {
                   >
                     <span
                       style={{
-                        color: "#e2e8f0",
+                        color: isActive ? "#00ff41" : "#ffffff",
                         fontSize: 13,
-                        fontWeight: 500,
+                        fontWeight: 700,
                       }}
                     >
                       {typeDef.label}
                     </span>
                     <span
                       style={{
-                        color: "#64748b",
+                        color: "#94a3b8",
                         fontSize: 11,
+                        fontWeight: 700,
                       }}
                     >
                       {typeDef.inputs.length} in / {typeDef.outputs.length} out

@@ -27,11 +27,13 @@ interface ChordNodeData {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  generators: "#f97316",
-  effects: "#8b5cf6",
-  modulators: "#3b82f6",
-  utilities: "#6b7280",
-  io: "#22c55e",
+  generators: "#00ff41",
+  effects: "#ff1493",
+  modulators: "#8b5cf6",
+  utilities: "#ffd700",
+  io: "#00d4ff",
+  sequencers: "#8b5cf6",
+  midi: "#a855f7",
 };
 
 function getCategoryForType(nodeType: string): string {
@@ -66,17 +68,17 @@ function ChordNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1e293b",
-        border: `2px solid ${isSelected ? "#60a5fa" : "#334155"}`,
-        borderRadius: 8,
+        background: "#1a1a2e",
+        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
+        borderRadius: 0,
         minWidth: 160,
         fontFamily:
-          'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+          '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         fontSize: 12,
-        color: "#e2e8f0",
+        color: "#ffffff",
         boxShadow: isSelected
-          ? "0 0 0 2px rgba(96, 165, 250, 0.3)"
-          : "0 2px 8px rgba(0, 0, 0, 0.3)",
+          ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
+          : "4px 4px 0px #000",
         transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
       }}
@@ -86,12 +88,13 @@ function ChordNodeComponent(props: NodeProps) {
         style={{
           background: accentColor,
           padding: "6px 12px",
-          borderRadius: "6px 6px 0 0",
-          fontWeight: 600,
-          fontSize: 11,
+          borderRadius: 0,
+          borderBottom: "3px solid #000",
+          fontWeight: 800,
+          fontSize: 12,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#fff",
+          letterSpacing: "0.1em",
+          color: "#000",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -99,7 +102,7 @@ function ChordNodeComponent(props: NodeProps) {
         }}
       >
         <span>{label}</span>
-        <span style={{ opacity: 0.6, fontSize: 9, marginLeft: 8 }}>
+        <span style={{ opacity: 0.7, fontSize: 9, fontWeight: 700, marginLeft: 8 }}>
           {nodeType}
         </span>
       </div>
@@ -124,19 +127,20 @@ function ChordNodeComponent(props: NodeProps) {
                   id={port.id}
                   style={{
                     top: topPx,
-                    width: 10,
-                    height: 10,
+                    width: 14,
+                    height: 14,
                     background: PORT_COLORS[port.type] ?? PORT_COLORS.audio,
-                    border: "2px solid #0f172a",
+                    border: "2px solid #000",
                     borderRadius: "50%",
                   }}
                 />
                 <div
                   style={{
                     position: "absolute",
-                    left: 14,
+                    left: 16,
                     top: topPx - 7,
                     fontSize: 10,
+                    fontWeight: 700,
                     color: "#94a3b8",
                     pointerEvents: "none",
                     whiteSpace: "nowrap",
@@ -159,19 +163,20 @@ function ChordNodeComponent(props: NodeProps) {
                   id={port.id}
                   style={{
                     top: topPx,
-                    width: 10,
-                    height: 10,
+                    width: 14,
+                    height: 14,
                     background: PORT_COLORS[port.type] ?? PORT_COLORS.audio,
-                    border: "2px solid #0f172a",
+                    border: "2px solid #000",
                     borderRadius: "50%",
                   }}
                 />
                 <div
                   style={{
                     position: "absolute",
-                    right: 14,
+                    right: 16,
                     top: topPx - 7,
                     fontSize: 10,
+                    fontWeight: 700,
                     color: "#94a3b8",
                     pointerEvents: "none",
                     whiteSpace: "nowrap",

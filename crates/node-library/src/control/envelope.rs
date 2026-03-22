@@ -69,10 +69,17 @@ fn rate_for_time(time_seconds: f64, sample_rate: f64) -> f64 {
 
 impl AudioNode for AdsrEnvelope {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
-        let attack_time = (ctx.parameters.get("attack").unwrap_or(0.01) as f64).max(0.0);
-        let decay_time = (ctx.parameters.get("decay").unwrap_or(0.1) as f64).max(0.0);
-        let sustain_level = (ctx.parameters.get("sustain").unwrap_or(0.7) as f64).clamp(0.0, 1.0);
-        let release_time = (ctx.parameters.get("release").unwrap_or(0.3) as f64).max(0.0);
+        let base_attack_time = (ctx.parameters.get("attack").unwrap_or(0.01) as f64).max(0.0);
+        let base_decay_time = (ctx.parameters.get("decay").unwrap_or(0.1) as f64).max(0.0);
+        let base_sustain_level = (ctx.parameters.get("sustain").unwrap_or(0.7) as f64).clamp(0.0, 1.0);
+        let base_release_time = (ctx.parameters.get("release").unwrap_or(0.3) as f64).max(0.0);
+
+        // Check for modulation inputs: attack_mod at [1], decay_mod at [2],
+        // sustain_mod at [3], release_mod at [4]
+        let has_attack_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
+        let has_decay_mod = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
+        let has_sustain_mod = ctx.inputs.len() > 3 && !ctx.inputs[3].is_empty();
+        let has_release_mod = ctx.inputs.len() > 4 && !ctx.inputs[4].is_empty();
 
         let sr = ctx.sample_rate;
 
@@ -85,6 +92,16 @@ impl AudioNode for AdsrEnvelope {
 
         for i in 0..ctx.buffer_size {
             let gate = if has_gate { ctx.inputs[0][i] > 0.5 } else { false };
+
+            // Per-sample modulation (time scale: mod * 2.0 seconds)
+            let atk_mod = if has_attack_mod { ctx.inputs[1][i] as f64 } else { 0.0 };
+            let dec_mod = if has_decay_mod { ctx.inputs[2][i] as f64 } else { 0.0 };
+            let sus_mod = if has_sustain_mod { ctx.inputs[3][i] as f64 } else { 0.0 };
+            let rel_mod = if has_release_mod { ctx.inputs[4][i] as f64 } else { 0.0 };
+            let attack_time = (base_attack_time + atk_mod * 2.0).max(0.0);
+            let decay_time = (base_decay_time + dec_mod * 2.0).max(0.0);
+            let sustain_level = (base_sustain_level + sus_mod).clamp(0.0, 1.0);
+            let release_time = (base_release_time + rel_mod * 2.0).max(0.0);
 
             // Detect gate transitions.
             if gate && !self.gate_was_high {

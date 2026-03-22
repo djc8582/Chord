@@ -38,22 +38,10 @@ import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "./store";
 import { ChordNode } from "./ChordNode";
 import { NodeSearchPalette } from "./NodeSearchPalette";
-import {
-  StepSequencerNode,
-  GravitySequencerNode,
-  GameOfLifeNode,
-  MarkovChainNode,
-  PolyrhythmNode,
-} from "./nodes";
 
 // Register custom node types
 const nodeTypes: NodeTypes = {
   chordNode: ChordNode,
-  stepSequencerNode: StepSequencerNode,
-  gravitySequencerNode: GravitySequencerNode,
-  gameOfLifeNode: GameOfLifeNode,
-  markovChainNode: MarkovChainNode,
-  polyrhythmNode: PolyrhythmNode,
 };
 
 // Default viewport
@@ -61,8 +49,8 @@ const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
 
 // Minimap style
 const minimapStyle = {
-  background: "#0f172a",
-  maskColor: "rgba(15, 23, 42, 0.7)",
+  background: "#0a0a0a",
+  maskColor: "rgba(10, 10, 10, 0.7)",
 };
 
 function CanvasInner() {
@@ -139,16 +127,10 @@ function CanvasInner() {
         return;
       }
 
-      // Delete/Backspace — remove selected nodes AND edges
+      // Delete/Backspace — remove selected
       if (e.key === "Delete" || e.key === "Backspace") {
         if (!searchOpen) {
           e.preventDefault();
-          // Remove selected edges first
-          const selectedEdges = useCanvasStore.getState().edges.filter((e) => e.selected);
-          for (const edge of selectedEdges) {
-            useCanvasStore.getState().disconnectEdge(edge.id);
-          }
-          // Then remove selected nodes
           removeSelectedNodes();
         }
         return;
@@ -220,7 +202,7 @@ function CanvasInner() {
       style={{
         width: "100%",
         height: "100%",
-        background: "#0f172a",
+        background: "#0a0a0a",
       }}
     >
       <ReactFlow
@@ -239,25 +221,23 @@ function CanvasInner() {
         selectNodesOnDrag={false}
         multiSelectionKeyCode="Meta"
         deleteKeyCode={null} // We handle delete ourselves
-        edgesFocusable
-        edgesReconnectable
         snapToGrid
         snapGrid={[10, 10]}
         minZoom={0.1}
         maxZoom={4}
-        connectionLineStyle={{ stroke: "#60a5fa", strokeWidth: 2 }}
+        connectionLineStyle={{ stroke: "#00ff41", strokeWidth: 3 }}
         proOptions={{ hideAttribution: true }}
-        style={{ background: "#0f172a" }}
+        style={{ background: "#0a0a0a" }}
       >
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1}
-          color="#1e293b"
+          color="#1a1a2e"
         />
         <MiniMap
           style={minimapStyle}
-          nodeColor="#334155"
+          nodeColor="#1a1a2e"
           nodeStrokeWidth={0}
           pannable
           zoomable

@@ -117,7 +117,10 @@ impl AudioNode for ConvolutionReverb {
         let decay = ctx.parameters.get("decay").unwrap_or(1.5).clamp(0.1, 5.0);
         let brightness = ctx.parameters.get("brightness").unwrap_or(0.5).clamp(0.0, 1.0);
         let predelay_ms = ctx.parameters.get("predelay").unwrap_or(10.0).clamp(0.0, 100.0);
-        let mix = ctx.parameters.get("mix").unwrap_or(0.3).clamp(0.0, 1.0);
+        let base_mix = ctx.parameters.get("mix").unwrap_or(0.3).clamp(0.0, 1.0);
+
+        // Check for modulation input: mix_mod at [1]
+        let has_mix_mod = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
 
         if ctx.outputs.is_empty() {
             return Ok(ProcessStatus::Silent);
@@ -160,6 +163,10 @@ impl AudioNode for ConvolutionReverb {
 
         for i in 0..ctx.buffer_size {
             let dry = input[i];
+
+            // Per-sample modulation
+            let mix_mod = if has_mix_mod { ctx.inputs[1][i] } else { 0.0 };
+            let mix = (base_mix + mix_mod).clamp(0.0, 1.0);
 
             // Write input to circular buffer
             self.input_buffer[self.write_pos] = dry;
