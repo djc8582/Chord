@@ -7,6 +7,7 @@
 
 import { create } from "zustand";
 import type { BridgeCommands } from "../bridge/types.js";
+import { fft, magnitudesHalf, applyHannWindow, nextPowerOfTwo } from "./dsp.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -296,5 +297,70 @@ export async function pollSignalStats(bridgeOverride?: BridgeCommands): Promise<
     );
   } catch {
     // Silently ignore — node may not exist yet or engine may be stopped.
+  }
+}
+
+/**
+ * Poll actual waveform buffer data from the Rust engine.
+ * Feeds real audio samples into the visualizer's waveform display
+ * and computes spectrum via FFT.
+ */
+export async function pollWaveformData(bridgeOverride?: BridgeCommands): Promise<void> {
+  const b = bridgeOverride ?? _bridge;
+  if (!b || !("getWaveformData" in b)) return;
+
+  const state = useVisualizerStore.getState();
+  if (state.frozen) return;
+
+  try {
+    const samples = await b.getWaveformData();
+    if (!samples || samples.length === 0) return;
+
+    const waveform = new Float64Array(samples);
+    useVisualizerStore.getState().setWaveformData(waveform);
+
+    const { mode } = useVisualizerStore.getState();
+    if (mode === "spectrum" || mode === "both") {
+      const fftSize = nextPowerOfTwo(samples.length);
+      const padded = new Float64Array(fftSize);
+      padded.set(waveform.subarray(0, Math.min(waveform.length, fftSize)));
+      applyHannWindow(padded);
+
+      const imag = new Float64Array(fftSize);
+      fft(padded, imag);
+      const mags = magnitudesHalf(padded, imag);
+      useVisualizerStore.getState().setSpectrumData(mags);
+    }
+  } catch {
+    // Silently ignore errors.
+  }
+}
+
+let _pollingRafId: number | null = null;
+let _lastPollTime = 0;
+
+/**
+ * Start polling waveform data from the engine at ~30fps.
+ */
+export function startVisualizerPolling(): void {
+  if (_pollingRafId !== null) return;
+
+  function loop(timestamp: number) {
+    if (timestamp - _lastPollTime >= 33) {
+      _lastPollTime = timestamp;
+      pollWaveformData();
+    }
+    _pollingRafId = requestAnimationFrame(loop);
+  }
+  _pollingRafId = requestAnimationFrame(loop);
+}
+
+/**
+ * Stop polling waveform data.
+ */
+export function stopVisualizerPolling(): void {
+  if (_pollingRafId !== null) {
+    cancelAnimationFrame(_pollingRafId);
+    _pollingRafId = null;
   }
 }
