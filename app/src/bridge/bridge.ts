@@ -36,6 +36,10 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
 
 export const bridge: BridgeCommands = {
   // -- Graph manipulation ---------------------------------------------------
+  clearGraph(): Promise<void> {
+    return tauriInvoke<void>("clear_graph");
+  },
+
   addNode(type: string, position: Vec2): Promise<NodeId> {
     return tauriInvoke<NodeId>("add_node", { nodeType: type, position });
   },

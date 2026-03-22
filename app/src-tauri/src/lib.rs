@@ -17,6 +17,7 @@ pub fn run() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // Graph manipulation
+            commands::clear_graph,
             commands::add_node,
             commands::remove_node,
             commands::connect_ports,

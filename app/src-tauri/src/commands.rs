@@ -247,6 +247,44 @@ pub fn set_parameter(
 // Tauri Commands — Transport
 // ---------------------------------------------------------------------------
 
+/// Clear all nodes and connections from the graph. Called on app init
+/// to ensure the backend starts fresh and matches the empty canvas.
+#[tauri::command]
+pub fn clear_graph(state: State<'_, AppArc>) -> Result<(), String> {
+    log::info("clear_graph", "clearing all nodes and connections");
+
+    // Stop playback first.
+    {
+        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+        engine.transport_mut().stop();
+        engine.reset_all_nodes();
+    }
+    {
+        let mut stream_guard = state.audio_stream.lock().map_err(|e| e.to_string())?;
+        if let Some(stream) = stream_guard.take() {
+            stream.stop();
+        }
+    }
+
+    // Clear the graph.
+    {
+        let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
+        *graph = Graph::new();
+    }
+
+    // Clear node instances and connection mappings.
+    {
+        let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+        instances.clear();
+    }
+    {
+        let mut conn_ids = state.connection_ids.lock().map_err(|e| e.to_string())?;
+        conn_ids.clear();
+    }
+
+    Ok(())
+}
+
 /// Start audio playback.
 ///
 /// This is the critical path for hearing sound:

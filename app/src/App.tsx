@@ -29,6 +29,11 @@ function App() {
     const doc = createPatchDocument();
     useCanvasStore.getState().initDocument(doc);
 
+    // Clear the backend graph so it matches the empty canvas.
+    // Without this, stale nodes from API tests or previous sessions
+    // would play when the user hits Space.
+    bridge.clearGraph().catch(() => {});
+
     // Give the canvas, inspector, timeline, and visualizer access to the bridge for backend sync
     setCanvasBridge(bridge);
     setInspectorBridge(bridge);
