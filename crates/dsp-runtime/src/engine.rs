@@ -328,19 +328,11 @@ impl AudioEngine {
                     }
                 }
 
-                // If no connections feed this node, check if external input should be used
-                // (for the first node in the chain that might be an input node).
-                let input_refs: Vec<&[f32]> = if input_buffers.is_empty() {
-                    if input.num_channels() > 0 {
-                        (0..input.num_channels())
-                            .map(|ch| input.channel(ch))
-                            .collect()
-                    } else {
-                        vec![&[] as &[f32]]
-                    }
-                } else {
-                    input_buffers.iter().map(|v| v.as_slice()).collect()
-                };
+                // Convert input buffers to slices for the ProcessContext.
+                // If no connections feed this node, pass an empty slice list —
+                // do NOT feed system audio input here, as that would inject
+                // microphone noise into nodes like the oscillator's FM input.
+                let input_refs: Vec<&[f32]> = input_buffers.iter().map(|v| v.as_slice()).collect();
 
                 // Prepare output buffers.
                 let mut output_data: Vec<Vec<f32>> = vec![vec![0.0f32; buffer_size]];
