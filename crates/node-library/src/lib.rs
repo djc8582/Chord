@@ -74,8 +74,11 @@ pub use control::{QuantizerNode, SampleAndHoldNode, Scale};
 pub use sequencers::EuclideanNode;
 pub use sources::{NoiseColor, NoiseNode};
 
+// Wave 4 sources
+pub use sources::GranularNode;
+
 // Wave 4
-pub use effects::{Chorus, CrossFader, Phaser, RingModulator, Waveshaper, WaveshaperMode};
+pub use effects::{Chorus, CrossFader, Phaser, RingModulator, Vocoder, Waveshaper, WaveshaperMode};
 
 // Wave 5
 pub use effects::{Gate, Limiter, PitchShifter};

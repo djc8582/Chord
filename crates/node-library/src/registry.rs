@@ -11,14 +11,14 @@ use chord_scripting_runtime::ExpressionNode;
 use crate::control::{AdsrEnvelope, Lfo, NoteToFreq, QuantizerNode, SampleAndHoldNode};
 use crate::effects::{
     BiquadFilter, Chorus, CompressorNode, CrossFader, DelayNode, EqNode, Gate, Limiter, Phaser,
-    PitchShifter, ReverbNode, RingModulator, Waveshaper,
+    PitchShifter, ReverbNode, RingModulator, Vocoder, Waveshaper,
 };
 use crate::midi::MidiToFreq;
 use crate::sequencers::{
     EuclideanNode, GameOfLifeSequencer, GravitySequencer, MarkovSequencer, PolyrhythmEngine,
     StepSequencer,
 };
-use crate::sources::{NoiseNode, Oscillator};
+use crate::sources::{GranularNode, NoiseNode, Oscillator};
 use crate::utility::{DCBlocker, GainNode, MixerNode, OutputNode, Stereo};
 
 /// Central registry of all node types.
@@ -129,6 +129,8 @@ impl NodeRegistry {
         self.register("ring_modulator", || Box::new(RingModulator::new()));
         self.register("chorus", || Box::new(Chorus::new()));
         self.register("phaser", || Box::new(Phaser::new()));
+        self.register("granular", || Box::new(GranularNode::new()));
+        self.register("vocoder", || Box::new(Vocoder::new()));
     }
 
     /// Register all Wave 5 (utility & analysis) nodes.

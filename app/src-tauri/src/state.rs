@@ -284,6 +284,36 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_parameter(ParameterDescriptor::new("pattern_b", "Pattern B", 4.0, 2.0, 16.0))
             .with_parameter(ParameterDescriptor::new("pattern_c", "Pattern C", 5.0, 2.0, 16.0)),
 
+        "granular" => NodeDescriptor::new("granular")
+            .with_input(PortDescriptor::new("in", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("grain_size", "Grain Size", 0.05, 0.01, 0.2)
+                    .with_unit("s"),
+            )
+            .with_parameter(ParameterDescriptor::new(
+                "density",
+                "Density",
+                10.0,
+                1.0,
+                50.0,
+            ))
+            .with_parameter(
+                ParameterDescriptor::new("pitch", "Pitch", 0.0, -24.0, 24.0)
+                    .with_unit("st"),
+            )
+            .with_parameter(ParameterDescriptor::new("scatter", "Scatter", 0.0, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
+        "vocoder" => NodeDescriptor::new("vocoder")
+            .with_input(PortDescriptor::new("carrier", PortDataType::Audio))
+            .with_input(PortDescriptor::new("modulator", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("bands", "Bands", 16.0, 1.0, 16.0))
+            .with_parameter(ParameterDescriptor::new("attack", "Attack", 5.0, 1.0, 100.0).with_unit("ms"))
+            .with_parameter(ParameterDescriptor::new("release", "Release", 50.0, 10.0, 500.0).with_unit("ms"))
+            .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
+
         // Fallback: generic pass-through descriptor for unknown types.
         other => NodeDescriptor::new(other)
             .with_input(PortDescriptor::new("in", PortDataType::Audio))

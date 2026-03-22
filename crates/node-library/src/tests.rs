@@ -6,9 +6,9 @@ use chord_dsp_runtime::{
 
 use crate::{
     AdsrEnvelope, BiquadFilter, Chorus, CompressorNode, CrossFader, DCBlocker, DelayNode, EqNode,
-    EuclideanNode, GainNode, Gate, Lfo, Limiter, MidiToFreq, MixerNode, NoiseNode, NodeRegistry,
-    Oscillator, OutputNode, Phaser, PitchShifter, QuantizerNode, ReverbNode, RingModulator,
-    SampleAndHoldNode, Stereo, Waveshaper,
+    EuclideanNode, GainNode, Gate, GranularNode, Lfo, Limiter, MidiToFreq, MixerNode, NoiseNode,
+    NodeRegistry, Oscillator, OutputNode, Phaser, PitchShifter, QuantizerNode, ReverbNode,
+    RingModulator, SampleAndHoldNode, Stereo, Vocoder, Waveshaper,
 };
 
 // ─── Test helpers ───────────────────────────────────────────────────────────
@@ -2207,11 +2207,11 @@ fn test_registry_wave3_nodes() {
 fn test_registry_with_all() {
     let registry = NodeRegistry::with_all();
 
-    // Wave 1: 10, Wave 2: 4, Wave 3: 9, Wave 4: 5, Wave 5: 5 = 33 total.
+    // Wave 1: 10, Wave 2: 4, Wave 3: 9, Wave 4: 7, Wave 5: 5 = 35 total.
     assert_eq!(
         registry.len(),
-        33,
-        "with_all() should register 33 nodes, got {}",
+        35,
+        "with_all() should register 35 nodes, got {}",
         registry.len()
     );
 
@@ -2220,7 +2220,7 @@ fn test_registry_with_all() {
         "delay", "reverb", "compressor", "eq",
         "euclidean", "noise", "sample_and_hold", "quantizer",
         "step_sequencer", "gravity_sequencer", "game_of_life_sequencer", "markov_sequencer", "polyrhythm",
-        "crossfader", "waveshaper", "ring_modulator", "chorus", "phaser",
+        "crossfader", "waveshaper", "ring_modulator", "chorus", "phaser", "granular", "vocoder",
         "pitch_shifter", "limiter", "gate", "stereo", "dc_blocker",
     ];
     for type_name in &all_types {
@@ -3561,5 +3561,34 @@ fn full_validation_quantizer() {
         &mut QuantizerNode::new(), 1, 1,
         &[("scale", 0.0, 11.0)],
         "quantizer",
+    );
+}
+
+#[test]
+fn full_validation_granular() {
+    full_validation(
+        &mut GranularNode::new(), 1, 1,
+        &[
+            ("grain_size", 0.01, 0.2),
+            ("density", 1.0, 50.0),
+            ("pitch", -24.0, 24.0),
+            ("scatter", 0.0, 1.0),
+            ("mix", 0.0, 1.0),
+        ],
+        "granular",
+    );
+}
+
+#[test]
+fn full_validation_vocoder() {
+    full_validation(
+        &mut Vocoder::new(), 2, 1,
+        &[
+            ("bands", 1.0, 16.0),
+            ("attack", 1.0, 100.0),
+            ("release", 10.0, 500.0),
+            ("mix", 0.0, 1.0),
+        ],
+        "vocoder",
     );
 }

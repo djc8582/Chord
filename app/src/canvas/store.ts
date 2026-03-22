@@ -365,6 +365,23 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     inputs: [{ id: "in", label: "In", type: "audio" }],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
+  granular: {
+    type: "granular",
+    label: "Granular",
+    category: "generators",
+    inputs: [{ id: "in", label: "In", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  vocoder: {
+    type: "vocoder",
+    label: "Vocoder",
+    category: "effects",
+    inputs: [
+      { id: "carrier", label: "Carrier", type: "audio" },
+      { id: "modulator", label: "Mod", type: "audio" },
+    ],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
 };
 
 // ---------------------------------------------------------------------------
