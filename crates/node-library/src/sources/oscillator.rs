@@ -44,13 +44,25 @@ impl Waveform {
 pub struct Oscillator {
     phase: f64,
     last_phase_increment: f64,
+    /// Smoothed AM value to prevent clicks on gate transitions.
+    smoothed_am: f32,
+    /// Smoothed frequency value to prevent clicks on note changes.
+    smoothed_freq: f64,
 }
+
+/// Smoothing coefficient — how fast the value converges.
+/// 0.005 ≈ 240 samples at 48kHz ≈ 5ms attack/release.
+const AM_SMOOTH: f32 = 0.005;
+/// Frequency smoothing — slightly faster to feel responsive.
+const FREQ_SMOOTH: f64 = 0.01;
 
 impl Oscillator {
     pub fn new() -> Self {
         Self {
             phase: 0.0,
             last_phase_increment: 0.0,
+            smoothed_am: 1.0,
+            smoothed_freq: 440.0,
         }
     }
 }
@@ -105,16 +117,19 @@ impl AudioNode for Oscillator {
 
         for i in 0..ctx.buffer_size {
             // Frequency set from input port 2 (overrides parameter when > 0).
-            let effective_base = if has_freq_input {
+            let target_base = if has_freq_input {
                 let f = ctx.inputs[2][i] as f64;
                 if f > 0.0 { f } else { base_freq }
             } else {
                 base_freq
             };
 
+            // Smooth frequency changes to prevent clicks on note transitions.
+            self.smoothed_freq += (target_base - self.smoothed_freq) * FREQ_SMOOTH;
+
             // Frequency modulation from input port 0 (additive Hz).
             let fm = if has_fm_input { ctx.inputs[0][i] as f64 } else { 0.0 };
-            let freq = (effective_base * detune_mult + fm).max(0.0);
+            let freq = (self.smoothed_freq * detune_mult + fm).max(0.0);
 
             let phase_inc = freq / sr;
             self.last_phase_increment = phase_inc;
@@ -154,9 +169,11 @@ impl AudioNode for Oscillator {
                 }
             };
 
-            // Apply amplitude modulation if connected.
+            // Apply amplitude modulation with smoothing to prevent gate clicks.
             let final_sample = if has_am_input {
-                sample as f32 * ctx.inputs[1][i]
+                let target_am = ctx.inputs[1][i];
+                self.smoothed_am += (target_am - self.smoothed_am) * AM_SMOOTH;
+                sample as f32 * self.smoothed_am
             } else {
                 sample as f32
             };
@@ -175,5 +192,7 @@ impl AudioNode for Oscillator {
     fn reset(&mut self) {
         self.phase = 0.0;
         self.last_phase_increment = 0.0;
+        self.smoothed_am = 1.0;
+        self.smoothed_freq = 440.0;
     }
 }
