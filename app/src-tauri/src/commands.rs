@@ -248,10 +248,12 @@ pub fn set_parameter(
 pub fn play(state: State<'_, AppState>) -> Result<(), String> {
     log::info("play", "transport started");
 
-    // 1. Compile the graph.
-    let compiled = {
+    // 1. Compile the graph and grab connections.
+    let (compiled, connections) = {
         let graph = state.graph.lock().map_err(|e| e.to_string())?;
-        GraphCompiler::compile(&graph).map_err(|e| e.to_string())?
+        let compiled = GraphCompiler::compile(&graph).map_err(|e| e.to_string())?;
+        let connections = graph.connections().to_vec();
+        (compiled, connections)
     };
 
     // 2. Move all node instances into the engine.
@@ -270,8 +272,8 @@ pub fn play(state: State<'_, AppState>) -> Result<(), String> {
         // Start the transport.
         engine.transport_mut().play();
 
-        // 3. Swap in the compiled graph.
-        engine.swap_graph(compiled);
+        // 3. Swap in the compiled graph with connection routing.
+        engine.swap_graph_with_connections(compiled, &connections);
     }
 
     // 4. Open an audio stream (if not already running).
@@ -556,8 +558,9 @@ fn recompile_and_swap(state: &AppState) -> Result<(), String> {
 
     match GraphCompiler::compile(&graph) {
         Ok(compiled) => {
+            let connections = graph.connections().to_vec();
             let engine = state.engine.lock().map_err(|e| e.to_string())?;
-            engine.swap_graph(compiled);
+            engine.swap_graph_with_connections(compiled, &connections);
             Ok(())
         }
         Err(e) => {

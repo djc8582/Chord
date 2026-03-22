@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Arc;
 
-use chord_audio_graph::{CompiledGraph, NodeId, PortId};
+use chord_audio_graph::{CompiledGraph, Connection, NodeId, PortId};
 
 use crate::node::{AudioNode, DiagnosticProbe, NodeFactory, ProcessContext};
 use crate::parameter::{ParameterChange, ParameterState, DEFAULT_SMOOTHING_SAMPLES};
@@ -59,6 +59,9 @@ impl Default for EngineConfig {
 struct EngineGraph {
     /// The compiled graph to execute.
     compiled: CompiledGraph,
+    /// Connections for buffer routing: (from_node, from_port_index, to_node, to_port_index).
+    /// Port indices are 0-based positions in the node's output/input port lists.
+    routing: Vec<(NodeId, usize, NodeId, usize)>,
 }
 
 /// The real-time audio processing engine.
@@ -171,8 +174,23 @@ impl AudioEngine {
     /// The new graph is prepared off the audio thread (allocations happen here).
     /// The audio thread picks up the new graph at the start of the next buffer.
     /// Returns the old graph (if any) for deallocation on the calling thread.
+    ///
+    /// NOTE: This version has no connection routing — nodes won't see each other's
+    /// output. Use [`swap_graph_with_connections`] for proper buffer routing.
     pub fn swap_graph(&self, graph: CompiledGraph) -> Option<CompiledGraph> {
-        let engine_graph = self.build_engine_graph(graph);
+        self.swap_graph_with_connections(graph, &[])
+    }
+
+    /// Swap in a new compiled graph with connection routing information.
+    ///
+    /// Connections are used to route output buffers from upstream nodes to
+    /// downstream nodes' inputs during processing.
+    pub fn swap_graph_with_connections(
+        &self,
+        graph: CompiledGraph,
+        connections: &[Connection],
+    ) -> Option<CompiledGraph> {
+        let engine_graph = self.build_engine_graph(graph, connections);
         let new_ptr = Box::into_raw(Box::new(engine_graph));
         let old_ptr = self.current_graph.swap(new_ptr, Ordering::AcqRel);
 
@@ -184,9 +202,22 @@ impl AudioEngine {
         }
     }
 
-    /// Build an EngineGraph from a CompiledGraph.
-    fn build_engine_graph(&self, compiled: CompiledGraph) -> EngineGraph {
-        EngineGraph { compiled }
+    /// Build an EngineGraph from a CompiledGraph and connections.
+    fn build_engine_graph(&self, compiled: CompiledGraph, connections: &[Connection]) -> EngineGraph {
+        // Pre-compute routing as (from_node, from_port_index, to_node, to_port_index).
+        // Port indices are always 0 for single-port nodes. For multi-port nodes,
+        // we'd need the node descriptors to map port IDs to indices, but for now
+        // we use a simple heuristic: port index = order of port in the connection list.
+        let routing: Vec<(NodeId, usize, NodeId, usize)> = connections
+            .iter()
+            .map(|c| {
+                // Use port ID values as indices (they typically start from small numbers)
+                // This is a simplification — a full implementation would look up port
+                // positions in the node descriptors.
+                (c.from_node, 0_usize, c.to_node, 0_usize)
+            })
+            .collect();
+        EngineGraph { compiled, routing }
     }
 
     /// Reclaim an EngineGraph from a raw pointer.
@@ -268,34 +299,44 @@ impl AudioEngine {
         let buffer_size = self.buffer_size;
         let execution_order = &engine_graph.compiled.execution_order;
 
-        // Step 3: Clear the buffer pool for this frame.
-        // We actually access the buffer pool through the pointer, but since we need
-        // mutable access, we'll track which buffers to clear.
-        // For safety, we work with the internal buffer pool.
+        // Step 3: Storage for node outputs so downstream nodes can read upstream results.
+        // Key: NodeId, Value: Vec of output port buffers (each is Vec<f32>).
+        let mut node_outputs: HashMap<NodeId, Vec<Vec<f32>>> = HashMap::new();
+        let routing = &engine_graph.routing;
 
         // Step 4: Execute nodes in topological order.
         for &node_id in execution_order {
             if let Some(node) = self.nodes.get_mut(&node_id) {
-                // Gather input buffers for this node.
-                // Look through the buffer assignments to find connections targeting this node.
                 let empty_params = crate::parameter::NodeParameterState::new();
                 let node_params = self.parameters.node(&node_id).unwrap_or(&empty_params);
 
                 self.midi_output_buf.clear();
 
-                // For now, use the input buffer as the node's input if this is the first node,
-                // otherwise use empty inputs.
-                // In a full implementation, we'd route through the buffer pool based on connections.
-                let empty_input: &[f32] = &[];
-                let input_refs: Vec<&[f32]> = if execution_order.first() == Some(&node_id)
-                    && input.num_channels() > 0
-                {
-                    (0..input.num_channels())
-                        .map(|ch| input.channel(ch))
-                        .collect()
+                // Gather input buffers for this node from upstream node outputs.
+                // Look through the routing table to find connections targeting this node.
+                let mut input_buffers: Vec<Vec<f32>> = Vec::new();
+                for &(from_node, from_port, to_node, _to_port) in routing {
+                    if to_node == node_id {
+                        if let Some(upstream_outputs) = node_outputs.get(&from_node) {
+                            if let Some(buf) = upstream_outputs.get(from_port) {
+                                input_buffers.push(buf.clone());
+                            }
+                        }
+                    }
+                }
+
+                // If no connections feed this node, check if external input should be used
+                // (for the first node in the chain that might be an input node).
+                let input_refs: Vec<&[f32]> = if input_buffers.is_empty() {
+                    if input.num_channels() > 0 {
+                        (0..input.num_channels())
+                            .map(|ch| input.channel(ch))
+                            .collect()
+                    } else {
+                        vec![&[] as &[f32]]
+                    }
                 } else {
-                    // No input connections resolved — use empty input.
-                    vec![empty_input]
+                    input_buffers.iter().map(|v| v.as_slice()).collect()
                 };
 
                 // Prepare output buffers.
@@ -369,6 +410,9 @@ impl AudioEngine {
                         out_ch[..copy_len].copy_from_slice(&src[..copy_len]);
                     }
                 }
+
+                // Store this node's output for downstream nodes.
+                node_outputs.insert(node_id, output_data);
             }
         }
 
