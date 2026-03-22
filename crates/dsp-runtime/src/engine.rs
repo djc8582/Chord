@@ -289,7 +289,7 @@ impl AudioEngine {
         if graph_ptr.is_null() {
             // No graph — output silence.
             output.clear();
-            self.transport.advance(self.buffer_size);
+            self.transport.advance(output.buffer_size());
             return;
         }
 
@@ -299,7 +299,9 @@ impl AudioEngine {
         // and swap_graph returns the old pointer for deallocation.
         let engine_graph = read_engine_graph(graph_ptr);
 
-        let buffer_size = self.buffer_size;
+        // Use the actual output buffer size from the audio callback, not
+        // self.buffer_size which may differ from what CPAL provides.
+        let buffer_size = output.buffer_size();
         let execution_order = &engine_graph.compiled.execution_order;
 
         // Step 3: Storage for node outputs so downstream nodes can read upstream results.
