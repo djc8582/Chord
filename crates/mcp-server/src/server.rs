@@ -52,6 +52,9 @@ pub struct ChordMcpServer {
     /// Maps MCP node IDs (from standalone graph) to app node IDs (strings)
     /// returned by the running app. Used in proxy mode.
     app_node_ids: HashMap<u64, String>,
+    /// Maps (app_node_id_numeric, port_id) → port_name from the app's add_node
+    /// response. Used in proxy mode to resolve port names for connect calls.
+    app_port_names: HashMap<(u64, u64), (String, bool)>,
 }
 
 impl Default for ChordMcpServer {
@@ -77,6 +80,7 @@ impl ChordMcpServer {
             proxy_mode,
             proxy_detection_disabled: false,
             app_node_ids: HashMap::new(),
+            app_port_names: HashMap::new(),
         }
     }
 
@@ -89,6 +93,7 @@ impl ChordMcpServer {
             proxy_mode: false,
             proxy_detection_disabled: true,
             app_node_ids: HashMap::new(),
+            app_port_names: HashMap::new(),
         }
     }
 
@@ -223,6 +228,34 @@ impl ChordMcpServer {
 
         // Store the app's node ID so we can map MCP numeric IDs in subsequent calls.
         if let Some(app_id) = result.get("node_id").and_then(|v| v.as_str()) {
+            // Cache port ID → name mappings from the app response so proxy_connect
+            // can resolve port names without relying on the local graph (whose
+            // PortIds differ due to the global atomic counter).
+            if let Ok(node_num) = app_id.parse::<u64>() {
+                if let Some(inputs) = result.get("inputs").and_then(|v| v.as_array()) {
+                    for port in inputs {
+                        if let (Some(pid), Some(name)) = (
+                            port.get("id").and_then(|v| v.as_u64()),
+                            port.get("name").and_then(|v| v.as_str()),
+                        ) {
+                            // false = input port
+                            self.app_port_names.insert((node_num, pid), (name.to_string(), false));
+                        }
+                    }
+                }
+                if let Some(outputs) = result.get("outputs").and_then(|v| v.as_array()) {
+                    for port in outputs {
+                        if let (Some(pid), Some(name)) = (
+                            port.get("id").and_then(|v| v.as_u64()),
+                            port.get("name").and_then(|v| v.as_str()),
+                        ) {
+                            // true = output port
+                            self.app_port_names.insert((node_num, pid), (name.to_string(), true));
+                        }
+                    }
+                }
+            }
+
             // Also run the local standalone logic so diagnostics/export still work.
             let local_result = self.tool_add_node(args);
             if let Ok(ref local) = local_result {
@@ -254,6 +287,8 @@ impl ChordMcpServer {
     fn proxy_connect(&mut self, args: &Value) -> McpResult<Value> {
         let from_node = get_u64(args, "from_node")?;
         let to_node = get_u64(args, "to_node")?;
+        let from_port_id = get_u64(args, "from_port")?;
+        let to_port_id = get_u64(args, "to_port")?;
 
         // Map MCP numeric IDs to app IDs.
         let from_app_id = self
@@ -267,40 +302,23 @@ impl ChordMcpServer {
             .cloned()
             .unwrap_or_else(|| to_node.to_string());
 
-        // Resolve port names: look up port names from the local graph.
-        let from_port_id = get_u64(args, "from_port")?;
-        let to_port_id = get_u64(args, "to_port")?;
+        // Parse the app node IDs as numbers to look up cached port names.
+        let from_node_num = from_app_id.parse::<u64>().unwrap_or(from_node);
+        let to_node_num = to_app_id.parse::<u64>().unwrap_or(to_node);
 
-        // Find port names from the local graph's node descriptors.
-        let (from_port_name, to_port_name) = {
-            let patch_id = args
-                .get("patch_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("app");
-            let patch = self.patches.get(patch_id);
+        // Resolve port names from the cached app response (not the local graph,
+        // whose PortIds differ due to the global atomic counter).
+        let from_port_name = self
+            .app_port_names
+            .get(&(from_node_num, from_port_id))
+            .map(|(name, _)| name.clone())
+            .unwrap_or_else(|| format!("{from_port_id}"));
 
-            let from_name = patch
-                .and_then(|p| p.graph.node(&NodeId(from_node)))
-                .and_then(|n| {
-                    n.outputs
-                        .iter()
-                        .find(|p| p.id == PortId(from_port_id))
-                        .map(|p| p.name.clone())
-                })
-                .unwrap_or_else(|| format!("{from_port_id}"));
-
-            let to_name = patch
-                .and_then(|p| p.graph.node(&NodeId(to_node)))
-                .and_then(|n| {
-                    n.inputs
-                        .iter()
-                        .find(|p| p.id == PortId(to_port_id))
-                        .map(|p| p.name.clone())
-                })
-                .unwrap_or_else(|| format!("{to_port_id}"));
-
-            (from_name, to_name)
-        };
+        let to_port_name = self
+            .app_port_names
+            .get(&(to_node_num, to_port_id))
+            .map(|(name, _)| name.clone())
+            .unwrap_or_else(|| format!("{to_port_id}"));
 
         let result = self.app_post(
             "connect",

@@ -154,6 +154,7 @@ fn route(path: &str, args: Value, state: &AppState, handle: &AppHandle) -> Value
         "/api/v1/compile" => api_compile(state),
         "/api/v1/get_patch" => api_get_patch(state),
         "/api/v1/get_waveform_data" => api_get_waveform_data(state),
+        "/api/v1/get_signal_stats" => api_get_signal_stats(state),
         _ => json!({"error": format!("Unknown endpoint: {path}")}),
     }
 }
@@ -568,6 +569,64 @@ fn api_get_waveform_data(state: &AppState) -> Value {
     let engine = state.engine.lock().unwrap();
     let buffer = engine.get_last_output_buffer();
     json!(buffer)
+}
+
+fn api_get_signal_stats(state: &AppState) -> Value {
+    let engine = state.engine.lock().unwrap();
+    let buffer = engine.get_last_output_buffer();
+
+    if buffer.is_empty() {
+        return json!({
+            "rms": 0.0,
+            "peak": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "dc_offset": 0.0,
+            "is_silent": true,
+            "has_nan": false,
+            "sample_count": 0,
+        });
+    }
+
+    let mut sum = 0.0f64;
+    let mut sum_sq = 0.0f64;
+    let mut peak = 0.0f32;
+    let mut min_val = f32::MAX;
+    let mut max_val = f32::MIN;
+    let mut has_nan = false;
+
+    for &s in &buffer {
+        if s.is_nan() || s.is_infinite() {
+            has_nan = true;
+            continue;
+        }
+        sum += s as f64;
+        sum_sq += (s as f64) * (s as f64);
+        if s.abs() > peak {
+            peak = s.abs();
+        }
+        if s < min_val {
+            min_val = s;
+        }
+        if s > max_val {
+            max_val = s;
+        }
+    }
+
+    let n = buffer.len() as f64;
+    let rms = (sum_sq / n).sqrt();
+    let dc_offset = sum / n;
+
+    json!({
+        "rms": rms,
+        "peak": peak,
+        "min": min_val,
+        "max": max_val,
+        "dc_offset": dc_offset,
+        "is_silent": peak < 1e-6,
+        "has_nan": has_nan,
+        "sample_count": buffer.len(),
+    })
 }
 
 // ---------------------------------------------------------------------------
