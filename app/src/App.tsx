@@ -6,20 +6,26 @@
  * panel layout.
  */
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Shell } from "./shell/index.js";
 import { Canvas, useCanvasStore, setCanvasBridge } from "./canvas/index.js";
 import { Inspector, setInspectorBridge } from "./inspector/index.js";
 import { Browser } from "./browser/index.js";
 import { Timeline, setTimelineBridge } from "./timeline/index.js";
 import { setVisualizerBridge } from "./visualizer/index.js";
+import { LiveMode } from "./live-mode/index.js";
+import { PianoRoll } from "./piano-roll/index.js";
 import { createPatchDocument } from "@chord/document-model";
 import { useBridge } from "./bridge/index.js";
 import { initMcpSync } from "./bridge/mcp-sync.js";
+import { useShellStore } from "./shell/store.js";
+import { useCommand } from "./shell/useCommand.js";
+import { useShortcut } from "./shell/useShortcut.js";
 
 function App() {
   const initialized = useRef(false);
   const bridge = useBridge();
+  const setIsPlaying = useShellStore((s) => s.setIsPlaying);
 
   // Create the Yjs document once and share it with all stores
   useEffect(() => {
@@ -30,8 +36,6 @@ function App() {
     useCanvasStore.getState().initDocument(doc);
 
     // Clear the backend graph so it matches the empty canvas.
-    // Without this, stale nodes from API tests or previous sessions
-    // would play when the user hits Space.
     bridge.clearGraph().catch(() => {});
 
     // Give the canvas, inspector, timeline, and visualizer access to the bridge for backend sync
@@ -56,17 +60,48 @@ function App() {
     };
   }, [bridge]);
 
+  // -- Live Mode callbacks --
+  const handlePanic = useCallback(() => {
+    bridge.stop().catch(console.error);
+    setIsPlaying(false);
+  }, [bridge, setIsPlaying]);
+
+  const handleBpmChange = useCallback(
+    (bpm: number) => {
+      bridge.setTempo(bpm).catch(console.error);
+    },
+    [bridge],
+  );
+
+  // -- Live Mode toggle --
+  const [liveModeOpen, setLiveModeOpen] = React.useState(false);
+  const toggleLiveMode = useCallback(() => setLiveModeOpen((v) => !v), []);
+
+  useCommand("view.toggleLiveMode", toggleLiveMode, {
+    label: "Toggle Live Mode",
+    category: "View",
+    shortcut: "mod+l",
+  });
+  useShortcut("mod+l", toggleLiveMode);
+
   return (
     <Shell
       panelContent={{
         inspector: <Inspector />,
         browser: <Browser />,
         timeline: <Timeline />,
+        "piano-roll": <PianoRoll />,
       }}
     >
       <Canvas />
+      {liveModeOpen && (
+        <LiveMode onPanic={handlePanic} onBpmChange={handleBpmChange} />
+      )}
     </Shell>
   );
 }
+
+// Need React import for useState
+import React from "react";
 
 export default App;

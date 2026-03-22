@@ -56,6 +56,15 @@ export const defaultPanels: PanelConfig[] = [
     defaultVisible: true,
     icon: "clock",
   },
+  {
+    id: "live-mode",
+    title: "Live Mode",
+    position: "center",
+    defaultSize: 0,
+    minSize: 200,
+    defaultVisible: false,
+    icon: "zap",
+  },
 ];
 
 /**

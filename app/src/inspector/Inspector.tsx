@@ -12,7 +12,7 @@
  * the Rust backend (via the bridge).
  */
 
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useCanvasStore } from "../canvas/store.js";
 import { useInspectorStore } from "./store.js";
 import { Slider } from "./Slider.js";
@@ -64,6 +64,10 @@ export const Inspector: React.FC<InspectorProps> = ({
   const setParam = useInspectorStore((s) => s.setParameter);
   const setNodeName = useInspectorStore((s) => s.setNodeName);
 
+  // -- MIDI Learn state ---
+  const [midiLearnActive, setMidiLearnActive] = useState(false);
+  const [midiLearnParam, setMidiLearnParam] = useState<string | null>(null);
+
   // Re-sync whenever canvas selection changes
   useEffect(() => {
     syncFromCanvas();
@@ -86,11 +90,10 @@ export const Inspector: React.FC<InspectorProps> = ({
     (param: string, value: number) => {
       setParam(param, value);
 
-      // Also notify the Rust backend using the mapped numeric ID.
+      // Also notify the Rust backend
       const nodeId = useInspectorStore.getState().inspectedNodeId;
       if (bridgeRef && nodeId) {
-        const backendId = useCanvasStore.getState().getBackendId(nodeId);
-        bridgeRef.setParameter(backendId, param, value).catch(() => {
+        bridgeRef.setParameter(nodeId, param, value).catch(() => {
           // Bridge call failed (e.g. engine not running) — silently ignore.
           // The Yjs document is already updated.
         });
@@ -105,6 +108,41 @@ export const Inspector: React.FC<InspectorProps> = ({
     },
     [setNodeName],
   );
+
+  // -- MIDI Learn handlers ---
+  const handleMidiLearnToggle = useCallback(() => {
+    if (midiLearnActive) {
+      // Cancel learn mode
+      setMidiLearnActive(false);
+      setMidiLearnParam(null);
+    } else {
+      // Enter learn mode — next parameter touch will activate listening
+      setMidiLearnActive(true);
+      setMidiLearnParam(null);
+    }
+  }, [midiLearnActive]);
+
+  const handleParameterTouch = useCallback(
+    (paramId: string) => {
+      if (midiLearnActive && !midiLearnParam) {
+        setMidiLearnParam(paramId);
+        // In a full implementation, this would create a MidiLearnSession
+        // and feed incoming MIDI messages to it. For now, just show the
+        // "waiting" state. Auto-cancel after 10 seconds.
+        setTimeout(() => {
+          setMidiLearnActive(false);
+          setMidiLearnParam(null);
+        }, 10000);
+      }
+    },
+    [midiLearnActive, midiLearnParam],
+  );
+
+  // Clear MIDI learn state when node selection changes
+  useEffect(() => {
+    setMidiLearnActive(false);
+    setMidiLearnParam(null);
+  }, [selectedNodeIds]);
 
   // ------- Empty state -------
   if (!inspectedNode) {
@@ -188,41 +226,129 @@ export const Inspector: React.FC<InspectorProps> = ({
           {parameterDescriptors.map((desc) => {
             const currentValue =
               inspectedNode.parameters[desc.id] ?? desc.defaultValue;
+            const isLearnTarget = midiLearnParam === desc.id;
+
+            const handleChange = (v: number) => {
+              handleParameterChange(desc.id, v);
+              // If MIDI learn is active and no param selected yet, select this one
+              handleParameterTouch(desc.id);
+            };
 
             if (shouldUseKnob(desc.min, desc.max, desc.step)) {
               return (
-                <Knob
-                  key={desc.id}
+                <div key={desc.id} style={{ position: "relative" }}>
+                  <Knob
+                    label={desc.label}
+                    value={currentValue}
+                    min={desc.min}
+                    max={desc.max}
+                    step={desc.step}
+                    unit={desc.unit}
+                    onChange={handleChange}
+                    data-testid={`${testId}-param-${desc.id}`}
+                  />
+                  {isLearnTarget && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "#f59e0b",
+                        fontWeight: 600,
+                        marginTop: 2,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Waiting for MIDI CC...
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div key={desc.id} style={{ position: "relative" }}>
+                <Slider
                   label={desc.label}
                   value={currentValue}
                   min={desc.min}
                   max={desc.max}
                   step={desc.step}
                   unit={desc.unit}
-                  onChange={(v) => handleParameterChange(desc.id, v)}
+                  onChange={handleChange}
                   data-testid={`${testId}-param-${desc.id}`}
                 />
-              );
-            }
-
-            return (
-              <Slider
-                key={desc.id}
-                label={desc.label}
-                value={currentValue}
-                min={desc.min}
-                max={desc.max}
-                step={desc.step}
-                unit={desc.unit}
-                onChange={(v) => handleParameterChange(desc.id, v)}
-                data-testid={`${testId}-param-${desc.id}`}
-              />
+                {isLearnTarget && (
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#f59e0b",
+                      fontWeight: 600,
+                      marginTop: 2,
+                      marginBottom: 4,
+                    }}
+                  >
+                    Waiting for MIDI CC...
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       ) : (
         <div style={{ fontSize: 12, color: "#666", fontStyle: "italic" }}>
           No parameters
+        </div>
+      )}
+
+      {/* MIDI Learn section */}
+      {parameterDescriptors.length > 0 && (
+        <div data-testid={`${testId}-midi-learn`} style={{ marginTop: 12 }}>
+          <button
+            onClick={handleMidiLearnToggle}
+            data-testid={`${testId}-midi-learn-btn`}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: midiLearnActive ? "#020617" : "#e2e8f0",
+              backgroundColor: midiLearnActive ? "#f59e0b" : "#334155",
+              border: midiLearnActive
+                ? "1px solid #d97706"
+                : "1px solid #475569",
+              borderRadius: 4,
+              cursor: "pointer",
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+            }}
+          >
+            {midiLearnActive ? "Cancel MIDI Learn" : "MIDI Learn"}
+          </button>
+          {midiLearnActive && !midiLearnParam && (
+            <div
+              data-testid={`${testId}-midi-learn-status`}
+              style={{
+                fontSize: 11,
+                color: "#f59e0b",
+                marginTop: 6,
+                textAlign: "center",
+              }}
+            >
+              Touch a parameter to assign MIDI control...
+            </div>
+          )}
+          {midiLearnParam && (
+            <div
+              data-testid={`${testId}-midi-learn-waiting`}
+              style={{
+                fontSize: 11,
+                color: "#f59e0b",
+                marginTop: 6,
+                textAlign: "center",
+              }}
+            >
+              Listening on "{midiLearnParam}" — move a MIDI controller...
+            </div>
+          )}
         </div>
       )}
 
