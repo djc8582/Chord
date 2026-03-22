@@ -51,71 +51,69 @@ export interface NodeTypeDefinition {
 }
 
 // Built-in node type registry
+// Port IDs MUST match the backend port names in state.rs build_node_descriptor().
+// If these don't match, connections drawn on canvas will silently fail to reach
+// the Rust audio engine.
 export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
   oscillator: {
     type: "oscillator",
     label: "Oscillator",
     category: "generators",
     inputs: [
-      { id: "frequency", label: "Freq", type: "control" },
-      { id: "detune", label: "Detune", type: "control" },
+      { id: "fm", label: "FM", type: "audio" },
     ],
-    outputs: [{ id: "output", label: "Out", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   filter: {
     type: "filter",
     label: "Filter",
     category: "effects",
     inputs: [
-      { id: "input", label: "In", type: "audio" },
-      { id: "cutoff", label: "Cutoff", type: "control" },
-      { id: "resonance", label: "Res", type: "control" },
+      { id: "in", label: "In", type: "audio" },
     ],
-    outputs: [{ id: "output", label: "Out", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   gain: {
     type: "gain",
     label: "Gain",
     category: "utilities",
     inputs: [
-      { id: "input", label: "In", type: "audio" },
-      { id: "gain", label: "Gain", type: "control" },
+      { id: "in", label: "In", type: "audio" },
     ],
-    outputs: [{ id: "output", label: "Out", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   envelope: {
     type: "envelope",
     label: "Envelope",
     category: "modulators",
-    inputs: [{ id: "trigger", label: "Trig", type: "trigger" }],
-    outputs: [{ id: "output", label: "Out", type: "control" }],
+    inputs: [{ id: "gate", label: "Gate", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   lfo: {
     type: "lfo",
     label: "LFO",
     category: "modulators",
-    inputs: [{ id: "rate", label: "Rate", type: "control" }],
-    outputs: [{ id: "output", label: "Out", type: "control" }],
+    inputs: [],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   mixer: {
     type: "mixer",
     label: "Mixer",
     category: "utilities",
     inputs: [
-      { id: "input1", label: "In 1", type: "audio" },
-      { id: "input2", label: "In 2", type: "audio" },
-      { id: "input3", label: "In 3", type: "audio" },
-      { id: "input4", label: "In 4", type: "audio" },
+      { id: "in1", label: "In 1", type: "audio" },
+      { id: "in2", label: "In 2", type: "audio" },
+      { id: "in3", label: "In 3", type: "audio" },
+      { id: "in4", label: "In 4", type: "audio" },
     ],
-    outputs: [{ id: "output", label: "Out", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   output: {
     type: "output",
     label: "Output",
     category: "io",
     inputs: [
-      { id: "left", label: "L", type: "audio" },
-      { id: "right", label: "R", type: "audio" },
+      { id: "in", label: "In", type: "audio" },
     ],
     outputs: [],
   },
@@ -125,8 +123,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     category: "io",
     inputs: [],
     outputs: [
-      { id: "left", label: "L", type: "audio" },
-      { id: "right", label: "R", type: "audio" },
+      { id: "out", label: "Out", type: "audio" },
     ],
   },
   delay: {
@@ -134,32 +131,47 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     label: "Delay",
     category: "effects",
     inputs: [
-      { id: "input", label: "In", type: "audio" },
-      { id: "time", label: "Time", type: "control" },
-      { id: "feedback", label: "FB", type: "control" },
+      { id: "in", label: "In", type: "audio" },
     ],
-    outputs: [{ id: "output", label: "Out", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
   reverb: {
     type: "reverb",
     label: "Reverb",
     category: "effects",
     inputs: [
-      { id: "input", label: "In", type: "audio" },
-      { id: "size", label: "Size", type: "control" },
-      { id: "damping", label: "Damp", type: "control" },
+      { id: "in", label: "In", type: "audio" },
     ],
-    outputs: [{ id: "output", label: "Out", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
-  midi_in: {
-    type: "midi_in",
-    label: "MIDI In",
-    category: "io",
-    inputs: [],
+  compressor: {
+    type: "compressor",
+    label: "Compressor",
+    category: "effects",
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+    ],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  eq: {
+    type: "eq",
+    label: "EQ",
+    category: "effects",
+    inputs: [
+      { id: "in", label: "In", type: "audio" },
+    ],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  midi_to_freq: {
+    type: "midi_to_freq",
+    label: "MIDI→Freq",
+    category: "midi",
+    inputs: [
+      { id: "midi", label: "MIDI", type: "midi" },
+    ],
     outputs: [
-      { id: "note", label: "Note", type: "midi" },
-      { id: "velocity", label: "Vel", type: "control" },
-      { id: "gate", label: "Gate", type: "trigger" },
+      { id: "freq", label: "Freq", type: "control" },
+      { id: "gate", label: "Gate", type: "control" },
     ],
   },
   noise: {
@@ -167,7 +179,7 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     label: "Noise",
     category: "generators",
     inputs: [],
-    outputs: [{ id: "output", label: "Out", type: "audio" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
 };
 

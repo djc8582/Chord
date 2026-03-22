@@ -11,6 +11,7 @@ import {
   disconnect,
   setParameter,
 } from "@chord/document-model";
+import { useCanvasStore } from "../canvas/store.js";
 
 // Dynamic import so this module can be loaded in non-Tauri environments.
 async function listenForEvent<T>(
@@ -43,6 +44,8 @@ export async function initMcpSync(
       position: { x: number; y: number };
     }>("mcp:node-added", ({ nodeId, nodeType, position }) => {
       addNodeWithId(doc, nodeId, nodeType, position, nodeType);
+      // For API-created nodes, the Yjs ID IS the backend numeric ID.
+      useCanvasStore.getState().backendIds.set(nodeId, nodeId);
       syncCanvas();
     }),
   );
