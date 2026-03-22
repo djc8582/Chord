@@ -573,10 +573,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         resolveBackendId(connection.source),
         resolveBackendId(connection.target),
       ]).then(([fromId, toId]) => {
+        console.log(`[chord] connect: ${fromId}:${fromPort} → ${toId}:${toPort}`);
         _bridge?.connect(
           { nodeId: fromId, port: fromPort },
           { nodeId: toId, port: toPort },
-        ).catch(() => {});
+        ).then((r) => console.log("[chord] connect result:", r))
+         .catch((e) => console.error("[chord] connect error:", e));
       });
     }
   },
@@ -589,6 +591,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     // Store the promise so that connect() can await it if called before this resolves.
     if (_bridge) {
       const promise = _bridge.addNode(type, { x: position.x, y: position.y }).then((backendId) => {
+        console.log(`[chord] addNode ${type}: yjs=${id} backend=${backendId}`);
         if (backendId) {
           get().backendIds.set(id, backendId);
         }

@@ -212,7 +212,7 @@ function PolyrhythmNodeComponent(props: NodeProps) {
         position={Position.Left}
         id="clock"
         style={{
-          top: "50%",
+          top: 75,
           width: 10,
           height: 10,
           background: PORT_COLORS.audio,
@@ -225,7 +225,7 @@ function PolyrhythmNodeComponent(props: NodeProps) {
         position={Position.Right}
         id="out"
         style={{
-          top: "50%",
+          top: 75,
           width: 10,
           height: 10,
           background: PORT_COLORS.audio,

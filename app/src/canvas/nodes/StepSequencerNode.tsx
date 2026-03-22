@@ -166,48 +166,15 @@ function StepSequencerNodeComponent(props: NodeProps) {
         </div>
       </div>
 
-      {/* Input handles (left) */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="clock"
-        style={{
-          top: "50%",
-          width: 10,
-          height: 10,
-          background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
-          borderRadius: "50%",
-        }}
-      />
+      {/* Input handles (left) — use pixel values for React Flow compatibility */}
+      <Handle type="target" position={Position.Left} id="clock"
+        style={{ top: 75, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
 
       {/* Output handles (right) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="pitch"
-        style={{
-          top: "40%",
-          width: 10,
-          height: 10,
-          background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
-          borderRadius: "50%",
-        }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="gate"
-        style={{
-          top: "60%",
-          width: 10,
-          height: 10,
-          background: PORT_COLORS.audio,
-          border: "2px solid #0f172a",
-          borderRadius: "50%",
-        }}
-      />
+      <Handle type="source" position={Position.Right} id="pitch"
+        style={{ top: 60, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
+      <Handle type="source" position={Position.Right} id="gate"
+        style={{ top: 90, width: 10, height: 10, background: PORT_COLORS.audio, border: "2px solid #0f172a", borderRadius: "50%" }} />
     </div>
   );
 }

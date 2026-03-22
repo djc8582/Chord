@@ -252,7 +252,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
         position={Position.Left}
         id="clock"
         style={{
-          top: "50%",
+          top: 75,
           width: 10,
           height: 10,
           background: PORT_COLORS.audio,
@@ -265,7 +265,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
         position={Position.Right}
         id="pitch"
         style={{
-          top: "40%",
+          top: 60,
           width: 10,
           height: 10,
           background: PORT_COLORS.audio,
@@ -278,7 +278,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
         position={Position.Right}
         id="gate"
         style={{
-          top: "60%",
+          top: 90,
           width: 10,
           height: 10,
           background: PORT_COLORS.audio,
