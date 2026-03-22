@@ -107,9 +107,9 @@ function GameOfLifeNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a2e",
-        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
-        borderRadius: 0,
+        background: "#ffffff",
+        border: isSelected ? "3px solid #c8ff00" : "3px solid #000",
+        borderRadius: 14,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
@@ -117,7 +117,7 @@ function GameOfLifeNodeComponent(props: NodeProps) {
         color: "#ffffff",
         boxShadow: isSelected
           ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
-          : "4px 4px 0px #000",
+          : "5px 5px 0px #000",
         transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
@@ -127,9 +127,9 @@ function GameOfLifeNodeComponent(props: NodeProps) {
       {/* Title bar */}
       <div
         style={{
-          background: "#8b5cf6",
+          background: "#f472b6",
           padding: "6px 12px",
-          borderRadius: 0,
+          borderRadius: 14,
           borderBottom: "3px solid #000",
           fontWeight: 800,
           fontSize: 12,
@@ -156,8 +156,8 @@ function GameOfLifeNodeComponent(props: NodeProps) {
             gridTemplateColumns: `repeat(${COLS}, ${cellW}px)`,
             gridTemplateRows: `repeat(${ROWS}, ${cellH}px)`,
             gap: 1,
-            background: "#0a0a1a",
-            borderRadius: 0,
+            background: "#f5f3ff",
+            borderRadius: 14,
             padding: 2,
             border: "2px solid #000",
           }}
@@ -165,7 +165,7 @@ function GameOfLifeNodeComponent(props: NodeProps) {
           {grid.map((row, r) =>
             row.map((alive, c) => {
               const isPlayhead = c === playheadCol;
-              let bg = "#1a1a2e";
+              let bg = "#ffffff";
               if (alive && isPlayhead) bg = "#ffd700";
               else if (alive) bg = "#00ff41";
               else if (isPlayhead) bg = "#00ff4120";
@@ -177,7 +177,7 @@ function GameOfLifeNodeComponent(props: NodeProps) {
                     width: cellW,
                     height: cellH,
                     background: bg,
-                    borderRadius: 0,
+                    borderRadius: 14,
                     opacity: alive ? (isPlayhead ? 1 : 0.6) : (isPlayhead ? 0.4 : 0.15),
                     transition: "background 0.06s",
                   }}

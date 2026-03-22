@@ -52,7 +52,7 @@ function OscillatorMiniDisplay({ waveform }: { waveform?: number }) {
 
   return (
     <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
-      <path d={pathD} fill="none" stroke="#00ff41" strokeWidth={2} opacity={0.9} />
+      <path d={pathD} fill="none" stroke="#c8ff00" strokeWidth={2} opacity={0.9} />
     </svg>
   );
 }
@@ -85,8 +85,8 @@ function FilterMiniDisplay({ filterType }: { filterType?: number }) {
 
   return (
     <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
-      <path d={pathD} fill="none" stroke="#ff1493" strokeWidth={2} opacity={0.9} />
-      <line x1={0} y1={h - 2} x2={w} y2={h - 2} stroke="#ffffff20" strokeWidth={1} />
+      <path d={pathD} fill="none" stroke="#ff6b6b" strokeWidth={2} opacity={0.9} />
+      <line x1={0} y1={h - 2} x2={w} y2={h - 2} stroke="#00000010" strokeWidth={1} />
     </svg>
   );
 }
@@ -127,12 +127,12 @@ function GainMiniDisplay({ level }: { level?: number }) {
   return (
     <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
       {/* Background track */}
-      <rect x={4} y={14} width={w - 8} height={12} rx={0} fill="#1a1a2e" stroke="#333" strokeWidth={1} />
+      <rect x={4} y={14} width={w - 8} height={12} rx={0} fill="#e8e5ff" stroke="#333" strokeWidth={1} />
       {/* Level bar */}
-      <rect x={4} y={14} width={barWidth} height={12} rx={0} fill={gainVal > 1.5 ? "#ff1493" : "#ffd700"} opacity={0.9} />
+      <rect x={4} y={14} width={barWidth} height={12} rx={0} fill={gainVal > 1.5 ? "#ff6b6b" : "#ffd700"} opacity={0.9} />
       {/* dB markers */}
-      <line x1={w / 2} y1={12} x2={w / 2} y2={28} stroke="#ffffff30" strokeWidth={1} />
-      <text x={w / 2} y={38} textAnchor="middle" fill="#94a3b8" fontSize={8} fontFamily="monospace">
+      <line x1={w / 2} y1={12} x2={w / 2} y2={28} stroke="#00000020" strokeWidth={1} />
+      <text x={w / 2} y={38} textAnchor="middle" fill="#666" fontSize={8} fontFamily="monospace">
         {(20 * Math.log10(Math.max(0.001, gainVal))).toFixed(1)}dB
       </text>
     </svg>
@@ -152,11 +152,11 @@ function DelayMiniDisplay() {
         const r = 8 - i * 1.2;
         const opacity = 1 - i * 0.18;
         return (
-          <circle key={i} cx={x} cy={mid} r={r} fill="#00ff41" opacity={opacity} />
+          <circle key={i} cx={x} cy={mid} r={r} fill="#c8ff00" opacity={opacity} />
         );
       })}
       {/* Connecting line */}
-      <line x1={15} y1={mid} x2={127} y2={mid} stroke="#00ff4140" strokeWidth={1} strokeDasharray="3,3" />
+      <line x1={15} y1={mid} x2={127} y2={mid} stroke="#c8ff0060" strokeWidth={1} strokeDasharray="3,3" />
     </svg>
   );
 }
@@ -180,8 +180,8 @@ function ReverbMiniDisplay() {
 
   return (
     <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
-      <path d={pathD} fill="none" stroke="#ff1493" strokeWidth={1.5} opacity={0.8} />
-      <line x1={0} y1={h - 2} x2={w} y2={h - 2} stroke="#ffffff15" strokeWidth={1} />
+      <path d={pathD} fill="none" stroke="#ff6b6b" strokeWidth={1.5} opacity={0.8} />
+      <line x1={0} y1={h - 2} x2={w} y2={h - 2} stroke="#00000010" strokeWidth={1} />
     </svg>
   );
 }
@@ -207,7 +207,7 @@ function NoiseMiniDisplay() {
   return (
     <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
       {dots.map((d, i) => (
-        <rect key={i} x={d.x} y={d.y} width={2} height={2} fill="#00ff41" opacity={d.opacity} />
+        <rect key={i} x={d.x} y={d.y} width={2} height={2} fill="#c8ff00" opacity={d.opacity} />
       ))}
     </svg>
   );

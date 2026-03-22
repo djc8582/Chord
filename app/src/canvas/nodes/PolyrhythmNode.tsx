@@ -62,9 +62,9 @@ function PolyrhythmNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a2e",
-        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
-        borderRadius: 0,
+        background: "#ffffff",
+        border: isSelected ? "3px solid #c8ff00" : "3px solid #000",
+        borderRadius: 14,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
@@ -72,7 +72,7 @@ function PolyrhythmNodeComponent(props: NodeProps) {
         color: "#ffffff",
         boxShadow: isSelected
           ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
-          : "4px 4px 0px #000",
+          : "5px 5px 0px #000",
         transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
@@ -82,9 +82,9 @@ function PolyrhythmNodeComponent(props: NodeProps) {
       {/* Title bar */}
       <div
         style={{
-          background: "#8b5cf6",
+          background: "#f472b6",
           padding: "6px 12px",
-          borderRadius: 0,
+          borderRadius: 14,
           borderBottom: "3px solid #000",
           fontWeight: 800,
           fontSize: 12,
@@ -109,8 +109,8 @@ function PolyrhythmNodeComponent(props: NodeProps) {
           width={170}
           height={110}
           style={{
-            background: "#0a0a1a",
-            borderRadius: 0,
+            background: "#f5f3ff",
+            borderRadius: 14,
             border: "2px solid #000",
           }}
         >

@@ -88,7 +88,7 @@ function StepSequencerNodeComponent(props: NodeProps) {
               height: stepSize * 1.5,
               background: isActive ? "#00ff41" : "#2a2a2a",
               border: `1.5px solid ${isCurrent ? "#ff1493" : isActive ? "#00ff4180" : "#444"}`,
-              borderRadius: 0,
+              borderRadius: 14,
               opacity: isActive ? (isCurrent ? 1 : 0.7) : 0.3,
               transition: "opacity 0.05s, background 0.05s",
               boxShadow: isCurrent ? "0 0 6px #ff1493" : "none",
@@ -116,9 +116,9 @@ function StepSequencerNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a2e",
-        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
-        borderRadius: 0,
+        background: "#ffffff",
+        border: isSelected ? "3px solid #c8ff00" : "3px solid #000",
+        borderRadius: 14,
         width: nodeWidth,
         height: nodeHeight,
         fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
@@ -126,7 +126,7 @@ function StepSequencerNodeComponent(props: NodeProps) {
         color: "#ffffff",
         boxShadow: isSelected
           ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
-          : "4px 4px 0px #000",
+          : "5px 5px 0px #000",
         transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
@@ -136,9 +136,9 @@ function StepSequencerNodeComponent(props: NodeProps) {
       {/* Title bar */}
       <div
         style={{
-          background: "#8b5cf6",
+          background: "#f472b6",
           padding: "6px 12px",
-          borderRadius: 0,
+          borderRadius: 14,
           borderBottom: "3px solid #000",
           fontWeight: 800,
           fontSize: 12,

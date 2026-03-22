@@ -135,9 +135,9 @@ function GravitySequencerNodeComponent(props: NodeProps) {
   return (
     <div
       style={{
-        background: "#1a1a2e",
-        border: isSelected ? "3px solid #00ff41" : "3px solid #000",
-        borderRadius: 0,
+        background: "#ffffff",
+        border: isSelected ? "3px solid #c8ff00" : "3px solid #000",
+        borderRadius: 14,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
@@ -145,7 +145,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
         color: "#ffffff",
         boxShadow: isSelected
           ? "0 0 12px rgba(0, 255, 65, 0.4), 4px 4px 0px #000"
-          : "4px 4px 0px #000",
+          : "5px 5px 0px #000",
         transition: "border-color 0.15s, box-shadow 0.15s",
         overflow: "visible",
         display: "flex",
@@ -155,9 +155,9 @@ function GravitySequencerNodeComponent(props: NodeProps) {
       {/* Title bar */}
       <div
         style={{
-          background: "#8b5cf6",
+          background: "#f472b6",
           padding: "6px 12px",
-          borderRadius: 0,
+          borderRadius: 14,
           borderBottom: "3px solid #000",
           fontWeight: 800,
           fontSize: 12,
@@ -189,8 +189,8 @@ function GravitySequencerNodeComponent(props: NodeProps) {
           width={FIELD_WIDTH}
           height={FIELD_HEIGHT}
           style={{
-            background: "#0a0a1a",
-            borderRadius: 0,
+            background: "#f5f3ff",
+            borderRadius: 14,
             border: "2px solid #000",
           }}
         >
@@ -203,7 +203,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
                 cy={att.y}
                 r={10}
                 fill="none"
-                stroke="#8b5cf620"
+                stroke="#f472b620"
                 strokeWidth={1}
               />
               {/* Attractor dot */}
@@ -211,7 +211,7 @@ function GravitySequencerNodeComponent(props: NodeProps) {
                 cx={att.x}
                 cy={att.y}
                 r={4}
-                fill={att.note === activeNote ? "#ffd700" : "#8b5cf6"}
+                fill={att.note === activeNote ? "#ffd700" : "#f472b6"}
                 opacity={att.note === activeNote ? 1 : 0.6}
               />
               {/* Label */}
