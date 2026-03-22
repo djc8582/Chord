@@ -375,8 +375,18 @@ impl AudioEngine {
                 // microphone noise into nodes like the oscillator's FM input.
                 let input_refs: Vec<&[f32]> = input_buffers.iter().map(|v| v.as_slice()).collect();
 
-                // Prepare output buffers.
-                let mut output_data: Vec<Vec<f32>> = vec![vec![0.0f32; buffer_size]];
+                // Prepare output buffers — allocate enough for the highest
+                // output port index used by this node's outgoing connections.
+                let max_output_idx = routing
+                    .iter()
+                    .filter(|&&(from_node, _, _, _)| from_node == node_id)
+                    .map(|&(_, from_port, _, _)| from_port)
+                    .max()
+                    .unwrap_or(0);
+                let num_outputs = max_output_idx + 1;
+                let mut output_data: Vec<Vec<f32>> = (0..num_outputs)
+                    .map(|_| vec![0.0f32; buffer_size])
+                    .collect();
                 let mut output_slices: Vec<&mut [f32]> = output_data
                     .iter_mut()
                     .map(|v| v.as_mut_slice())
