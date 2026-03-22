@@ -57,6 +57,15 @@ export const defaultPanels: PanelConfig[] = [
     icon: "clock",
   },
   {
+    id: "piano-roll",
+    title: "Piano Roll",
+    position: "bottom",
+    defaultSize: 300,
+    minSize: 150,
+    defaultVisible: true,
+    icon: "music",
+  },
+  {
     id: "visualizer",
     title: "Visualizer",
     position: "bottom",
