@@ -95,6 +95,8 @@ export interface ShellState {
   panels: Record<PanelId, PanelState>;
   registerPanel: (config: PanelConfig) => void;
   togglePanel: (id: PanelId) => void;
+  showPanel: (id: PanelId) => void;
+  hidePanel: (id: PanelId) => void;
   setPanelSize: (id: PanelId, size: number) => void;
   collapsePanel: (id: PanelId) => void;
   expandPanel: (id: PanelId) => void;

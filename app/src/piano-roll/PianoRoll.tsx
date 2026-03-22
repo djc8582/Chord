@@ -71,12 +71,14 @@ const Toolbar: React.FC = () => {
         alignItems: "center",
         gap: 12,
         padding: "4px 8px",
-        background: "#2a2a2a",
-        borderBottom: "1px solid #444",
+        background: "#fffef0",
+        borderBottom: "3px solid #000",
         fontSize: 12,
-        color: "#ccc",
+        color: "#000",
         flexShrink: 0,
         height: 32,
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
+        fontWeight: 700,
       }}
     >
       {/* Tool selector */}
@@ -88,12 +90,14 @@ const Toolbar: React.FC = () => {
             onClick={() => setTool(opt.value)}
             style={{
               padding: "2px 8px",
-              background: tool === opt.value ? "#5a5aff" : "#444",
-              color: "#fff",
-              border: "none",
-              borderRadius: 3,
+              background: tool === opt.value ? "#c8ff00" : "#ffffff",
+              color: "#000",
+              border: "3px solid #000",
+              borderRadius: 8,
               cursor: "pointer",
               fontSize: 11,
+              fontWeight: 700,
+              fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
             }}
           >
             {opt.label}
@@ -117,12 +121,14 @@ const Toolbar: React.FC = () => {
           value={snapValue}
           onChange={handleSnapChange}
           style={{
-            background: "#333",
-            color: "#ccc",
-            border: "1px solid #555",
-            borderRadius: 3,
+            background: "#ffffff",
+            color: "#000",
+            border: "3px solid #000",
+            borderRadius: 8,
             fontSize: 11,
             padding: "1px 4px",
+            fontWeight: 700,
+            fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
           }}
         >
           {SNAP_OPTIONS.map((opt) => (
@@ -140,12 +146,14 @@ const Toolbar: React.FC = () => {
         disabled={selectedNoteIds.size === 0}
         style={{
           padding: "2px 8px",
-          background: selectedNoteIds.size > 0 ? "#444" : "#333",
-          color: selectedNoteIds.size > 0 ? "#fff" : "#666",
-          border: "none",
-          borderRadius: 3,
+          background: selectedNoteIds.size > 0 ? "#ffffff" : "#fffef0",
+          color: selectedNoteIds.size > 0 ? "#000" : "#999",
+          border: "3px solid #000",
+          borderRadius: 8,
           cursor: selectedNoteIds.size > 0 ? "pointer" : "default",
           fontSize: 11,
+          fontWeight: 700,
+          fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
         }}
       >
         Quantize
@@ -221,9 +229,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
         height,
         display: "flex",
         flexDirection: "column",
-        background: "#1a1a1a",
+        background: "#fffef0",
         overflow: "hidden",
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
       }}
     >
       {/* Toolbar */}
@@ -253,7 +261,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
       {velocityEditMode && (
         <div style={{ display: "flex" }}>
           {/* Spacer to align with keyboard */}
-          <div style={{ width: KEYBOARD_WIDTH, flexShrink: 0, background: "#222" }} />
+          <div style={{ width: KEYBOARD_WIDTH, flexShrink: 0, background: "#fffef0" }} />
           <VelocityLane width={gridWidth} />
         </div>
       )}

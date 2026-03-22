@@ -115,11 +115,12 @@ export function Panel({ id, title, position, minSize, children }: PanelProps) {
           padding: "4px 8px",
           height: 28,
           minHeight: 28,
-          background: theme.colors.bgSurface,
-          borderBottom: `3px solid ${theme.colors.border}`,
+          background: "#c8ff00",
+          borderBottom: "3px solid #000",
+          borderRadius: position === "bottom" ? "0" : "0",
           fontSize: 11,
           fontWeight: 800,
-          color: theme.colors.accent,
+          color: "#000",
           textTransform: "uppercase",
           letterSpacing: "0.1em",
           userSelect: "none",
@@ -130,13 +131,14 @@ export function Panel({ id, title, position, minSize, children }: PanelProps) {
         <button
           onClick={() => (collapsed ? expandPanel(id) : collapsePanel(id))}
           style={{
-            background: "none",
-            border: "none",
-            color: theme.colors.accent,
+            background: "#000",
+            border: "2px solid #000",
+            borderRadius: 4,
+            color: "#c8ff00",
             cursor: "pointer",
             fontSize: 14,
             fontWeight: 800,
-            padding: "0 4px",
+            padding: "0 6px",
             lineHeight: 1,
           }}
           title={collapsed ? "Expand" : "Collapse"}

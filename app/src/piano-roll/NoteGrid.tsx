@@ -106,7 +106,7 @@ export const NoteGrid: React.FC<NoteGridProps> = React.memo(
             y1={0}
             x2={x}
             y2={128 * zoomY}
-            stroke={isBarBoundary ? "#555" : isBeatBoundary ? "#444" : "#333"}
+            stroke={isBarBoundary ? "#999" : isBeatBoundary ? "#ccc" : "#e8e8e8"}
             strokeWidth={isBarBoundary ? 1.5 : 0.5}
           />,
         );
@@ -123,7 +123,7 @@ export const NoteGrid: React.FC<NoteGridProps> = React.memo(
             y1={y}
             x2={width}
             y2={y}
-            stroke={isC ? "#555" : "#333"}
+            stroke={isC ? "#999" : "#e8e8e8"}
             strokeWidth={isC ? 1 : 0.5}
           />,
         );
@@ -381,7 +381,7 @@ export const NoteGrid: React.FC<NoteGridProps> = React.memo(
           position: "relative",
           flex: 1,
           height: 128 * zoomY,
-          background: "#1e1e1e",
+          background: "#fffef0",
           overflow: "hidden",
           cursor:
             tool === "draw"
@@ -406,8 +406,8 @@ export const NoteGrid: React.FC<NoteGridProps> = React.memo(
                 Math.abs(selectionRect.endBeat - selectionRect.startBeat) * zoomX,
               height:
                 (Math.abs(selectionRect.endPitch - selectionRect.startPitch) + 1) * zoomY,
-              border: "1px dashed rgba(100, 150, 255, 0.8)",
-              background: "rgba(100, 150, 255, 0.15)",
+              border: "2px dashed #c8ff00",
+              background: "rgba(200, 255, 0, 0.15)",
               pointerEvents: "none",
               zIndex: 10,
             }}
@@ -423,10 +423,10 @@ export const NoteGrid: React.FC<NoteGridProps> = React.memo(
             top: 0,
             width: 2,
             height: "100%",
-            backgroundColor: "#f43f5e",
+            backgroundColor: "#7c3aed",
             pointerEvents: "none",
             zIndex: 15,
-            boxShadow: "0 0 4px rgba(244, 63, 94, 0.5)",
+            boxShadow: "0 0 4px rgba(124, 58, 237, 0.5)",
           }}
         />
       </div>

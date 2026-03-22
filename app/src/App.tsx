@@ -110,6 +110,36 @@ function App() {
     category: "View",
   });
 
+  // Toggle piano roll vs timeline based on selected node type
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
+  useEffect(() => {
+    const canvasState = useCanvasStore.getState();
+    const shellState = useShellStore.getState();
+
+    if (selectedNodeIds.length === 1) {
+      // Check if the selected node is a sequencer type
+      const nodeId = selectedNodeIds[0];
+      const node = canvasState.nodes.find((n) => n.id === nodeId);
+      const nodeType = (node?.data as any)?.nodeType ?? "";
+      const sequencerTypes = new Set([
+        "step_sequencer",
+        "euclidean",
+        "gravity_sequencer",
+        "game_of_life_sequencer",
+        "markov_sequencer",
+        "polyrhythm",
+      ]);
+
+      if (sequencerTypes.has(nodeType)) {
+        shellState.showPanel("piano-roll");
+        shellState.hidePanel("timeline");
+      } else {
+        shellState.showPanel("timeline");
+        shellState.hidePanel("piano-roll");
+      }
+    }
+  }, [selectedNodeIds]);
+
   return (
     <Shell
       panelContent={{

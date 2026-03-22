@@ -62,7 +62,7 @@ export const defaultPanels: PanelConfig[] = [
     position: "bottom",
     defaultSize: 300,
     minSize: 150,
-    defaultVisible: true,
+    defaultVisible: false,
     icon: "music",
   },
   {

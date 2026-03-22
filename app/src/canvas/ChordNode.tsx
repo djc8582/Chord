@@ -354,7 +354,7 @@ function ChordNodeComponent(props: NodeProps) {
           ? `6px 6px 0px ${accentColor}`
           : "5px 5px 0px #000",
         transition: "border-color 0.15s, box-shadow 0.15s",
-        overflow: "hidden",
+        overflow: "visible",
       }}
     >
       {/* Title bar */}

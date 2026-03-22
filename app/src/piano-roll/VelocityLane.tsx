@@ -89,8 +89,8 @@ export const VelocityLane: React.FC<VelocityLaneProps> = React.memo(
           position: "relative",
           width,
           height: VELOCITY_LANE_HEIGHT,
-          background: "#181818",
-          borderTop: "1px solid #444",
+          background: "#fffef0",
+          borderTop: "3px solid #000",
           overflow: "hidden",
           flexShrink: 0,
         }}
@@ -107,7 +107,7 @@ export const VelocityLane: React.FC<VelocityLaneProps> = React.memo(
                 top: y,
                 width: "100%",
                 height: 1,
-                background: "rgba(255,255,255,0.08)",
+                background: "rgba(0,0,0,0.08)",
                 pointerEvents: "none",
               }}
             />
@@ -135,8 +135,8 @@ export const VelocityLane: React.FC<VelocityLaneProps> = React.memo(
                 height: barHeight,
                 background: color,
                 border: isSelected
-                  ? "1px solid #fff"
-                  : "1px solid rgba(255,255,255,0.2)",
+                  ? "2px solid #000"
+                  : "1px solid rgba(0,0,0,0.2)",
                 borderBottom: "none",
                 cursor: "ns-resize",
                 boxSizing: "border-box",

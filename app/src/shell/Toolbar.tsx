@@ -43,8 +43,8 @@ export function Toolbar() {
         minHeight: 44,
         padding: "0 12px",
         gap: 8,
-        background: theme.colors.bgPanel,
-        borderBottom: `3px solid ${theme.colors.border}`,
+        background: "#fffef0",
+        borderBottom: "3px solid #000",
         userSelect: "none",
       }}
     >
@@ -52,13 +52,16 @@ export function Toolbar() {
       <span
         style={{
           fontWeight: 900,
-          fontSize: 16,
-          color: "#00ff41",
+          fontSize: 22,
+          color: "#000",
           marginRight: 12,
           textTransform: "uppercase",
-          letterSpacing: "0.15em",
+          letterSpacing: "0.1em",
           fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
-          textShadow: "0 0 8px rgba(0, 255, 65, 0.4)",
+          background: "#c8ff00",
+          padding: "4px 12px",
+          border: "3px solid #000",
+          borderRadius: 8,
         }}
       >
         CHORD
@@ -102,11 +105,11 @@ export function Toolbar() {
         data-testid="transport-toggle"
         style={{
           ...buttonStyle,
-          background: isPlaying ? "#00ff41" : "transparent",
+          background: isPlaying ? "#c8ff00" : "transparent",
           color: isPlaying ? "#000" : theme.colors.text,
           minWidth: 60,
           justifyContent: "center",
-          boxShadow: isPlaying ? "0 0 12px rgba(0, 255, 65, 0.4)" : "none",
+          boxShadow: isPlaying ? "4px 4px 0px #000" : "none",
         }}
         onClick={() => executeCommand("transport.toggle")}
         title={isPlaying ? "Stop (Space)" : "Play (Space)"}

@@ -63,9 +63,9 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = React.memo(
             width: KEYBOARD_WIDTH,
             height: zoomY,
             boxSizing: "border-box",
-            background: black ? "#2a2a2a" : "#f0f0f0",
-            color: black ? "#bbb" : "#333",
-            borderBottom: isC ? "2px solid #666" : "1px solid #ccc",
+            background: black ? "#333" : "#ffffff",
+            color: black ? "#ccc" : "#000",
+            borderBottom: isC ? "2px solid #000" : "1px solid #ddd",
             fontSize: 10,
             lineHeight: `${zoomY}px`,
             paddingLeft: 4,
@@ -93,8 +93,8 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = React.memo(
           height: 128 * zoomY,
           overflow: "hidden",
           flexShrink: 0,
-          borderRight: "2px solid #555",
-          background: "#e8e8e8",
+          borderRight: "3px solid #000",
+          background: "#f5f5f0",
         }}
       >
         {keys}

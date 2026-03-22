@@ -38,6 +38,32 @@ export const useShellStore = create<ShellState>((set, get) => ({
     });
   },
 
+  showPanel(id) {
+    set((state) => {
+      const panel = state.panels[id];
+      if (!panel) return state;
+      return {
+        panels: {
+          ...state.panels,
+          [id]: { ...panel, visible: true },
+        },
+      };
+    });
+  },
+
+  hidePanel(id) {
+    set((state) => {
+      const panel = state.panels[id];
+      if (!panel) return state;
+      return {
+        panels: {
+          ...state.panels,
+          [id]: { ...panel, visible: false },
+        },
+      };
+    });
+  },
+
   setPanelSize(id, size) {
     set((state) => {
       const panel = state.panels[id];
