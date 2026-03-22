@@ -53,6 +53,17 @@ impl ChordMcpServer {
         all_tool_definitions()
     }
 
+    /// Get mutable access to a patch's diagnostic engine.
+    ///
+    /// Used by the runtime to feed signal data, and by tests to simulate processing.
+    pub fn diagnostics_mut(&mut self, patch_id: &str) -> McpResult<&mut DiagnosticEngine> {
+        let patch = self
+            .patches
+            .get_mut(patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.to_string()))?;
+        Ok(&mut patch.diagnostics)
+    }
+
     /// Dispatch a tool call by name with the given JSON arguments.
     ///
     /// Returns `Ok(Value)` on success or `Err(McpError)` on failure.
@@ -69,6 +80,10 @@ impl ChordMcpServer {
             "compile_patch" => self.tool_compile_patch(&args),
             "run_diagnostics" => self.tool_run_diagnostics(&args),
             "export_patch" => self.tool_export_patch(&args),
+            "get_signal_stats" => self.tool_get_signal_stats(&args),
+            "find_problems" => self.tool_find_problems(&args),
+            "get_cpu_profile" => self.tool_get_cpu_profile(&args),
+            "auto_fix" => self.tool_auto_fix(&args),
             _ => Err(McpError::UnknownTool(name.to_string())),
         }
     }
@@ -453,6 +468,393 @@ impl ChordMcpServer {
         Ok(json!({
             "patch_id": patch_id,
             "graph": graph_json,
+        }))
+    }
+
+    /// `get_signal_stats` — Get real-time signal statistics for a specific node/port.
+    fn tool_get_signal_stats(&self, args: &Value) -> McpResult<Value> {
+        let patch_id = get_string(args, "patch_id")?;
+        let node_id_val = get_u64(args, "node_id")?;
+        let port_id_val = get_u64(args, "port_id")?;
+
+        let patch = self
+            .patches
+            .get(&patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.clone()))?;
+
+        let node_id = NodeId(node_id_val);
+        let port_id = PortId(port_id_val);
+
+        match patch.diagnostics.get_signal_stats(node_id, port_id) {
+            Some(stats) => {
+                let stats_json = serde_json::to_value(&stats).map_err(|e| {
+                    McpError::Internal(format!("Failed to serialize signal stats: {e}"))
+                })?;
+                Ok(json!({
+                    "node_id": node_id_val,
+                    "port_id": port_id_val,
+                    "stats": stats_json,
+                }))
+            }
+            None => Ok(json!({
+                "node_id": node_id_val,
+                "port_id": port_id_val,
+                "stats": null,
+                "message": "No signal stats available for this node/port. The node may not have been processed yet."
+            })),
+        }
+    }
+
+    /// `find_problems` — List all detected problems with severity and suggested fixes.
+    fn tool_find_problems(&mut self, args: &Value) -> McpResult<Value> {
+        let patch_id = get_string(args, "patch_id")?;
+
+        let patch = self
+            .patches
+            .get_mut(&patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.clone()))?;
+
+        let problems = patch.diagnostics.get_problems();
+
+        let problems_json = serde_json::to_value(&problems).map_err(|e| {
+            McpError::Internal(format!("Failed to serialize problems: {e}"))
+        })?;
+
+        Ok(json!({
+            "patch_id": patch_id,
+            "problem_count": problems.len(),
+            "problems": problems_json,
+        }))
+    }
+
+    /// `get_cpu_profile` — Get per-node CPU profiling data.
+    fn tool_get_cpu_profile(&self, args: &Value) -> McpResult<Value> {
+        let patch_id = get_string(args, "patch_id")?;
+
+        let patch = self
+            .patches
+            .get(&patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.clone()))?;
+
+        let profile = patch.diagnostics.get_cpu_profile();
+
+        let profile_json = serde_json::to_value(&profile).map_err(|e| {
+            McpError::Internal(format!("Failed to serialize CPU profile: {e}"))
+        })?;
+
+        Ok(json!({
+            "patch_id": patch_id,
+            "profile": profile_json,
+        }))
+    }
+
+    /// `auto_fix` — Apply a suggested fix for a detected problem.
+    fn tool_auto_fix(&mut self, args: &Value) -> McpResult<Value> {
+        let patch_id = get_string(args, "patch_id")?;
+        let fix_obj = args.get("fix").ok_or_else(|| {
+            McpError::InvalidArguments("Missing 'fix' field".to_string())
+        })?;
+
+        let fix_type = fix_obj
+            .get("type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                McpError::InvalidArguments("Missing 'type' field in fix object".to_string())
+            })?;
+
+        // Verify patch exists.
+        if !self.patches.contains_key(&patch_id) {
+            return Err(McpError::PatchNotFound(patch_id));
+        }
+
+        match fix_type {
+            "InsertGain" => {
+                let node_id_val = fix_obj
+                    .get("node_id")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| {
+                        McpError::InvalidArguments(
+                            "InsertGain fix requires 'node_id'".to_string(),
+                        )
+                    })?;
+                let gain = fix_obj
+                    .get("gain")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.5);
+
+                self.apply_insert_gain(&patch_id, NodeId(node_id_val), gain)
+            }
+            "InsertDcBlocker" => {
+                let node_id_val = fix_obj
+                    .get("node_id")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| {
+                        McpError::InvalidArguments(
+                            "InsertDcBlocker fix requires 'node_id'".to_string(),
+                        )
+                    })?;
+
+                self.apply_insert_node_after(&patch_id, NodeId(node_id_val), "dc_blocker", "InsertDcBlocker")
+            }
+            "InsertLimiter" => {
+                let node_id_val = fix_obj
+                    .get("node_id")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| {
+                        McpError::InvalidArguments(
+                            "InsertLimiter fix requires 'node_id'".to_string(),
+                        )
+                    })?;
+
+                self.apply_insert_node_after(&patch_id, NodeId(node_id_val), "limiter", "InsertLimiter")
+            }
+            "MuteNode" => {
+                let node_id_val = fix_obj
+                    .get("node_id")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| {
+                        McpError::InvalidArguments(
+                            "MuteNode fix requires 'node_id'".to_string(),
+                        )
+                    })?;
+
+                self.apply_mute_node(&patch_id, NodeId(node_id_val))
+            }
+            "BypassNode" => {
+                let node_id_val = fix_obj
+                    .get("node_id")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| {
+                        McpError::InvalidArguments(
+                            "BypassNode fix requires 'node_id'".to_string(),
+                        )
+                    })?;
+
+                self.apply_bypass_node(&patch_id, NodeId(node_id_val))
+            }
+            "IncreaseBufferSize" => {
+                let _size = fix_obj
+                    .get("size")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(512) as u32;
+
+                Ok(json!({
+                    "applied": false,
+                    "description": "Manual fix needed: IncreaseBufferSize requires restarting the audio engine with a larger buffer size."
+                }))
+            }
+            other => Err(McpError::InvalidArguments(format!(
+                "Unknown fix type: '{other}'. Valid types: InsertGain, InsertDcBlocker, InsertLimiter, MuteNode, BypassNode, IncreaseBufferSize"
+            ))),
+        }
+    }
+
+    // ────────────────────────────────────────────
+    // Auto-fix helpers
+    // ────────────────────────────────────────────
+
+    /// Insert a gain node after the target node and set its gain parameter.
+    fn apply_insert_gain(
+        &mut self,
+        patch_id: &str,
+        target_node_id: NodeId,
+        gain: f64,
+    ) -> McpResult<Value> {
+        let patch = self
+            .patches
+            .get_mut(patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.to_string()))?;
+
+        // Verify target node exists.
+        if patch.graph.node(&target_node_id).is_none() {
+            return Err(McpError::NodeNotFound(format!("{}", target_node_id.0)));
+        }
+
+        // Create the gain node descriptor.
+        let mut gain_desc = build_node_descriptor("gain");
+        let gain_node_id = gain_desc.id;
+        let gain_in_port = gain_desc.inputs[0].id;
+        let gain_out_port = gain_desc.outputs[0].id;
+
+        // Set the gain parameter.
+        if let Some(param) = gain_desc.parameters.iter_mut().find(|p| p.id == "gain") {
+            param.value = gain.clamp(param.min, param.max);
+        }
+
+        // Find connections originating from the target node.
+        let outgoing: Vec<_> = patch
+            .graph
+            .connections()
+            .iter()
+            .filter(|c| c.from_node == target_node_id)
+            .map(|c| (c.id, c.from_port, c.to_node, c.to_port))
+            .collect();
+
+        // Add the gain node.
+        patch.graph.add_node(gain_desc);
+
+        // Rewire: for each outgoing connection from the target, reconnect through the gain node.
+        if outgoing.is_empty() {
+            // No outgoing connections — just connect target → gain.
+            let target_out = patch
+                .graph
+                .node(&target_node_id)
+                .and_then(|n| n.outputs.first().map(|p| p.id));
+            if let Some(out_port) = target_out {
+                let _ = patch.graph.connect(target_node_id, out_port, gain_node_id, gain_in_port);
+            }
+        } else {
+            for (conn_id, from_port, to_node, to_port) in outgoing {
+                // Remove old connection.
+                patch.graph.disconnect(&conn_id);
+                // Connect target → gain.
+                let _ = patch.graph.connect(target_node_id, from_port, gain_node_id, gain_in_port);
+                // Connect gain → original destination.
+                let _ = patch.graph.connect(gain_node_id, gain_out_port, to_node, to_port);
+            }
+        }
+
+        Ok(json!({
+            "applied": true,
+            "description": format!("Inserted gain node ({}) after node {} with gain={:.4}", gain_node_id.0, target_node_id.0, gain),
+            "new_node_id": gain_node_id.0,
+        }))
+    }
+
+    /// Insert a pass-through node (dc_blocker, limiter, etc.) after the target node.
+    /// Uses the "fallback" descriptor which has "in" and "out" ports.
+    fn apply_insert_node_after(
+        &mut self,
+        patch_id: &str,
+        target_node_id: NodeId,
+        node_type: &str,
+        fix_name: &str,
+    ) -> McpResult<Value> {
+        let patch = self
+            .patches
+            .get_mut(patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.to_string()))?;
+
+        if patch.graph.node(&target_node_id).is_none() {
+            return Err(McpError::NodeNotFound(format!("{}", target_node_id.0)));
+        }
+
+        let new_desc = build_node_descriptor(node_type);
+        let new_node_id = new_desc.id;
+        let new_in_port = new_desc.inputs[0].id;
+        let new_out_port = new_desc.outputs[0].id;
+
+        // Find outgoing connections from the target node.
+        let outgoing: Vec<_> = patch
+            .graph
+            .connections()
+            .iter()
+            .filter(|c| c.from_node == target_node_id)
+            .map(|c| (c.id, c.from_port, c.to_node, c.to_port))
+            .collect();
+
+        patch.graph.add_node(new_desc);
+
+        if outgoing.is_empty() {
+            let target_out = patch
+                .graph
+                .node(&target_node_id)
+                .and_then(|n| n.outputs.first().map(|p| p.id));
+            if let Some(out_port) = target_out {
+                let _ = patch.graph.connect(target_node_id, out_port, new_node_id, new_in_port);
+            }
+        } else {
+            for (conn_id, from_port, to_node, to_port) in outgoing {
+                patch.graph.disconnect(&conn_id);
+                let _ = patch.graph.connect(target_node_id, from_port, new_node_id, new_in_port);
+                let _ = patch.graph.connect(new_node_id, new_out_port, to_node, to_port);
+            }
+        }
+
+        Ok(json!({
+            "applied": true,
+            "description": format!("{}: inserted {} node ({}) after node {}", fix_name, node_type, new_node_id.0, target_node_id.0),
+            "new_node_id": new_node_id.0,
+        }))
+    }
+
+    /// Mute a node by inserting a gain node set to 0.
+    fn apply_mute_node(
+        &mut self,
+        patch_id: &str,
+        target_node_id: NodeId,
+    ) -> McpResult<Value> {
+        self.apply_insert_gain(patch_id, target_node_id, 0.0)
+            .map(|mut v| {
+                // Override description.
+                if let Some(obj) = v.as_object_mut() {
+                    obj.insert(
+                        "description".to_string(),
+                        json!(format!("Muted node {} by inserting a gain node at 0.0", target_node_id.0)),
+                    );
+                }
+                v
+            })
+    }
+
+    /// Bypass a node by disconnecting it and reconnecting its inputs to its outputs.
+    fn apply_bypass_node(
+        &mut self,
+        patch_id: &str,
+        target_node_id: NodeId,
+    ) -> McpResult<Value> {
+        let patch = self
+            .patches
+            .get_mut(patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.to_string()))?;
+
+        if patch.graph.node(&target_node_id).is_none() {
+            return Err(McpError::NodeNotFound(format!("{}", target_node_id.0)));
+        }
+
+        // Find incoming and outgoing connections.
+        let incoming: Vec<_> = patch
+            .graph
+            .connections()
+            .iter()
+            .filter(|c| c.to_node == target_node_id)
+            .map(|c| (c.id, c.from_node, c.from_port))
+            .collect();
+
+        let outgoing: Vec<_> = patch
+            .graph
+            .connections()
+            .iter()
+            .filter(|c| c.from_node == target_node_id)
+            .map(|c| (c.id, c.to_node, c.to_port))
+            .collect();
+
+        // Remove all connections to/from the target node.
+        let mut removed_ids = Vec::new();
+        for (conn_id, _, _) in &incoming {
+            patch.graph.disconnect(conn_id);
+            removed_ids.push(conn_id.0);
+        }
+        for (conn_id, _, _) in &outgoing {
+            patch.graph.disconnect(conn_id);
+            removed_ids.push(conn_id.0);
+        }
+
+        // Reconnect: wire each incoming source directly to each outgoing destination.
+        let mut new_connections = Vec::new();
+        for (_, from_node, from_port) in &incoming {
+            for (_, to_node, to_port) in &outgoing {
+                if let Ok(conn_id) = patch.graph.connect(*from_node, *from_port, *to_node, *to_port) {
+                    new_connections.push(conn_id.0);
+                }
+            }
+        }
+
+        Ok(json!({
+            "applied": true,
+            "description": format!("Bypassed node {} — reconnected {} input(s) to {} output(s)", target_node_id.0, incoming.len(), outgoing.len()),
+            "removed_connections": removed_ids,
+            "new_connections": new_connections,
         }))
     }
 }

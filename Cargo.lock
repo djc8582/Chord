@@ -443,6 +443,7 @@ dependencies = [
  "chord-audio-graph",
  "chord-dsp-runtime",
  "chord-midi-engine",
+ "chord-testing-framework",
 ]
 
 [[package]]

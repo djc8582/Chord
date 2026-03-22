@@ -499,3 +499,181 @@ fn test_generate_silent_buffer_is_silent() {
     assert_eq!(buffer.buffer_size(), 512);
     assert_silent(&buffer);
 }
+
+// ---- NodeTestHarness ----
+
+use crate::node_harness::NodeTestHarness;
+
+#[test]
+fn test_node_harness_gain_produces_stats_and_output() {
+    let harness = NodeTestHarness::default_config();
+    let result = harness.test_node("gain", &[("gain", 1.0)], 5);
+
+    // Should produce 5 buffers of stats and output.
+    assert_eq!(result.stats.len(), 5, "Expected 5 stats entries");
+    assert_eq!(result.output_buffers.len(), 5, "Expected 5 output buffers");
+
+    // With a sine input and gain=1.0, output should not be silent.
+    let has_nonzero = result.output_buffers.iter().any(|buf| {
+        buf.iter().any(|&s| s.abs() > 1e-6)
+    });
+    assert!(has_nonzero, "Gain node with sine input should produce non-silent output");
+
+    // Stats should show nonzero RMS for at least some buffers.
+    let has_rms = result.stats.iter().any(|s| s.rms > 0.0);
+    assert!(has_rms, "Stats should show nonzero RMS");
+
+    // No NaN should be present.
+    assert!(
+        !result.stats.iter().any(|s| s.has_nan),
+        "Should have no NaN in gain node output"
+    );
+}
+
+#[test]
+fn test_node_harness_oscillator_as_source() {
+    let harness = NodeTestHarness::default_config();
+    let result = harness.test_node("oscillator", &[("frequency", 440.0)], 5);
+
+    assert_eq!(result.stats.len(), 5);
+    assert_eq!(result.output_buffers.len(), 5);
+
+    // Oscillator should produce non-silent output.
+    let has_nonzero = result.output_buffers.iter().any(|buf| {
+        buf.iter().any(|&s| s.abs() > 1e-6)
+    });
+    assert!(has_nonzero, "Oscillator should produce audio");
+
+    // No NaN.
+    assert!(
+        !result.stats.iter().any(|s| s.has_nan),
+        "Oscillator should not produce NaN"
+    );
+}
+
+#[test]
+fn test_node_harness_fuzz_sweeps_parameters() {
+    let harness = NodeTestHarness::default_config();
+    let results = harness.fuzz("gain", 5);
+
+    // Gain has 1 parameter, 5 steps => 5 entries.
+    assert_eq!(results.len(), 5, "Expected 5 fuzz entries for gain with 5 steps");
+
+    // Each entry should have a param combo with the "gain" parameter.
+    for (combo, _problems) in &results {
+        assert!(
+            combo.iter().any(|(name, _)| name == "gain"),
+            "Each fuzz entry should reference the 'gain' parameter"
+        );
+    }
+}
+
+#[test]
+fn test_node_harness_fuzz_filter_sweeps_multiple_params() {
+    let harness = NodeTestHarness::default_config();
+    let results = harness.fuzz("filter", 3);
+
+    // Filter has 3 params (cutoff, resonance, mode), 3 steps each => 9 entries.
+    assert_eq!(
+        results.len(),
+        9,
+        "Expected 9 fuzz entries for filter with 3 params x 3 steps"
+    );
+}
+
+#[test]
+fn test_node_harness_stress_returns_results() {
+    let harness = NodeTestHarness::default_config();
+    let problems = harness.stress("gain");
+
+    // We don't assert specific problems (depends on node behavior),
+    // but the function should return without panicking.
+    // With gain at max (10.0) and a sine input, clipping is expected.
+    // The deduplication means we get at most one per category.
+    // Just verify the function runs successfully.
+    let _ = problems;
+}
+
+#[test]
+fn test_node_harness_stress_filter_edge_cases() {
+    let harness = NodeTestHarness::default_config();
+    let problems = harness.stress("filter");
+
+    // Filter stress test exercises cutoff at 0Hz, Nyquist, etc.
+    // and resonance at extreme values. Should not panic.
+    // No NaN should be produced (filter clamps internally).
+    let has_nan = problems
+        .iter()
+        .any(|p| p.category == chord_diagnostics::ProblemCategory::NaN);
+    assert!(!has_nan, "Filter stress should not produce NaN");
+}
+
+#[test]
+fn test_node_harness_benchmark_returns_reasonable_duration() {
+    let harness = NodeTestHarness::default_config();
+    let avg = harness.benchmark("gain", 50);
+
+    // The average should be positive and reasonable (< 1ms for a simple gain node).
+    assert!(avg > std::time::Duration::ZERO, "Benchmark should measure non-zero time");
+    assert!(
+        avg < std::time::Duration::from_millis(1),
+        "Gain node benchmark should be well under 1ms, got {:?}",
+        avg,
+    );
+}
+
+#[test]
+fn test_node_harness_full_validation_gain() {
+    let harness = NodeTestHarness::default_config();
+    let report = harness.full_validation("gain");
+
+    assert_eq!(report.node_type, "gain");
+    // Gain node with default params should not produce NaN or critical errors.
+    assert!(
+        !report.basic.stats.iter().any(|s| s.has_nan),
+        "Gain basic test should have no NaN"
+    );
+    assert!(
+        report.benchmark_avg > std::time::Duration::ZERO,
+        "Benchmark should be positive"
+    );
+    // Summary should be non-empty.
+    assert!(!report.summary.is_empty(), "Summary should be non-empty");
+}
+
+#[test]
+fn test_node_harness_full_validation_oscillator() {
+    let harness = NodeTestHarness::default_config();
+    let report = harness.full_validation("oscillator");
+
+    assert_eq!(report.node_type, "oscillator");
+    // Oscillator should produce audio in basic test.
+    let has_output = report.basic.output_buffers.iter().any(|buf| {
+        buf.iter().any(|&s| s.abs() > 1e-6)
+    });
+    assert!(has_output, "Oscillator should produce audio in basic test");
+    assert!(!report.summary.is_empty());
+}
+
+#[test]
+fn test_node_harness_fuzz_no_params_node() {
+    let harness = NodeTestHarness::default_config();
+    // dc_blocker has no known parameters.
+    let results = harness.fuzz("dc_blocker", 5);
+
+    // Should return at least one entry (a basic test with no params).
+    assert!(
+        !results.is_empty(),
+        "Fuzz on a no-param node should return at least one entry"
+    );
+}
+
+#[test]
+fn test_node_harness_stress_source_node() {
+    let harness = NodeTestHarness::default_config();
+    let problems = harness.stress("oscillator");
+
+    // Oscillator stress tests frequency at 0Hz, Nyquist, etc.
+    // Should complete without panic.
+    let _ = problems;
+}

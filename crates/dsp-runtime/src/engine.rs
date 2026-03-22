@@ -316,7 +316,15 @@ impl AudioEngine {
                     midi_output: &mut self.midi_output_buf,
                 };
 
+                // Time the node's process() call.
+                let start = std::time::Instant::now();
                 let result = node.process(&mut ctx);
+                let elapsed = start.elapsed();
+
+                // Report node timing to the diagnostic probe.
+                if let Some(probe) = &mut self.diagnostic_probe {
+                    probe.on_node_timing(node_id, elapsed);
+                }
 
                 // Sanitize output buffers after every node (NaN/Inf protection).
                 for out_buf in &mut output_data {
@@ -331,17 +339,15 @@ impl AudioEngine {
                     }
                 }
 
-                // Report to diagnostic probe.
+                // Report ALL output ports to the diagnostic probe.
                 if let Some(probe) = &mut self.diagnostic_probe {
-                    // Copy first output channel to diagnostic buffer for reporting.
-                    if !output_data.is_empty() {
+                    for (port_idx, src) in output_data.iter().enumerate() {
                         let diag_ch = self.diagnostic_buffer.channel_mut(0);
-                        let src = &output_data[0];
                         let copy_len = diag_ch.len().min(src.len());
                         diag_ch[..copy_len].copy_from_slice(&src[..copy_len]);
                         probe.on_buffer_processed(
                             node_id,
-                            PortId(0),
+                            PortId(port_idx as u64),
                             &self.diagnostic_buffer,
                         );
                     }
@@ -366,7 +372,14 @@ impl AudioEngine {
             }
         }
 
-        // Step 5: Advance transport.
+        // Step 5: Signal end of buffer cycle to the diagnostic probe.
+        if let Some(probe) = &mut self.diagnostic_probe {
+            let buffer_duration =
+                std::time::Duration::from_secs_f64(buffer_size as f64 / self.sample_rate);
+            probe.on_buffer_complete(buffer_duration);
+        }
+
+        // Step 6: Advance transport.
         self.transport.advance(buffer_size);
     }
 

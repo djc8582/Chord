@@ -213,5 +213,96 @@ pub fn all_tool_definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         },
+        ToolDefinition {
+            name: "get_signal_stats".to_string(),
+            description: "Get real-time signal statistics for a specific node/port. Returns peak, rms, dc_offset, crest_factor, zero_crossing_rate, has_nan, has_inf, click_count, clip_count, silent_buffer_count.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patch_id": {
+                        "type": "string",
+                        "description": "The patch containing the node."
+                    },
+                    "node_id": {
+                        "type": "integer",
+                        "description": "The node to get stats for."
+                    },
+                    "port_id": {
+                        "type": "integer",
+                        "description": "The port to get stats for."
+                    }
+                },
+                "required": ["patch_id", "node_id", "port_id"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "find_problems".to_string(),
+            description: "List all detected problems in the patch with severity and suggested auto-fixes. Each problem includes category, severity, description, node_id, and an auto_fix suggestion.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patch_id": {
+                        "type": "string",
+                        "description": "The patch to check for problems."
+                    }
+                },
+                "required": ["patch_id"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "get_cpu_profile".to_string(),
+            description: "Get per-node CPU profiling data including DSP load percentage, per-node timing, underrun count, and spike count.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patch_id": {
+                        "type": "string",
+                        "description": "The patch to profile."
+                    }
+                },
+                "required": ["patch_id"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "auto_fix".to_string(),
+            description: "Apply a suggested fix for a detected problem. Fix types: InsertGain (adds a gain node), InsertDcBlocker (adds a DC blocker), InsertLimiter (adds a limiter), MuteNode (mutes a node), BypassNode (bypasses a node), IncreaseBufferSize (increases buffer size).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patch_id": {
+                        "type": "string",
+                        "description": "The patch to apply the fix to."
+                    },
+                    "fix": {
+                        "type": "object",
+                        "description": "The fix to apply. Must have a 'type' field: 'InsertGain' (with 'node_id' and 'gain'), 'InsertDcBlocker' (with 'node_id'), 'InsertLimiter' (with 'node_id'), 'MuteNode' (with 'node_id'), 'BypassNode' (with 'node_id'), or 'IncreaseBufferSize' (with 'size').",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "description": "Fix type: InsertGain, InsertDcBlocker, InsertLimiter, MuteNode, BypassNode, IncreaseBufferSize"
+                            },
+                            "node_id": {
+                                "type": "integer",
+                                "description": "The node to apply the fix to (required for node-level fixes)."
+                            },
+                            "gain": {
+                                "type": "number",
+                                "description": "Gain value for InsertGain fix."
+                            },
+                            "size": {
+                                "type": "integer",
+                                "description": "New buffer size for IncreaseBufferSize fix."
+                            }
+                        },
+                        "required": ["type"]
+                    }
+                },
+                "required": ["patch_id", "fix"],
+                "additionalProperties": false
+            }),
+        },
     ]
 }

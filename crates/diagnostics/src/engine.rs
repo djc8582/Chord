@@ -152,6 +152,14 @@ impl DiagnosticProbe for DiagnosticEngine {
     fn on_error(&mut self, node_id: NodeId, error: AudioError) {
         self.signal_monitor.on_error(node_id, error);
     }
+
+    fn on_node_timing(&mut self, node_id: NodeId, duration: std::time::Duration) {
+        self.performance_profiler.record_node_timing(node_id, duration);
+    }
+
+    fn on_buffer_complete(&mut self, _buffer_duration: std::time::Duration) {
+        self.performance_profiler.end_buffer();
+    }
 }
 
 impl Default for DiagnosticEngine {

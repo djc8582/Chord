@@ -94,7 +94,14 @@ impl AudioNode for MidiToFreq {
             return Ok(ProcessStatus::Silent);
         }
 
-        let freq_f32 = self.current_freq as f32;
+        // When no note is active (gate is off), output 0.0 frequency.
+        // This avoids sending a stale frequency value when nothing is playing
+        // and keeps the output at 0.0 (silence) until a note-on is received.
+        let freq_f32 = if self.gate > 0.0 {
+            self.current_freq as f32
+        } else {
+            0.0
+        };
 
         // Output 0: frequency.
         let freq_out = &mut ctx.outputs[0];

@@ -6,6 +6,7 @@
 //! - **Audio assertions** (`assert_silent`, `assert_not_silent`, `assert_peak_below`, etc.)
 //! - **Snapshot testing** for regression testing of audio output
 //! - **AudioTestHarness** for setting up test graphs without boilerplate
+//! - **NodeTestHarness** for automated diagnostic-driven node validation
 //! - **Test node helpers** (sine source, silence source, passthrough, null output)
 //! - **Simple DFT / Goertzel** for frequency analysis in tests
 
@@ -13,12 +14,14 @@ mod assertions;
 mod dft;
 mod harness;
 mod helpers;
+pub mod node_harness;
 mod snapshot;
 
 pub use assertions::*;
 pub use dft::*;
 pub use harness::*;
 pub use helpers::*;
+pub use node_harness::{NodeTestHarness, TestResult, ValidationReport};
 pub use snapshot::*;
 
 // Re-export commonly needed types from dependencies.

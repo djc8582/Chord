@@ -85,6 +85,15 @@ pub trait DiagnosticProbe: Send {
 
     /// Called when a node produces an error (e.g., NaN detection).
     fn on_error(&mut self, node_id: NodeId, error: AudioError);
+
+    /// Called after each node's process() call with the elapsed wall-clock time.
+    /// Default implementation is a no-op so existing implementations don't break.
+    fn on_node_timing(&mut self, _node_id: NodeId, _duration: std::time::Duration) {}
+
+    /// Called after all nodes in a buffer cycle have been processed.
+    /// `buffer_duration` is the real-time duration of the buffer (buffer_size / sample_rate).
+    /// Default implementation is a no-op so existing implementations don't break.
+    fn on_buffer_complete(&mut self, _buffer_duration: std::time::Duration) {}
 }
 
 /// Factory for creating audio node instances.

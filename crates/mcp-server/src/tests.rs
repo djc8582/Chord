@@ -25,6 +25,10 @@ fn list_tools_returns_all_expected_tools() {
         "compile_patch",
         "run_diagnostics",
         "export_patch",
+        "get_signal_stats",
+        "find_problems",
+        "get_cpu_profile",
+        "auto_fix",
     ];
 
     assert_eq!(tools.len(), expected_names.len());
@@ -751,4 +755,632 @@ fn multiple_patches_are_independent() {
     let p2 = server.call_tool("get_patch", json!({ "patch_id": pid2 })).unwrap();
     assert_eq!(p1["node_count"], 1);
     assert_eq!(p2["node_count"], 0);
+}
+
+// ────────────────────────────────────────────
+// Diagnostic tools: get_signal_stats
+// ────────────────────────────────────────────
+
+#[test]
+fn get_signal_stats_returns_stats_after_processing() {
+    use chord_diagnostics::{AudioBuffer, NodeId, PortId};
+    use chord_dsp_runtime::DiagnosticProbe;
+
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    // Add an oscillator node so we have a node_id.
+    let osc = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "oscillator" }),
+        )
+        .unwrap();
+    let osc_id = osc["node_id"].as_u64().unwrap();
+    let osc_out_port = osc["outputs"][0]["id"].as_u64().unwrap();
+
+    // Feed signal data into the diagnostic engine.
+    let node_id = NodeId(osc_id);
+    let port_id = PortId(osc_out_port);
+    let mut buffer = AudioBuffer::new(1, 256);
+    // Fill with a sine-like signal that has some amplitude.
+    for i in 0..256 {
+        buffer.channel_mut(0)[i] = (i as f32 / 256.0 * std::f32::consts::TAU).sin() * 0.8;
+    }
+
+    {
+        let diag = server.diagnostics_mut(&patch_id).unwrap();
+        diag.on_buffer_processed(node_id, port_id, &buffer);
+    }
+
+    // Now call get_signal_stats.
+    let result = server
+        .call_tool(
+            "get_signal_stats",
+            json!({
+                "patch_id": patch_id,
+                "node_id": osc_id,
+                "port_id": osc_out_port,
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(result["node_id"], osc_id);
+    assert_eq!(result["port_id"], osc_out_port);
+    assert!(result["stats"].is_object());
+
+    let stats = &result["stats"];
+    // Peak should be around 0.8.
+    let peak = stats["peak"].as_f64().unwrap();
+    assert!(peak > 0.7 && peak <= 0.81, "Expected peak ~0.8, got {peak}");
+    // RMS should be positive.
+    let rms = stats["rms"].as_f64().unwrap();
+    assert!(rms > 0.0, "Expected positive RMS");
+    // No NaN/Inf.
+    assert_eq!(stats["has_nan"], false);
+    assert_eq!(stats["has_inf"], false);
+    // Sample count should be 256.
+    assert_eq!(stats["sample_count"], 256);
+}
+
+#[test]
+fn get_signal_stats_returns_null_for_unprocessed_port() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let osc = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "oscillator" }),
+        )
+        .unwrap();
+    let osc_id = osc["node_id"].as_u64().unwrap();
+    let osc_out_port = osc["outputs"][0]["id"].as_u64().unwrap();
+
+    // No signal data fed — stats should be null.
+    let result = server
+        .call_tool(
+            "get_signal_stats",
+            json!({
+                "patch_id": patch_id,
+                "node_id": osc_id,
+                "port_id": osc_out_port,
+            }),
+        )
+        .unwrap();
+
+    assert!(result["stats"].is_null());
+    assert!(result["message"].as_str().is_some());
+}
+
+#[test]
+fn get_signal_stats_unknown_patch_returns_error() {
+    let mut server = ChordMcpServer::new();
+
+    let result = server.call_tool(
+        "get_signal_stats",
+        json!({
+            "patch_id": "nonexistent",
+            "node_id": 1,
+            "port_id": 1,
+        }),
+    );
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        crate::McpError::PatchNotFound(_) => {}
+        other => panic!("Expected PatchNotFound, got: {other:?}"),
+    }
+}
+
+// ────────────────────────────────────────────
+// Diagnostic tools: find_problems
+// ────────────────────────────────────────────
+
+#[test]
+fn find_problems_returns_problems_for_clipping_signal() {
+    use chord_diagnostics::{AudioBuffer, NodeId, PortId};
+    use chord_dsp_runtime::DiagnosticProbe;
+
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let osc = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "oscillator" }),
+        )
+        .unwrap();
+    let osc_id = osc["node_id"].as_u64().unwrap();
+    let osc_out_port = osc["outputs"][0]["id"].as_u64().unwrap();
+
+    // Feed a clipping signal (samples > 1.0).
+    let node_id = NodeId(osc_id);
+    let port_id = PortId(osc_out_port);
+    let mut buffer = AudioBuffer::new(1, 256);
+    for i in 0..256 {
+        // Signal that clips at 2.0.
+        buffer.channel_mut(0)[i] = (i as f32 / 256.0 * std::f32::consts::TAU).sin() * 2.0;
+    }
+
+    {
+        let diag = server.diagnostics_mut(&patch_id).unwrap();
+        diag.on_buffer_processed(node_id, port_id, &buffer);
+    }
+
+    let result = server
+        .call_tool("find_problems", json!({ "patch_id": patch_id }))
+        .unwrap();
+
+    assert_eq!(result["patch_id"], patch_id);
+    let problem_count = result["problem_count"].as_u64().unwrap();
+    assert!(problem_count > 0, "Expected at least one problem for clipping signal");
+
+    let problems = result["problems"].as_array().unwrap();
+    // Should have a Clipping problem.
+    let has_clipping = problems.iter().any(|p| p["category"] == "Clipping");
+    assert!(has_clipping, "Expected a Clipping problem");
+
+    // Each problem should have the required fields.
+    for problem in problems {
+        assert!(problem["severity"].is_string());
+        assert!(problem["category"].is_string());
+        assert!(problem["description"].is_string());
+        assert!(problem["node_id"].is_number());
+    }
+}
+
+#[test]
+fn find_problems_returns_empty_for_clean_patch() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let result = server
+        .call_tool("find_problems", json!({ "patch_id": patch_id }))
+        .unwrap();
+
+    assert_eq!(result["problem_count"], 0);
+    assert_eq!(result["problems"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn find_problems_unknown_patch_returns_error() {
+    let mut server = ChordMcpServer::new();
+
+    let result = server.call_tool(
+        "find_problems",
+        json!({ "patch_id": "nonexistent" }),
+    );
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        crate::McpError::PatchNotFound(_) => {}
+        other => panic!("Expected PatchNotFound, got: {other:?}"),
+    }
+}
+
+// ────────────────────────────────────────────
+// Diagnostic tools: get_cpu_profile
+// ────────────────────────────────────────────
+
+#[test]
+fn get_cpu_profile_returns_timing_data_after_processing() {
+    use chord_diagnostics::NodeId;
+    use std::time::Duration;
+
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let osc = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "oscillator" }),
+        )
+        .unwrap();
+    let osc_id = osc["node_id"].as_u64().unwrap();
+
+    // Record some timing data.
+    {
+        let diag = server.diagnostics_mut(&patch_id).unwrap();
+        diag.record_node_timing(NodeId(osc_id), Duration::from_micros(50));
+        diag.end_buffer();
+    }
+
+    let result = server
+        .call_tool("get_cpu_profile", json!({ "patch_id": patch_id }))
+        .unwrap();
+
+    assert_eq!(result["patch_id"], patch_id);
+    assert!(result["profile"].is_object());
+
+    let profile = &result["profile"];
+    assert!(profile["dsp_load_percent"].is_number());
+    assert!(profile["buffer_duration_us"].is_number());
+    assert!(profile["total_process_time_us"].is_number());
+    assert!(profile["underrun_count"].is_number());
+
+    // Check per-node timing exists for our oscillator.
+    let node_times = &profile["node_times"];
+    let osc_key = osc_id.to_string();
+    assert!(
+        node_times.get(&osc_key).is_some(),
+        "Expected timing data for node {osc_id}"
+    );
+    let osc_timing = &node_times[&osc_key];
+    assert!(osc_timing["latest_us"].as_f64().unwrap() > 0.0);
+    assert_eq!(osc_timing["call_count"], 1);
+}
+
+#[test]
+fn get_cpu_profile_returns_empty_profile_without_processing() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let result = server
+        .call_tool("get_cpu_profile", json!({ "patch_id": patch_id }))
+        .unwrap();
+
+    let profile = &result["profile"];
+    assert_eq!(profile["dsp_load_percent"], 0.0);
+    assert_eq!(profile["underrun_count"], 0);
+    assert!(profile["node_times"].as_object().unwrap().is_empty());
+}
+
+#[test]
+fn get_cpu_profile_unknown_patch_returns_error() {
+    let mut server = ChordMcpServer::new();
+
+    let result = server.call_tool(
+        "get_cpu_profile",
+        json!({ "patch_id": "nonexistent" }),
+    );
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        crate::McpError::PatchNotFound(_) => {}
+        other => panic!("Expected PatchNotFound, got: {other:?}"),
+    }
+}
+
+// ────────────────────────────────────────────
+// Diagnostic tools: auto_fix
+// ────────────────────────────────────────────
+
+#[test]
+fn auto_fix_insert_gain_adds_gain_node() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    // Create osc → output chain.
+    let osc = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "oscillator" }),
+        )
+        .unwrap();
+    let osc_id = osc["node_id"].as_u64().unwrap();
+    let osc_out = osc["outputs"][0]["id"].as_u64().unwrap();
+
+    let output = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "output" }),
+        )
+        .unwrap();
+    let output_id = output["node_id"].as_u64().unwrap();
+    let output_in = output["inputs"][0]["id"].as_u64().unwrap();
+
+    server
+        .call_tool(
+            "connect",
+            json!({
+                "patch_id": patch_id,
+                "from_node": osc_id,
+                "from_port": osc_out,
+                "to_node": output_id,
+                "to_port": output_in,
+            }),
+        )
+        .unwrap();
+
+    // Apply InsertGain fix.
+    let fix_result = server
+        .call_tool(
+            "auto_fix",
+            json!({
+                "patch_id": patch_id,
+                "fix": {
+                    "type": "InsertGain",
+                    "node_id": osc_id,
+                    "gain": 0.5
+                }
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(fix_result["applied"], true);
+    assert!(fix_result["new_node_id"].is_number());
+
+    // Verify the patch now has 3 nodes (osc, gain, output).
+    let patch = server
+        .call_tool("get_patch", json!({ "patch_id": patch_id }))
+        .unwrap();
+    assert_eq!(patch["node_count"], 3);
+
+    // Verify the connection chain is osc → gain → output (2 connections).
+    assert_eq!(patch["connection_count"], 2);
+
+    // Verify the new gain node has gain=0.5.
+    let new_gain_id = fix_result["new_node_id"].as_u64().unwrap();
+    let gain_node = patch["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["node_id"].as_u64().unwrap() == new_gain_id)
+        .expect("Should find the new gain node");
+    assert_eq!(gain_node["node_type"], "gain");
+    let gain_param = gain_node["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "gain")
+        .unwrap();
+    assert_eq!(gain_param["value"], 0.5);
+}
+
+#[test]
+fn auto_fix_mute_node_inserts_zero_gain() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let osc = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "oscillator" }),
+        )
+        .unwrap();
+    let osc_id = osc["node_id"].as_u64().unwrap();
+
+    // Apply MuteNode fix.
+    let fix_result = server
+        .call_tool(
+            "auto_fix",
+            json!({
+                "patch_id": patch_id,
+                "fix": {
+                    "type": "MuteNode",
+                    "node_id": osc_id,
+                }
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(fix_result["applied"], true);
+    assert!(fix_result["description"].as_str().unwrap().contains("Muted"));
+
+    // Verify the patch now has 2 nodes (osc + gain at 0).
+    let patch = server
+        .call_tool("get_patch", json!({ "patch_id": patch_id }))
+        .unwrap();
+    assert_eq!(patch["node_count"], 2);
+
+    // Find the gain node and verify its gain is 0.0.
+    let new_gain_id = fix_result["new_node_id"].as_u64().unwrap();
+    let gain_node = patch["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["node_id"].as_u64().unwrap() == new_gain_id)
+        .expect("Should find the mute gain node");
+    let gain_param = gain_node["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "gain")
+        .unwrap();
+    assert_eq!(gain_param["value"], 0.0);
+}
+
+#[test]
+fn auto_fix_bypass_node_reconnects() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    // Build: osc → gain → output.
+    let osc = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "oscillator" }),
+        )
+        .unwrap();
+    let osc_id = osc["node_id"].as_u64().unwrap();
+    let osc_out = osc["outputs"][0]["id"].as_u64().unwrap();
+
+    let gain = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "gain" }),
+        )
+        .unwrap();
+    let gain_id = gain["node_id"].as_u64().unwrap();
+    let gain_in = gain["inputs"][0]["id"].as_u64().unwrap();
+    let gain_out = gain["outputs"][0]["id"].as_u64().unwrap();
+
+    let output = server
+        .call_tool(
+            "add_node",
+            json!({ "patch_id": patch_id, "node_type": "output" }),
+        )
+        .unwrap();
+    let output_id = output["node_id"].as_u64().unwrap();
+    let output_in = output["inputs"][0]["id"].as_u64().unwrap();
+
+    server
+        .call_tool(
+            "connect",
+            json!({
+                "patch_id": patch_id,
+                "from_node": osc_id,
+                "from_port": osc_out,
+                "to_node": gain_id,
+                "to_port": gain_in,
+            }),
+        )
+        .unwrap();
+
+    server
+        .call_tool(
+            "connect",
+            json!({
+                "patch_id": patch_id,
+                "from_node": gain_id,
+                "from_port": gain_out,
+                "to_node": output_id,
+                "to_port": output_in,
+            }),
+        )
+        .unwrap();
+
+    // Bypass the gain node.
+    let fix_result = server
+        .call_tool(
+            "auto_fix",
+            json!({
+                "patch_id": patch_id,
+                "fix": {
+                    "type": "BypassNode",
+                    "node_id": gain_id,
+                }
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(fix_result["applied"], true);
+    assert!(fix_result["description"].as_str().unwrap().contains("Bypassed"));
+
+    // The gain node should now be disconnected.
+    // osc should connect directly to output.
+    let patch = server
+        .call_tool("get_patch", json!({ "patch_id": patch_id }))
+        .unwrap();
+
+    // Still 3 nodes, but only 1 connection: osc → output.
+    assert_eq!(patch["node_count"], 3);
+    assert_eq!(patch["connection_count"], 1);
+
+    let conn = &patch["connections"].as_array().unwrap()[0];
+    assert_eq!(conn["from_node"], osc_id);
+    assert_eq!(conn["to_node"], output_id);
+}
+
+#[test]
+fn auto_fix_increase_buffer_size_returns_manual_fix() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let fix_result = server
+        .call_tool(
+            "auto_fix",
+            json!({
+                "patch_id": patch_id,
+                "fix": {
+                    "type": "IncreaseBufferSize",
+                    "size": 1024
+                }
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(fix_result["applied"], false);
+    assert!(fix_result["description"].as_str().unwrap().contains("Manual fix needed"));
+}
+
+#[test]
+fn auto_fix_unknown_patch_returns_error() {
+    let mut server = ChordMcpServer::new();
+
+    let result = server.call_tool(
+        "auto_fix",
+        json!({
+            "patch_id": "nonexistent",
+            "fix": {
+                "type": "MuteNode",
+                "node_id": 1
+            }
+        }),
+    );
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        crate::McpError::PatchNotFound(_) => {}
+        other => panic!("Expected PatchNotFound, got: {other:?}"),
+    }
+}
+
+#[test]
+fn auto_fix_unknown_fix_type_returns_error() {
+    let mut server = ChordMcpServer::new();
+
+    let create_result = server.call_tool("create_patch", json!({})).unwrap();
+    let patch_id = create_result["patch_id"].as_str().unwrap().to_string();
+
+    let result = server.call_tool(
+        "auto_fix",
+        json!({
+            "patch_id": patch_id,
+            "fix": {
+                "type": "UnknownFixType",
+                "node_id": 1
+            }
+        }),
+    );
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        crate::McpError::InvalidArguments(msg) => {
+            assert!(msg.contains("Unknown fix type"));
+        }
+        other => panic!("Expected InvalidArguments, got: {other:?}"),
+    }
+}
+
+// ────────────────────────────────────────────
+// Tool definitions include all diagnostic tools
+// ────────────────────────────────────────────
+
+#[test]
+fn tool_definitions_include_diagnostic_tools() {
+    let server = ChordMcpServer::new();
+    let tools = server.list_tools();
+
+    let diagnostic_tools = ["get_signal_stats", "find_problems", "get_cpu_profile", "auto_fix"];
+
+    for tool_name in &diagnostic_tools {
+        let tool = tools.iter().find(|t| t.name == *tool_name);
+        assert!(tool.is_some(), "Missing diagnostic tool: {tool_name}");
+
+        let tool = tool.unwrap();
+        assert!(!tool.description.is_empty(), "Tool {tool_name} has empty description");
+        assert!(tool.input_schema.is_object(), "Tool {tool_name} has non-object schema");
+
+        // All diagnostic tools require patch_id.
+        let required = tool.input_schema["required"].as_array().unwrap();
+        let has_patch_id = required.iter().any(|v| v.as_str() == Some("patch_id"));
+        assert!(has_patch_id, "Tool {tool_name} should require patch_id");
+    }
 }

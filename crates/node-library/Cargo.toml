@@ -7,3 +7,6 @@ edition = "2021"
 chord-dsp-runtime = { path = "../dsp-runtime" }
 chord-audio-graph = { path = "../audio-graph" }
 chord-midi-engine = { path = "../midi-engine" }
+
+[dev-dependencies]
+chord-testing-framework = { path = "../testing-framework" }
