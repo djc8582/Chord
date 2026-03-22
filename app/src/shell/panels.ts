@@ -57,6 +57,15 @@ export const defaultPanels: PanelConfig[] = [
     icon: "clock",
   },
   {
+    id: "visualizer",
+    title: "Visualizer",
+    position: "bottom",
+    defaultSize: 220,
+    minSize: 120,
+    defaultVisible: false,
+    icon: "activity",
+  },
+  {
     id: "live-mode",
     title: "Live Mode",
     position: "center",

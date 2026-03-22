@@ -12,7 +12,8 @@ import { Canvas, useCanvasStore, setCanvasBridge } from "./canvas/index.js";
 import { Inspector, setInspectorBridge } from "./inspector/index.js";
 import { Browser } from "./browser/index.js";
 import { Timeline, setTimelineBridge } from "./timeline/index.js";
-import { setVisualizerBridge } from "./visualizer/index.js";
+import { setVisualizerBridge, startVisualizerPolling, stopVisualizerPolling } from "./visualizer/store.js";
+import { Visualizer } from "./visualizer/index.js";
 import { LiveMode } from "./live-mode/index.js";
 import { PianoRoll } from "./piano-roll/index.js";
 import { createPatchDocument } from "@chord/document-model";
@@ -78,6 +79,17 @@ function App() {
     [bridge],
   );
 
+  // -- Visualizer polling: start when playing, stop when stopped --
+  const isPlaying = useShellStore((s) => s.isPlaying);
+  useEffect(() => {
+    if (isPlaying) {
+      startVisualizerPolling();
+    } else {
+      stopVisualizerPolling();
+    }
+    return () => stopVisualizerPolling();
+  }, [isPlaying]);
+
   // -- Live Mode toggle --
   const [liveModeOpen, setLiveModeOpen] = React.useState(false);
   const toggleLiveMode = useCallback(() => setLiveModeOpen((v) => !v), []);
@@ -89,6 +101,15 @@ function App() {
   });
   useShortcut("mod+l", toggleLiveMode);
 
+  // -- Visualizer panel toggle --
+  const toggleVisualizer = useCallback(() => {
+    useShellStore.getState().togglePanel("visualizer");
+  }, []);
+  useCommand("view.toggleVisualizer", toggleVisualizer, {
+    label: "Toggle Visualizer",
+    category: "View",
+  });
+
   return (
     <Shell
       panelContent={{
@@ -96,6 +117,7 @@ function App() {
         browser: <Browser />,
         timeline: <Timeline />,
         "piano-roll": <PianoRoll />,
+        visualizer: <Visualizer />,
       }}
     >
       <Canvas />
