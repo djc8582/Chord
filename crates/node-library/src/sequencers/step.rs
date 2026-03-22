@@ -10,7 +10,8 @@ use chord_dsp_runtime::{AudioNode, ProcessContext, ProcessResult, ProcessStatus}
 const MAX_STEPS: usize = 32;
 
 /// Default C major scale ascending pattern (C4 through C5).
-const DEFAULT_PATTERN: [f32; 8] = [60.0, 62.0, 64.0, 65.0, 67.0, 69.0, 71.0, 72.0];
+// C minor pentatonic — more musical than straight C major.
+const DEFAULT_PATTERN: [f32; 8] = [60.0, 63.0, 65.0, 67.0, 70.0, 72.0, 67.0, 65.0];
 
 /// Step Sequencer node.
 ///

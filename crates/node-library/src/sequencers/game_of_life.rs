@@ -146,11 +146,14 @@ impl GameOfLifeSequencer {
         height: usize,
         density: f32,
     ) -> (f32, bool) {
+        // C major pentatonic across 2 octaves for musical output.
+        const SCALE: [f32; 10] = [48.0, 50.0, 52.0, 55.0, 57.0, 60.0, 62.0, 64.0, 67.0, 69.0];
+
         // Find the lowest live cell in this column.
         for row in 0..height {
             if self.grid[row][column % width] {
-                // Map row to MIDI note: row 0 = C4 (60), each row up = +1 semitone.
-                let pitch = 60.0 + row as f32;
+                // Map row to a scale note, wrapping if height > scale length.
+                let pitch = SCALE[row % SCALE.len()];
                 return (pitch, true);
             }
         }
