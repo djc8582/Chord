@@ -52,10 +52,18 @@ impl AudioNode for GainNode {
         let output = &mut ctx.outputs[0];
 
         for i in 0..ctx.buffer_size {
-            let g = self.smoothed_gain.next_sample();
-            let gain_mod = if has_gain_mod { ctx.inputs[1][i] } else { 0.0 };
-            let effective_gain = (g + gain_mod).max(0.0);
-            output[i] = input[i] * effective_gain;
+            if has_gain_mod {
+                // When gain_mod is connected, use raw base + mod for instant response.
+                // This enables proper envelope gating (base=0, env opens gain).
+                let gain_mod = ctx.inputs[1][i];
+                let effective_gain = (target_gain + gain_mod).max(0.0);
+                output[i] = input[i] * effective_gain;
+                // Keep smoothed param in sync so it doesn't jump when mod disconnects
+                self.smoothed_gain.set_immediate(effective_gain);
+            } else {
+                let g = self.smoothed_gain.next_sample();
+                output[i] = input[i] * g;
+            }
         }
 
         Ok(ProcessStatus::Ok)
