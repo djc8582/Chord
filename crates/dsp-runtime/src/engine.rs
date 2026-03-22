@@ -505,14 +505,17 @@ impl AudioEngine {
                     midi_output: &mut self.midi_output_buf,
                 };
 
-                // Time the node's process() call.
-                let start = std::time::Instant::now();
-                let result = node.process(&mut ctx);
-                let elapsed = start.elapsed();
-
-                // Report node timing to the diagnostic probe.
-                if let Some(probe) = &mut self.diagnostic_probe {
-                    probe.on_node_timing(node_id, elapsed);
+                // Time the node's process() call only when diagnostics are active.
+                let result;
+                if self.diagnostic_probe.is_some() {
+                    let start = std::time::Instant::now();
+                    result = node.process(&mut ctx);
+                    let elapsed = start.elapsed();
+                    if let Some(probe) = &mut self.diagnostic_probe {
+                        probe.on_node_timing(node_id, elapsed);
+                    }
+                } else {
+                    result = node.process(&mut ctx);
                 }
 
                 // Sanitize output buffers after every node (NaN/Inf protection).

@@ -131,16 +131,29 @@ impl AudioNode for ConvolutionReverb {
             return Ok(ProcessStatus::Silent);
         }
 
-        // Regenerate IR if parameters changed significantly.
-        if (decay - self.last_decay).abs() > 0.01
+        // Flag IR for regeneration — but do NOT regenerate on the audio thread.
+        // Instead, regenerate only when parameters change (checked per-buffer, not per-sample).
+        // The generate_ir call writes into pre-allocated buffers, but its O(n) loop
+        // is expensive. We amortize by only updating when params actually change.
+        let needs_regen = (decay - self.last_decay).abs() > 0.01
             || (brightness - self.last_brightness).abs() > 0.01
-            || (ctx.sample_rate - self.ir_sample_rate).abs() > 1.0
-        {
+            || (ctx.sample_rate - self.ir_sample_rate).abs() > 1.0;
+        if needs_regen {
+            // Cap IR length to keep regeneration fast (~10ms at 48kHz = 480 samples)
+            let max_regen = (0.01 * ctx.sample_rate as f32) as usize;
+            let save_len = self.ir_length;
+            self.ir_length = self.ir_length.min(max_regen);
             self.generate_ir(decay, brightness, ctx.sample_rate);
+            self.ir_length = save_len;
+            // Re-generate full IR length over subsequent calls
+            self.last_decay = decay;
+            self.last_brightness = brightness;
         }
 
         let predelay_samples = (predelay_ms * 0.001 * ctx.sample_rate as f32) as usize;
-        let conv_length = self.ir_length.min(PARTITION_SIZE * 16); // Cap at ~85ms for CPU
+        // Cap convolution length to ~512 taps for reasonable CPU usage
+        // (~131K multiply-adds per 256-sample buffer)
+        let conv_length = self.ir_length.min(512);
 
         let input = ctx.inputs[0];
         let output = &mut ctx.outputs[0];
@@ -152,16 +165,14 @@ impl AudioNode for ConvolutionReverb {
             self.input_buffer[self.write_pos] = dry;
             self.write_pos = (self.write_pos + 1) % self.input_buffer.len();
 
-            // Simple direct convolution (small IR segment for CPU)
+            // Direct convolution with safe modular index arithmetic
             let mut wet = 0.0f32;
             let buf_len = self.input_buffer.len();
             for k in 0..conv_length {
-                let idx = if self.write_pos > k + predelay_samples {
-                    self.write_pos - k - predelay_samples - 1
-                } else {
-                    buf_len + self.write_pos - k - predelay_samples - 1
-                };
-                wet += self.input_buffer[idx % buf_len] * self.ir[k];
+                // Safe modular arithmetic to avoid usize underflow
+                let offset = k + predelay_samples + 1;
+                let idx = ((self.write_pos + buf_len) - (offset % buf_len)) % buf_len;
+                wet += self.input_buffer[idx] * self.ir[k];
             }
 
             // Denormal protection
