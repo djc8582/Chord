@@ -484,6 +484,85 @@ pub fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             )
             .with_parameter(ParameterDescriptor::new("mix", "Mix", 1.0, 0.0, 1.0)),
 
+        "kick_drum" => NodeDescriptor::new("kick_drum")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("pitch_start", "Pitch Start", 150.0, 50.0, 500.0)
+                    .with_unit("Hz"),
+            )
+            .with_parameter(
+                ParameterDescriptor::new("pitch_end", "Pitch End", 45.0, 20.0, 200.0)
+                    .with_unit("Hz"),
+            )
+            .with_parameter(
+                ParameterDescriptor::new("pitch_decay", "Pitch Decay", 0.05, 0.01, 0.3)
+                    .with_unit("s"),
+            )
+            .with_parameter(
+                ParameterDescriptor::new("decay", "Decay", 0.3, 0.05, 2.0).with_unit("s"),
+            )
+            .with_parameter(ParameterDescriptor::new("click", "Click", 0.3, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("drive", "Drive", 0.2, 0.0, 1.0)),
+
+        "snare_drum" => NodeDescriptor::new("snare_drum")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("tone_freq", "Tone Freq", 180.0, 80.0, 400.0)
+                    .with_unit("Hz"),
+            )
+            .with_parameter(
+                ParameterDescriptor::new("noise_color", "Noise Color", 2000.0, 500.0, 8000.0)
+                    .with_unit("Hz"),
+            )
+            .with_parameter(ParameterDescriptor::new(
+                "tone_mix", "Tone Mix", 0.5, 0.0, 1.0,
+            ))
+            .with_parameter(
+                ParameterDescriptor::new("decay", "Decay", 0.15, 0.03, 1.0).with_unit("s"),
+            )
+            .with_parameter(ParameterDescriptor::new("snap", "Snap", 0.7, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("snappy", "Snappy", 0.3, 0.0, 1.0)),
+
+        "hi_hat" => NodeDescriptor::new("hi_hat")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("color", "Color", 8000.0, 2000.0, 16000.0)
+                    .with_unit("Hz"),
+            )
+            .with_parameter(
+                ParameterDescriptor::new("decay", "Decay", 0.05, 0.01, 0.5).with_unit("s"),
+            )
+            .with_parameter(ParameterDescriptor::new("open", "Open", 0.0, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("tone", "Tone", 0.5, 0.0, 1.0)),
+
+        "clap" => NodeDescriptor::new("clap")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("color", "Color", 1200.0, 400.0, 6000.0)
+                    .with_unit("Hz"),
+            )
+            .with_parameter(
+                ParameterDescriptor::new("decay", "Decay", 0.12, 0.03, 0.5).with_unit("s"),
+            )
+            .with_parameter(ParameterDescriptor::new("spread", "Spread", 0.5, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("tone", "Tone", 0.5, 0.0, 1.0)),
+
+        "tom" => NodeDescriptor::new("tom")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(
+                ParameterDescriptor::new("pitch", "Pitch", 120.0, 40.0, 400.0).with_unit("Hz"),
+            )
+            .with_parameter(
+                ParameterDescriptor::new("decay", "Decay", 0.25, 0.05, 1.0).with_unit("s"),
+            )
+            .with_parameter(ParameterDescriptor::new("sweep", "Sweep", 0.3, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("tone", "Tone", 0.7, 0.0, 1.0)),
+
         // Fallback: generic pass-through descriptor for unknown types.
         other => NodeDescriptor::new(other)
             .with_input(PortDescriptor::new("in", PortDataType::Audio))

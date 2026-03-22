@@ -18,7 +18,7 @@ use crate::sequencers::{
     EuclideanNode, GameOfLifeSequencer, GravitySequencer, MarkovSequencer, PolyrhythmEngine,
     StepSequencer,
 };
-use crate::sources::{GranularNode, NoiseNode, Oscillator};
+use crate::sources::{Clap, GranularNode, HiHat, KickDrum, NoiseNode, Oscillator, SnareDrum, Tom};
 use crate::utility::{DCBlocker, GainNode, MixerNode, OutputNode, Stereo};
 
 /// Central registry of all node types.
@@ -73,9 +73,11 @@ impl NodeRegistry {
         registry
     }
 
-    /// Create a registry pre-populated with all available nodes (Wave 1-5).
+    /// Create a registry pre-populated with all available nodes (Wave 1-5 + drums).
     pub fn with_all() -> Self {
-        Self::with_wave5()
+        let mut registry = Self::with_wave5();
+        registry.register_drums();
+        registry
     }
 
     /// Register a node type with a factory.
@@ -142,6 +144,15 @@ impl NodeRegistry {
         self.register("dc_blocker", || Box::new(DCBlocker::new()));
         self.register("convolution_reverb", || Box::new(ConvolutionReverb::new()));
         self.register("spectral", || Box::new(SpectralNode::new()));
+    }
+
+    /// Register all drum synthesis nodes.
+    pub fn register_drums(&mut self) {
+        self.register("kick_drum", || Box::new(KickDrum::new()));
+        self.register("snare_drum", || Box::new(SnareDrum::new()));
+        self.register("hi_hat", || Box::new(HiHat::new()));
+        self.register("clap", || Box::new(Clap::new()));
+        self.register("tom", || Box::new(Tom::new()));
     }
 
     /// Create a node instance by type name.

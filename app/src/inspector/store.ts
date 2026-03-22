@@ -198,6 +198,40 @@ export const PARAMETER_DEFINITIONS: Record<string, ParameterDescriptor[]> = {
     { id: "shift", label: "Shift", min: -512, max: 512, step: 1, defaultValue: 0, unit: "bins" },
     { id: "mix", label: "Mix", min: 0, max: 1, step: 0.01, defaultValue: 1, unit: "" },
   ],
+  kick_drum: [
+    { id: "pitch_start", label: "Pitch Start", min: 50, max: 500, step: 1, defaultValue: 150, unit: "Hz" },
+    { id: "pitch_end", label: "Pitch End", min: 20, max: 200, step: 1, defaultValue: 45, unit: "Hz" },
+    { id: "pitch_decay", label: "Pitch Decay", min: 0.01, max: 0.3, step: 0.01, defaultValue: 0.05, unit: "s" },
+    { id: "decay", label: "Decay", min: 0.05, max: 2, step: 0.01, defaultValue: 0.3, unit: "s" },
+    { id: "click", label: "Click", min: 0, max: 1, step: 0.01, defaultValue: 0.3, unit: "" },
+    { id: "drive", label: "Drive", min: 0, max: 1, step: 0.01, defaultValue: 0.2, unit: "" },
+  ],
+  snare_drum: [
+    { id: "tone_freq", label: "Tone Freq", min: 80, max: 400, step: 1, defaultValue: 180, unit: "Hz" },
+    { id: "noise_color", label: "Noise Color", min: 500, max: 8000, step: 1, defaultValue: 2000, unit: "Hz" },
+    { id: "tone_mix", label: "Tone Mix", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+    { id: "decay", label: "Decay", min: 0.03, max: 1, step: 0.01, defaultValue: 0.15, unit: "s" },
+    { id: "snap", label: "Snap", min: 0, max: 1, step: 0.01, defaultValue: 0.7, unit: "" },
+    { id: "snappy", label: "Snappy", min: 0, max: 1, step: 0.01, defaultValue: 0.3, unit: "" },
+  ],
+  hi_hat: [
+    { id: "color", label: "Color", min: 2000, max: 16000, step: 1, defaultValue: 8000, unit: "Hz" },
+    { id: "decay", label: "Decay", min: 0.01, max: 0.5, step: 0.01, defaultValue: 0.05, unit: "s" },
+    { id: "open", label: "Open", min: 0, max: 1, step: 0.01, defaultValue: 0, unit: "" },
+    { id: "tone", label: "Tone", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+  ],
+  clap: [
+    { id: "color", label: "Color", min: 400, max: 6000, step: 1, defaultValue: 1200, unit: "Hz" },
+    { id: "decay", label: "Decay", min: 0.03, max: 0.5, step: 0.01, defaultValue: 0.12, unit: "s" },
+    { id: "spread", label: "Spread", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+    { id: "tone", label: "Tone", min: 0, max: 1, step: 0.01, defaultValue: 0.5, unit: "" },
+  ],
+  tom: [
+    { id: "pitch", label: "Pitch", min: 40, max: 400, step: 1, defaultValue: 120, unit: "Hz" },
+    { id: "decay", label: "Decay", min: 0.05, max: 1, step: 0.01, defaultValue: 0.25, unit: "s" },
+    { id: "sweep", label: "Sweep", min: 0, max: 1, step: 0.01, defaultValue: 0.3, unit: "" },
+    { id: "tone", label: "Tone", min: 0, max: 1, step: 0.01, defaultValue: 0.7, unit: "" },
+  ],
 };
 
 // ---------------------------------------------------------------------------

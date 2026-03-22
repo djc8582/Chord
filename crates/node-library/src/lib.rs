@@ -77,6 +77,9 @@ pub use sources::{NoiseColor, NoiseNode};
 // Wave 4 sources
 pub use sources::GranularNode;
 
+// Drum synthesis
+pub use sources::{Clap, HiHat, KickDrum, SnareDrum, Tom};
+
 // Wave 4
 pub use effects::{Chorus, CrossFader, Phaser, RingModulator, Vocoder, Waveshaper, WaveshaperMode};
 

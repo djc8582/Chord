@@ -2207,11 +2207,11 @@ fn test_registry_wave3_nodes() {
 fn test_registry_with_all() {
     let registry = NodeRegistry::with_all();
 
-    // Wave 1: 10, Wave 2: 4, Wave 3: 9, Wave 4: 7, Wave 5: 7 = 37 total.
+    // Wave 1: 10, Wave 2: 4, Wave 3: 9, Wave 4: 7, Wave 5: 7, Drums: 5 = 42 total.
     assert_eq!(
         registry.len(),
-        37,
-        "with_all() should register 37 nodes, got {}",
+        42,
+        "with_all() should register 42 nodes, got {}",
         registry.len()
     );
 
@@ -2222,6 +2222,7 @@ fn test_registry_with_all() {
         "step_sequencer", "gravity_sequencer", "game_of_life_sequencer", "markov_sequencer", "polyrhythm",
         "crossfader", "waveshaper", "ring_modulator", "chorus", "phaser", "granular", "vocoder",
         "pitch_shifter", "limiter", "gate", "stereo", "dc_blocker", "convolution_reverb", "spectral",
+        "kick_drum", "snare_drum", "hi_hat", "clap", "tom",
     ];
     for type_name in &all_types {
         assert!(

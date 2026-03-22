@@ -459,6 +459,41 @@ export const NODE_TYPE_REGISTRY: Record<string, NodeTypeDefinition> = {
     ],
     outputs: [{ id: "out", label: "Out", type: "audio" }],
   },
+  kick_drum: {
+    type: "kick_drum",
+    label: "Kick",
+    category: "generators",
+    inputs: [{ id: "trigger", label: "Trig", type: "trigger" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  snare_drum: {
+    type: "snare_drum",
+    label: "Snare",
+    category: "generators",
+    inputs: [{ id: "trigger", label: "Trig", type: "trigger" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  hi_hat: {
+    type: "hi_hat",
+    label: "Hi-Hat",
+    category: "generators",
+    inputs: [{ id: "trigger", label: "Trig", type: "trigger" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  clap: {
+    type: "clap",
+    label: "Clap",
+    category: "generators",
+    inputs: [{ id: "trigger", label: "Trig", type: "trigger" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
+  tom: {
+    type: "tom",
+    label: "Tom",
+    category: "generators",
+    inputs: [{ id: "trigger", label: "Trig", type: "trigger" }],
+    outputs: [{ id: "out", label: "Out", type: "audio" }],
+  },
 };
 
 // ---------------------------------------------------------------------------
