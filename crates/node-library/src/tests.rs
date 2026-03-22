@@ -3280,3 +3280,286 @@ fn test_all_wave4_wave5_nodes_instantiate_from_factory() {
         );
     }
 }
+
+// ─── Full Validation: fuzz + stress + NaN/Inf checks ──────────────────────
+
+/// Helper to check that an output buffer contains no NaN or Inf values.
+fn assert_no_nan_inf(buf: &[f32], label: &str) {
+    for (i, &s) in buf.iter().enumerate() {
+        assert!(
+            s.is_finite(),
+            "{label}: sample {i} is not finite (value={s})"
+        );
+    }
+}
+
+/// Full validation for a single node: fuzz its parameters across the full range,
+/// feed various input signals (silence, impulse, DC, loud, noise), and verify
+/// no NaN/Inf in outputs and no panics.
+fn full_validation(
+    node: &mut dyn AudioNode,
+    num_inputs: usize,
+    num_outputs: usize,
+    param_ranges: &[(&str, f32, f32)],
+    label: &str,
+) {
+    let signals: Vec<(&str, f32)> = vec![
+        ("silence", 0.0),
+        ("dc_low", 0.001),
+        ("dc_mid", 0.5),
+        ("dc_full", 1.0),
+        ("dc_loud", 2.0),
+        ("dc_extreme", 10.0),
+        ("dc_negative", -1.0),
+        ("dc_tiny", 1e-20),
+    ];
+
+    let fuzz_points = [0.0f32, 0.25, 0.5, 0.75, 1.0];
+
+    for (sig_name, sig_val) in &signals {
+        for &fuzz in &fuzz_points {
+            let mut tc = TestContext::new(num_inputs, num_outputs);
+            for i in 0..num_inputs {
+                tc.fill_input(i, *sig_val);
+            }
+            for &(name, min, max) in param_ranges {
+                let val = min + (max - min) * fuzz;
+                tc.params.set(name, val, 0);
+            }
+
+            let result = tc.process(node);
+            assert!(
+                result.is_ok(),
+                "{label}: process failed with signal={sig_name}, fuzz={fuzz}: {:?}",
+                result.err()
+            );
+
+            for out_idx in 0..num_outputs {
+                assert_no_nan_inf(
+                    tc.output(out_idx),
+                    &format!("{label} sig={sig_name} fuzz={fuzz} out={out_idx}"),
+                );
+            }
+        }
+    }
+
+    // Stress test: rapid parameter changes with sine input
+    for _ in 0..10 {
+        let mut tc = TestContext::new(num_inputs, num_outputs);
+        for i in 0..num_inputs {
+            for j in 0..BUFFER_SIZE {
+                tc.input_buffers[i][j] = ((j as f32 * 0.1).sin()) * 0.8;
+            }
+        }
+        for &(name, min, max) in param_ranges {
+            let val = min + (max - min) * 0.73;
+            tc.params.set(name, val, 0);
+        }
+        let _ = tc.process(node);
+        for out_idx in 0..num_outputs {
+            assert_no_nan_inf(
+                tc.output(out_idx),
+                &format!("{label} stress out={out_idx}"),
+            );
+        }
+    }
+
+    // Reset and post-reset processing
+    node.reset();
+    let mut tc = TestContext::new(num_inputs, num_outputs);
+    for i in 0..num_inputs {
+        tc.fill_input(i, 0.5);
+    }
+    let result = tc.process(node);
+    assert!(result.is_ok(), "{label}: post-reset process failed");
+    for out_idx in 0..num_outputs {
+        assert_no_nan_inf(tc.output(out_idx), &format!("{label} post-reset out={out_idx}"));
+    }
+}
+
+#[test]
+fn full_validation_oscillator() {
+    full_validation(
+        &mut Oscillator::new(), 3, 1,
+        &[("frequency", 0.1, 20000.0), ("detune", -1200.0, 1200.0), ("waveform", 0.0, 3.0)],
+        "oscillator",
+    );
+}
+
+#[test]
+fn full_validation_filter() {
+    full_validation(
+        &mut BiquadFilter::new(), 1, 1,
+        &[("cutoff", 20.0, 20000.0), ("resonance", 0.1, 30.0), ("mode", 0.0, 2.0)],
+        "filter",
+    );
+}
+
+#[test]
+fn full_validation_gain() {
+    full_validation(&mut GainNode::new(), 1, 1, &[("gain", 0.0, 10.0)], "gain");
+}
+
+#[test]
+fn full_validation_delay() {
+    full_validation(
+        &mut DelayNode::new(), 2, 2,
+        &[("time", 0.001, 2.0), ("feedback", 0.0, 0.99), ("mix", 0.0, 1.0)],
+        "delay",
+    );
+}
+
+#[test]
+fn full_validation_reverb() {
+    full_validation(
+        &mut ReverbNode::new(), 1, 1,
+        &[("room_size", 0.0, 1.0), ("damping", 0.0, 1.0), ("mix", 0.0, 1.0)],
+        "reverb",
+    );
+}
+
+#[test]
+fn full_validation_compressor() {
+    full_validation(
+        &mut CompressorNode::new(), 1, 1,
+        &[("threshold", -60.0, 0.0), ("ratio", 1.0, 20.0), ("attack", 0.001, 1.0), ("release", 0.01, 2.0)],
+        "compressor",
+    );
+}
+
+#[test]
+fn full_validation_eq() {
+    full_validation(
+        &mut EqNode::new(), 1, 1,
+        &[("low_gain", -24.0, 24.0), ("mid_gain", -24.0, 24.0), ("high_gain", -24.0, 24.0)],
+        "eq",
+    );
+}
+
+#[test]
+fn full_validation_envelope() {
+    full_validation(
+        &mut AdsrEnvelope::new(), 1, 1,
+        &[("attack", 0.0, 10.0), ("decay", 0.0, 10.0), ("sustain", 0.0, 1.0), ("release", 0.0, 30.0)],
+        "envelope",
+    );
+}
+
+#[test]
+fn full_validation_lfo() {
+    full_validation(
+        &mut Lfo::new(), 0, 1,
+        &[("rate", 0.01, 100.0), ("depth", 0.0, 1.0), ("waveform", 0.0, 3.0)],
+        "lfo",
+    );
+}
+
+#[test]
+fn full_validation_noise() {
+    full_validation(&mut NoiseNode::new(), 0, 1, &[("color", 0.0, 2.0)], "noise");
+}
+
+#[test]
+fn full_validation_mixer() {
+    full_validation(&mut MixerNode::new(), 4, 1, &[], "mixer");
+}
+
+#[test]
+fn full_validation_chorus() {
+    full_validation(
+        &mut Chorus::new(), 1, 1,
+        &[("rate", 0.1, 10.0), ("depth", 0.0, 1.0), ("mix", 0.0, 1.0)],
+        "chorus",
+    );
+}
+
+#[test]
+fn full_validation_phaser() {
+    full_validation(
+        &mut Phaser::new(), 1, 1,
+        &[("rate", 0.1, 10.0), ("depth", 0.0, 1.0), ("mix", 0.0, 1.0)],
+        "phaser",
+    );
+}
+
+#[test]
+fn full_validation_waveshaper() {
+    full_validation(
+        &mut Waveshaper::new(), 1, 1,
+        &[("drive", 0.0, 10.0), ("mix", 0.0, 1.0)],
+        "waveshaper",
+    );
+}
+
+#[test]
+fn full_validation_ring_modulator() {
+    full_validation(
+        &mut RingModulator::new(), 2, 1,
+        &[("mix", 0.0, 1.0)],
+        "ring_modulator",
+    );
+}
+
+#[test]
+fn full_validation_limiter() {
+    full_validation(
+        &mut Limiter::new(), 1, 1,
+        &[("ceiling", -24.0, 0.0), ("release", 0.01, 2.0)],
+        "limiter",
+    );
+}
+
+#[test]
+fn full_validation_gate_node() {
+    full_validation(
+        &mut Gate::new(), 1, 1,
+        &[("threshold", -80.0, 0.0), ("attack", 0.0, 1.0), ("hold", 0.0, 1.0), ("release", 0.0, 2.0)],
+        "gate",
+    );
+}
+
+#[test]
+fn full_validation_pitch_shifter() {
+    full_validation(
+        &mut PitchShifter::new(), 1, 1,
+        &[("semitones", -24.0, 24.0), ("mix", 0.0, 1.0)],
+        "pitch_shifter",
+    );
+}
+
+#[test]
+fn full_validation_crossfader() {
+    full_validation(
+        &mut CrossFader::new(), 2, 1,
+        &[("position", 0.0, 1.0)],
+        "crossfader",
+    );
+}
+
+#[test]
+fn full_validation_stereo() {
+    full_validation(
+        &mut Stereo::new(), 1, 1,
+        &[("width", 0.0, 2.0)],
+        "stereo",
+    );
+}
+
+#[test]
+fn full_validation_dc_blocker() {
+    full_validation(&mut DCBlocker::new(), 1, 1, &[], "dc_blocker");
+}
+
+#[test]
+fn full_validation_sample_and_hold() {
+    full_validation(&mut SampleAndHoldNode::new(), 2, 1, &[], "sample_and_hold");
+}
+
+#[test]
+fn full_validation_quantizer() {
+    full_validation(
+        &mut QuantizerNode::new(), 1, 1,
+        &[("scale", 0.0, 11.0)],
+        "quantizer",
+    );
+}
