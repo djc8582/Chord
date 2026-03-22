@@ -270,6 +270,9 @@ impl AudioEngine {
         set_ftz_daz();
 
         // Step 1: Drain parameter changes from the ring buffer.
+        // Use immediate (0) smoothing here because the engine never calls
+        // advance_all() per-sample, so smoothed values would never converge.
+        // Nodes that need smoothing (e.g. GainNode) implement their own.
         self.param_drain_buf.clear();
         self.param_ring.drain_into(&mut self.param_drain_buf);
         for change in &self.param_drain_buf {
@@ -277,7 +280,7 @@ impl AudioEngine {
                 change.node_id,
                 &change.param_name,
                 change.value as f32,
-                DEFAULT_SMOOTHING_SAMPLES,
+                0,
             );
         }
 
