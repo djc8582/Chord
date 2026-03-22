@@ -14,6 +14,7 @@ use chord_dsp_runtime::{AudioNode, ProcessContext, ProcessResult, ProcessStatus}
 const NUM_BANDS: usize = 16;
 
 /// A simple one-pole envelope follower.
+#[derive(Clone, Copy)]
 struct EnvelopeFollower {
     value: f32,
     attack_coeff: f32,
@@ -50,6 +51,7 @@ impl EnvelopeFollower {
 }
 
 /// A 2nd-order band-pass filter (biquad).
+#[derive(Clone, Copy)]
 struct BandPassFilter {
     b0: f32,
     b1: f32,
@@ -128,11 +130,11 @@ impl BandPassFilter {
 /// - `[0]` vocoded output.
 pub struct Vocoder {
     /// Band-pass filters for the carrier signal.
-    carrier_filters: Vec<BandPassFilter>,
+    carrier_filters: [BandPassFilter; NUM_BANDS],
     /// Band-pass filters for the modulator signal.
-    modulator_filters: Vec<BandPassFilter>,
+    modulator_filters: [BandPassFilter; NUM_BANDS],
     /// Envelope followers for each modulator band.
-    envelope_followers: Vec<EnvelopeFollower>,
+    envelope_followers: [EnvelopeFollower; NUM_BANDS],
     /// Whether filters have been initialized for the current sample rate.
     initialized_sr: f32,
 }
@@ -140,20 +142,18 @@ pub struct Vocoder {
 impl Vocoder {
     pub fn new() -> Self {
         let sr = 48000.0f32;
-        let (carrier_filters, modulator_filters, envelope_followers) = Self::build_bands(sr, 5.0, 50.0);
-        Self {
-            carrier_filters,
-            modulator_filters,
-            envelope_followers,
+        let mut vocoder = Self {
+            carrier_filters: [BandPassFilter::new(100.0, 4.0, sr); NUM_BANDS],
+            modulator_filters: [BandPassFilter::new(100.0, 4.0, sr); NUM_BANDS],
+            envelope_followers: [EnvelopeFollower::new(5.0, 50.0, sr); NUM_BANDS],
             initialized_sr: sr,
-        }
+        };
+        vocoder.init_bands(sr, 5.0, 50.0);
+        vocoder
     }
 
-    fn build_bands(sample_rate: f32, attack_ms: f32, release_ms: f32) -> (Vec<BandPassFilter>, Vec<BandPassFilter>, Vec<EnvelopeFollower>) {
-        let mut carrier = Vec::with_capacity(NUM_BANDS);
-        let mut modulator = Vec::with_capacity(NUM_BANDS);
-        let mut followers = Vec::with_capacity(NUM_BANDS);
-
+    /// Initialize (or reinitialize) filter bands in-place — no allocation.
+    fn init_bands(&mut self, sample_rate: f32, attack_ms: f32, release_ms: f32) {
         // Logarithmically-spaced center frequencies from ~100 Hz to ~8000 Hz.
         let min_freq = 100.0f32;
         let max_freq = 8000.0f32;
@@ -162,12 +162,10 @@ impl Vocoder {
         for i in 0..NUM_BANDS {
             let t = i as f32 / (NUM_BANDS - 1) as f32;
             let freq = min_freq * (max_freq / min_freq).powf(t);
-            carrier.push(BandPassFilter::new(freq, q, sample_rate));
-            modulator.push(BandPassFilter::new(freq, q, sample_rate));
-            followers.push(EnvelopeFollower::new(attack_ms, release_ms, sample_rate));
+            self.carrier_filters[i] = BandPassFilter::new(freq, q, sample_rate);
+            self.modulator_filters[i] = BandPassFilter::new(freq, q, sample_rate);
+            self.envelope_followers[i] = EnvelopeFollower::new(attack_ms, release_ms, sample_rate);
         }
-
-        (carrier, modulator, followers)
     }
 }
 
@@ -199,13 +197,10 @@ impl AudioNode for Vocoder {
             return Ok(ProcessStatus::Silent);
         }
 
-        // Re-initialize filters if sample rate changed
+        // Re-initialize filters in-place if sample rate changed — no allocation.
         let sr = ctx.sample_rate as f32;
         if (sr - self.initialized_sr).abs() > 1.0 {
-            let (c, m, f) = Self::build_bands(sr, attack, release);
-            self.carrier_filters = c;
-            self.modulator_filters = m;
-            self.envelope_followers = f;
+            self.init_bands(sr, attack, release);
             self.initialized_sr = sr;
         }
 

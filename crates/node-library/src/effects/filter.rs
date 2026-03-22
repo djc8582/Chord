@@ -158,7 +158,7 @@ impl Default for BiquadFilter {
 impl AudioNode for BiquadFilter {
     fn process(&mut self, ctx: &mut ProcessContext) -> ProcessResult {
         let cutoff = ctx.parameters.get("cutoff").unwrap_or(1000.0) as f64;
-        let resonance = ctx.parameters.get("resonance").unwrap_or(0.707) as f64;
+        let resonance = (ctx.parameters.get("resonance").unwrap_or(0.707) as f64).clamp(0.1, 30.0);
         let mode = FilterMode::from_param(ctx.parameters.get("mode").unwrap_or(0.0));
 
         // Recompute coefficients only if parameters changed.

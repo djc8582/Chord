@@ -86,10 +86,8 @@ impl AudioNode for DelayNode {
         let has_right_input = ctx.inputs.len() > 1;
         let has_right_output = ctx.outputs.len() > 1;
 
-        // We need to split outputs to write to two ports simultaneously.
-        // Process left and right in separate passes to avoid borrow conflicts.
-        // First pass: compute into local temp storage.
-        // Since we can't allocate, we process sample-by-sample.
+        // Process both channels in a single per-sample loop so the right
+        // channel always reads from a consistent delay buffer state.
 
         for i in 0..ctx.buffer_size {
             let dry_l = if has_left_input { ctx.inputs[0][i] } else { 0.0 };
@@ -99,7 +97,7 @@ impl AudioNode for DelayNode {
                 dry_l
             };
 
-            // Read from delay buffer.
+            // Read from delay buffer — both channels from the same read position.
             let read_pos = if self.write_pos >= delay_samples {
                 self.write_pos - delay_samples
             } else {
@@ -109,49 +107,19 @@ impl AudioNode for DelayNode {
             let wet_l = self.buffer_l[read_pos];
             let wet_r = self.buffer_r[read_pos];
 
-            // Write new samples with feedback into buffer.
+            // Write new samples with feedback into both channels.
             self.buffer_l[self.write_pos] = dry_l + wet_l * feedback as f32;
             self.buffer_r[self.write_pos] = dry_r + wet_r * feedback as f32;
 
             // Advance write position.
             self.write_pos = (self.write_pos + 1) % buf_len;
 
-            // Mix dry and wet signals.
+            // Mix dry and wet signals for both channels.
             let out_l = dry_l * (1.0 - mix as f32) + wet_l * mix as f32;
+            let out_r = dry_r * (1.0 - mix as f32) + wet_r * mix as f32;
 
             ctx.outputs[0][i] = out_l;
-        }
-
-        // Second pass for right channel output (if available).
-        if has_right_output {
-            // We need to re-read from the buffer for right channel output.
-            // Since we already advanced write_pos, compute read positions relative to
-            // the current write_pos going backwards.
-            let current_wp = self.write_pos;
-            for i in 0..ctx.buffer_size {
-                let dry_r = if has_right_input {
-                    ctx.inputs[1][i]
-                } else if has_left_input {
-                    ctx.inputs[0][i]
-                } else {
-                    0.0
-                };
-
-                // The sample at index i was written at write_pos - buffer_size + i.
-                let sample_wp = if current_wp >= ctx.buffer_size {
-                    current_wp - ctx.buffer_size + i
-                } else {
-                    buf_len - (ctx.buffer_size - current_wp) + i
-                };
-                let read_pos = if sample_wp >= delay_samples {
-                    sample_wp - delay_samples
-                } else {
-                    buf_len - (delay_samples - sample_wp)
-                };
-
-                // Read the wet signal that was used for this sample.
-                let wet_r = self.buffer_r[read_pos];
-                let out_r = dry_r * (1.0 - mix as f32) + wet_r * mix as f32;
+            if has_right_output {
                 ctx.outputs[1][i] = out_r;
             }
         }

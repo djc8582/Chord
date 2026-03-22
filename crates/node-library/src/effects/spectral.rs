@@ -41,6 +41,17 @@ pub struct SpectralNode {
     was_frozen: bool,
     /// Hop counter.
     hop_count: usize,
+    // Pre-allocated scratch buffers for process_block (BUG 14 fix).
+    /// FFT real component scratch buffer.
+    scratch_real: Vec<f32>,
+    /// FFT imaginary component scratch buffer.
+    scratch_imag: Vec<f32>,
+    /// Magnitude scratch buffer.
+    scratch_mags: Vec<f32>,
+    /// Phase scratch buffer.
+    scratch_phases: Vec<f32>,
+    /// Shifted magnitudes scratch buffer.
+    scratch_shifted: Vec<f32>,
 }
 
 impl SpectralNode {
@@ -52,15 +63,21 @@ impl SpectralNode {
             window[i] = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * t).cos());
         }
 
+        let half = FFT_SIZE / 2;
         Self {
             input_buf: vec![0.0; FFT_SIZE * 2],
             output_buf: vec![0.0; FFT_SIZE * 2],
             input_pos: 0,
-            frozen_mags: vec![0.0; FFT_SIZE / 2 + 1],
-            prev_mags: vec![0.0; FFT_SIZE / 2 + 1],
+            frozen_mags: vec![0.0; half + 1],
+            prev_mags: vec![0.0; half + 1],
             window,
             was_frozen: false,
             hop_count: 0,
+            scratch_real: vec![0.0; FFT_SIZE],
+            scratch_imag: vec![0.0; FFT_SIZE],
+            scratch_mags: vec![0.0; half + 1],
+            scratch_phases: vec![0.0; half + 1],
+            scratch_shifted: vec![0.0; half + 1],
         }
     }
 
@@ -68,75 +85,78 @@ impl SpectralNode {
     fn process_block(&mut self, freeze: bool, blur: f32, shift: i32) {
         let half = FFT_SIZE / 2;
 
+        // Zero-fill pre-allocated scratch buffers.
+        self.scratch_real.fill(0.0);
+        self.scratch_imag.fill(0.0);
+
         // Extract windowed block from input buffer.
-        let mut real = vec![0.0f32; FFT_SIZE];
-        let mut imag = vec![0.0f32; FFT_SIZE];
         let buf_len = self.input_buf.len();
         for i in 0..FFT_SIZE {
             let idx = (self.input_pos + buf_len - FFT_SIZE + i) % buf_len;
-            real[i] = self.input_buf[idx] * self.window[i];
+            self.scratch_real[i] = self.input_buf[idx] * self.window[i];
         }
 
         // Forward FFT (Cooley-Tukey radix-2 DIT).
-        fft_in_place(&mut real, &mut imag, false);
+        fft_in_place(&mut self.scratch_real, &mut self.scratch_imag, false);
 
-        // Compute magnitudes and phases.
-        let mut mags = vec![0.0f32; half + 1];
-        let mut phases = vec![0.0f32; half + 1];
+        // Compute magnitudes and phases into pre-allocated buffers.
         for i in 0..=half {
-            mags[i] = (real[i] * real[i] + imag[i] * imag[i]).sqrt();
-            phases[i] = imag[i].atan2(real[i]);
+            self.scratch_mags[i] = (self.scratch_real[i] * self.scratch_real[i]
+                + self.scratch_imag[i] * self.scratch_imag[i])
+                .sqrt();
+            self.scratch_phases[i] = self.scratch_imag[i].atan2(self.scratch_real[i]);
         }
 
         // Apply spectral transformations.
         // 1. Freeze: lock the magnitude spectrum.
         if freeze {
             if !self.was_frozen {
-                self.frozen_mags.copy_from_slice(&mags);
+                self.frozen_mags.copy_from_slice(&self.scratch_mags[..half + 1]);
             }
-            mags.copy_from_slice(&self.frozen_mags);
+            self.scratch_mags[..half + 1].copy_from_slice(&self.frozen_mags);
         }
         self.was_frozen = freeze;
 
         // 2. Blur: smooth magnitudes over time.
         if blur > 0.001 {
             for i in 0..=half {
-                mags[i] = mags[i] * (1.0 - blur) + self.prev_mags[i] * blur;
+                self.scratch_mags[i] =
+                    self.scratch_mags[i] * (1.0 - blur) + self.prev_mags[i] * blur;
             }
         }
-        self.prev_mags.copy_from_slice(&mags);
+        self.prev_mags.copy_from_slice(&self.scratch_mags[..half + 1]);
 
         // 3. Shift: move spectral bins up or down.
         if shift != 0 {
-            let mut shifted = vec![0.0f32; half + 1];
+            self.scratch_shifted.fill(0.0);
             for i in 0..=half {
                 let src = i as i32 - shift;
                 if src >= 0 && src <= half as i32 {
-                    shifted[i] = mags[src as usize];
+                    self.scratch_shifted[i] = self.scratch_mags[src as usize];
                 }
             }
-            mags.copy_from_slice(&shifted);
+            self.scratch_mags[..half + 1].copy_from_slice(&self.scratch_shifted);
         }
 
         // Reconstruct complex spectrum from modified magnitudes and original phases.
         for i in 0..=half {
-            real[i] = mags[i] * phases[i].cos();
-            imag[i] = mags[i] * phases[i].sin();
+            self.scratch_real[i] = self.scratch_mags[i] * self.scratch_phases[i].cos();
+            self.scratch_imag[i] = self.scratch_mags[i] * self.scratch_phases[i].sin();
         }
         // Mirror for negative frequencies.
         for i in 1..half {
-            real[FFT_SIZE - i] = real[i];
-            imag[FFT_SIZE - i] = -imag[i];
+            self.scratch_real[FFT_SIZE - i] = self.scratch_real[i];
+            self.scratch_imag[FFT_SIZE - i] = -self.scratch_imag[i];
         }
 
         // Inverse FFT.
-        fft_in_place(&mut real, &mut imag, true);
+        fft_in_place(&mut self.scratch_real, &mut self.scratch_imag, true);
 
         // Overlap-add into output buffer.
         let out_len = self.output_buf.len();
         for i in 0..FFT_SIZE {
             let idx = (self.input_pos + out_len - FFT_SIZE + i) % out_len;
-            self.output_buf[idx] += real[i] * self.window[i] * (2.0 / 3.0);
+            self.output_buf[idx] += self.scratch_real[i] * self.window[i] * (2.0 / 3.0);
         }
     }
 }
