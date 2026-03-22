@@ -42,7 +42,7 @@ export async function initMcpSync(
       nodeId: string;
       nodeType: string;
       position: { x: number; y: number };
-    }>("mcp:node-added", ({ nodeId, nodeType, position }) => {
+    }>("mcp-node-added", ({ nodeId, nodeType, position }) => {
       addNodeWithId(doc, nodeId, nodeType, position, nodeType);
       // For API-created nodes, the Yjs ID IS the backend numeric ID.
       useCanvasStore.getState().backendIds.set(nodeId, nodeId);
@@ -52,7 +52,7 @@ export async function initMcpSync(
 
   // mcp:node-removed — remove a node
   cleanups.push(
-    await listenForEvent<{ nodeId: string }>("mcp:node-removed", ({ nodeId }) => {
+    await listenForEvent<{ nodeId: string }>("mcp-node-removed", ({ nodeId }) => {
       removeNode(doc, nodeId);
       syncCanvas();
     }),
@@ -66,7 +66,7 @@ export async function initMcpSync(
       fromPort: string;
       toNode: string;
       toPort: string;
-    }>("mcp:connected", ({ fromNode, fromPort, toNode, toPort }) => {
+    }>("mcp-connected", ({ fromNode, fromPort, toNode, toPort }) => {
       connect(
         doc,
         { nodeId: fromNode, port: fromPort },
@@ -79,7 +79,7 @@ export async function initMcpSync(
   // mcp:disconnected — remove a connection
   cleanups.push(
     await listenForEvent<{ connectionId: string }>(
-      "mcp:disconnected",
+      "mcp-disconnected",
       ({ connectionId }) => {
         disconnect(doc, connectionId);
         syncCanvas();
@@ -93,7 +93,7 @@ export async function initMcpSync(
       nodeId: string;
       param: string;
       value: number;
-    }>("mcp:parameter-set", ({ nodeId, param, value }) => {
+    }>("mcp-parameter-set", ({ nodeId, param, value }) => {
       try {
         setParameter(doc, nodeId, param, value);
         syncCanvas();

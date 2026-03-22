@@ -221,14 +221,15 @@ fn api_add_node(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     }
 
     // Emit event to frontend so canvas can update.
-    let _ = handle.emit(
-        "mcp:node-added",
+    let emit_result = handle.emit(
+        "mcp-node-added",
         json!({
             "nodeId": node_id.0.to_string(),
             "nodeType": node_type,
             "position": {"x": x, "y": y},
         }),
     );
+    println!("[chord::api] emit mcp-node-added: {:?}", emit_result);
 
     json!({
         "node_id": node_id.0.to_string(),
@@ -262,7 +263,7 @@ fn api_remove_node(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     }
 
     let _ = recompile_and_swap(state);
-    let _ = handle.emit("mcp:node-removed", json!({"nodeId": id_str}));
+    let _ = handle.emit("mcp-node-removed", json!({"nodeId": id_str}));
 
     json!({"removed": id_str})
 }
@@ -335,7 +336,7 @@ fn api_connect(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     let _ = recompile_and_swap(state);
 
     let _ = handle.emit(
-        "mcp:connected",
+        "mcp-connected",
         json!({
             "connectionId": conn_id_str,
             "fromNode": from_node_str,
@@ -376,7 +377,7 @@ fn api_disconnect(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     }
 
     let _ = recompile_and_swap(state);
-    let _ = handle.emit("mcp:disconnected", json!({"connectionId": id}));
+    let _ = handle.emit("mcp-disconnected", json!({"connectionId": id}));
 
     json!({"removed": id})
 }
@@ -404,7 +405,7 @@ fn api_set_parameter(args: Value, state: &AppState, handle: &AppHandle) -> Value
     engine.set_parameter(node_id, &param, value);
 
     let _ = handle.emit(
-        "mcp:parameter-set",
+        "mcp-parameter-set",
         json!({
             "nodeId": node_id_str,
             "param": param,

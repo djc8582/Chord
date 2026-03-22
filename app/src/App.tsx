@@ -40,8 +40,11 @@ function App() {
     initMcpSync(doc, () => useCanvasStore.getState().syncFromDocument()).then(
       (cleanup) => {
         mcpCleanup = cleanup;
+        console.log("[chord] MCP sync listeners initialized");
       },
-    );
+    ).catch((err) => {
+      console.error("[chord] MCP sync init failed:", err);
+    });
 
     return () => {
       mcpCleanup?.();
