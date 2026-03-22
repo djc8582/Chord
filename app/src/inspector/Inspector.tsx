@@ -25,6 +25,9 @@ import type { BridgeCommands } from "../bridge/types.js";
 
 let bridgeRef: BridgeCommands | null = null;
 
+/** Node types that support loading audio files via load_audio_data. */
+const AUDIO_LOADABLE_TYPES = new Set(["granular", "sampler", "file_player"]);
+
 /**
  * Provide a bridge instance for the inspector to call setParameter on the
  * Rust backend. When running in tests or without Tauri, this can be omitted
@@ -67,6 +70,9 @@ export const Inspector: React.FC<InspectorProps> = ({
   // -- MIDI Learn state ---
   const [midiLearnActive, setMidiLearnActive] = useState(false);
   const [midiLearnParam, setMidiLearnParam] = useState<string | null>(null);
+
+  // -- Audio file loading state ---
+  const [loadedFileName, setLoadedFileName] = useState<string | null>(null);
 
   // Re-sync whenever canvas selection changes
   useEffect(() => {
@@ -138,10 +144,11 @@ export const Inspector: React.FC<InspectorProps> = ({
     [midiLearnActive, midiLearnParam],
   );
 
-  // Clear MIDI learn state when node selection changes
+  // Clear MIDI learn + file state when node selection changes
   useEffect(() => {
     setMidiLearnActive(false);
     setMidiLearnParam(null);
+    setLoadedFileName(null);
   }, [selectedNodeIds]);
 
   // ------- Empty state -------
@@ -296,6 +303,62 @@ export const Inspector: React.FC<InspectorProps> = ({
       ) : (
         <div style={{ fontSize: 12, color: "#666", fontStyle: "italic" }}>
           No parameters
+        </div>
+      )}
+
+      {/* Load Audio File button — shown for granular, sampler, etc. */}
+      {AUDIO_LOADABLE_TYPES.has(inspectedNode.type) && (
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={async () => {
+              if (!bridgeRef) return;
+              const nodeId = useInspectorStore.getState().inspectedNodeId;
+              if (!nodeId) return;
+              try {
+                // Use Tauri's file dialog
+                const { open } = await import("@tauri-apps/plugin-dialog");
+                const path = await open({
+                  filters: [{ name: "Audio", extensions: ["wav", "wave", "aif", "aiff"] }],
+                  multiple: false,
+                });
+                if (path) {
+                  const result = await bridgeRef.loadAudioFile(nodeId, path as string);
+                  if (result?.ok) {
+                    setLoadedFileName(
+                      (path as string).split("/").pop()?.split("\\").pop() ?? "loaded"
+                    );
+                  }
+                }
+              } catch {
+                // Dialog plugin not available — try prompt fallback
+                const path = window.prompt("Enter path to WAV file:");
+                if (path) {
+                  const result = await bridgeRef.loadAudioFile(nodeId, path);
+                  if (result?.ok) {
+                    setLoadedFileName(path.split("/").pop()?.split("\\").pop() ?? "loaded");
+                  }
+                }
+              }
+            }}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#e2e8f0",
+              backgroundColor: "#1e3a5f",
+              border: "1px solid #2563eb",
+              borderRadius: 4,
+              cursor: "pointer",
+            }}
+          >
+            Load Audio File
+          </button>
+          {loadedFileName && (
+            <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
+              {loadedFileName}
+            </div>
+          )}
         </div>
       )}
 

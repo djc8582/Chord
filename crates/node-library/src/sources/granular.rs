@@ -305,16 +305,15 @@ impl AudioNode for GranularNode {
     }
 
     fn reset(&mut self) {
-        for s in &mut self.buffer {
-            *s = 0.0;
-        }
-        self.write_pos = 0;
-        self.samples_written = 0;
+        // Do NOT clear the buffer — it may contain loaded audio file data
+        // that the user expects to persist across stop/play cycles.
+        // Only reset playback state.
         for grain in &mut self.grains {
             *grain = Grain::inactive();
         }
         self.spawn_accumulator = 0.0;
         self.rng_state = 54321;
+        // Keep write_pos and samples_written so loaded data stays accessible.
     }
 
     fn tail_length(&self) -> u32 {
