@@ -8,7 +8,8 @@ use chord_dsp_runtime::{AudioNode, ProcessContext, ProcessResult, ProcessStatus}
 
 /// Maximum impulse response length in samples (~2 seconds at 48kHz).
 const MAX_IR_LENGTH: usize = 96000;
-/// Partition size for the convolution.
+/// Partition size for the convolution (used when partitioned overlap-add is implemented).
+#[allow(dead_code)]
 const PARTITION_SIZE: usize = 256;
 
 /// Convolution Reverb node.
@@ -99,7 +100,8 @@ impl ConvolutionReverb {
         }
     }
 
-    /// Simple LCG random
+    /// Simple LCG random (reserved for future IR generation).
+    #[allow(dead_code)]
     fn next_random(&mut self) -> f32 {
         self.rng = self.rng.wrapping_mul(1103515245).wrapping_add(12345);
         (self.rng as f32 / u32::MAX as f32) * 2.0 - 1.0

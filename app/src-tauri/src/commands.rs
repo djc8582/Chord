@@ -364,7 +364,7 @@ pub fn sync_and_play(
         // Set default parameters + any provided values.
         {
             let desc = build_node_descriptor(&n.node_type);
-            let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+            let engine = state.engine.lock().map_err(|e| e.to_string())?;
             for param in &desc.parameters {
                 engine.set_parameter(node_id, &param.id, param.default);
             }
@@ -977,6 +977,7 @@ pub fn export_patch(
 /// Resolve a node ID string to a `NodeId`.
 /// Accepts either a numeric string ("42") or a frontend Yjs ID ("mn26z15d-0-7bzmz1").
 /// Frontend IDs are looked up in the `frontend_id_map`.
+#[allow(dead_code)]
 fn parse_node_id(id: &str) -> Result<NodeId, String> {
     // Try numeric parse first (fast path for API calls).
     if let Ok(n) = id.parse::<u64>() {

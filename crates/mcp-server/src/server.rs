@@ -1506,8 +1506,8 @@ impl ChordMcpServer {
             }
             _ => {
                 // Melodic/pad/texture: [clock → sequencer →] source → filter → gain
-                let mut last_id;
-                let mut last_out_port;
+                let last_id;
+                let last_out_port;
 
                 // Optionally add a sequencer.
                 if let Some(seq_type) = &layer.sequencer {
@@ -1786,7 +1786,7 @@ impl ChordMcpServer {
     fn tool_load_patch_file(&mut self, args: &Value) -> McpResult<Value> {
         let json_str = get_string(args, "patch_json")?;
         let patch_file = PatchFile::from_json(&json_str)
-            .map_err(|e| McpError::InvalidArguments(e))?;
+            .map_err(McpError::InvalidArguments)?;
 
         // Create a new patch.
         let patch_id = format!("patch_{}", self.next_patch_id);

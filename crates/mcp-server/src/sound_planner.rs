@@ -32,7 +32,7 @@ pub fn plan_synthesis(analysis: &SoundAnalysis) -> PatchRecipe {
             octave: freq_to_octave(analysis.fundamental_freq.unwrap_or(440.0)),
             waveform: waveform as u32,
             volume: 0.5,
-            filter_cutoff: analysis.spectral_centroid.min(10000.0).max(200.0),
+            filter_cutoff: analysis.spectral_centroid.clamp(200.0, 10000.0),
             filter_resonance: 1.5,
             sequencer: None,
             sequencer_params: HashMap::new(),
@@ -75,7 +75,7 @@ pub fn plan_synthesis(analysis: &SoundAnalysis) -> PatchRecipe {
             octave: 0,
             waveform: 0,
             volume: noise_vol,
-            filter_cutoff: analysis.spectral_centroid.min(8000.0).max(200.0),
+            filter_cutoff: analysis.spectral_centroid.clamp(200.0, 8000.0),
             filter_resonance: 1.0,
             sequencer: None,
             sequencer_params: HashMap::new(),
@@ -91,7 +91,7 @@ pub fn plan_synthesis(analysis: &SoundAnalysis) -> PatchRecipe {
             octave: 0,
             waveform: 0,
             volume: 0.3,
-            filter_cutoff: analysis.spectral_centroid.min(5000.0).max(100.0),
+            filter_cutoff: analysis.spectral_centroid.clamp(100.0, 5000.0),
             filter_resonance: 2.0,
             sequencer: None,
             sequencer_params: HashMap::new(),
@@ -193,9 +193,7 @@ pub fn classify_sound(description: &str) -> SoundCategory {
         SoundCategory::SciFi
     } else if contains_any(&desc, &["step", "walk", "footstep", "foot"]) {
         SoundCategory::Footstep
-    } else if contains_any(&desc, &["door", "creak", "knock", "slam"]) {
-        SoundCategory::Mechanical
-    } else if contains_any(&desc, &["engine", "motor", "machine", "servo"]) {
+    } else if contains_any(&desc, &["door", "creak", "knock", "slam", "engine", "motor", "machine", "servo"]) {
         SoundCategory::Mechanical
     } else if contains_any(&desc, &["thunder", "explosion", "boom", "crash"]) {
         SoundCategory::Explosion

@@ -16,7 +16,7 @@ use std::sync::Arc;
 use chord_audio_graph::{CompiledGraph, Connection, NodeId, PortId};
 
 use crate::node::{AudioNode, DiagnosticProbe, NodeFactory, ProcessContext};
-use crate::parameter::{ParameterChange, ParameterState, DEFAULT_SMOOTHING_SAMPLES};
+use crate::parameter::{ParameterChange, ParameterState};
 use crate::ring_buffer::SpscRingBuffer;
 use crate::sanitize::{sanitize_buffer, set_ftz_daz};
 use crate::transport::TransportState;
@@ -377,7 +377,7 @@ impl AudioEngine {
     ///
     /// This is the HOT PATH. Everything in here follows the hard rules:
     /// zero allocation, zero locking, zero blocking.
-    pub fn process(&mut self, input: &AudioBuffer, output: &mut AudioBuffer) {
+    pub fn process(&mut self, _input: &AudioBuffer, output: &mut AudioBuffer) {
         // Step 0: Set FTZ/DAZ flags for denormal protection.
         set_ftz_daz();
 

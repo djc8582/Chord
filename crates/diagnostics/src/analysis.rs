@@ -559,7 +559,7 @@ fn measure_noise_ratio(audio: &[f32], harmonics: &[Harmonic], sr: f64) -> f64 {
     }
 
     let noise_energy = total_energy - harmonic_energy;
-    (noise_energy / total_energy).max(0.0).min(1.0)
+    (noise_energy / total_energy).clamp(0.0, 1.0)
 }
 
 // ─── Vibrato Detection ───

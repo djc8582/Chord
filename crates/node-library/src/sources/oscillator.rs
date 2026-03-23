@@ -105,7 +105,7 @@ impl AudioNode for Oscillator {
         let detune_mult = (2.0_f64).powf(detune_cents / 1200.0);
 
         let sr = ctx.sample_rate;
-        let has_fm_input = ctx.inputs.len() > 0 && !ctx.inputs[0].is_empty();
+        let has_fm_input = !ctx.inputs.is_empty() && !ctx.inputs[0].is_empty();
         let has_am_input = ctx.inputs.len() > 1 && !ctx.inputs[1].is_empty();
         let has_freq_input = ctx.inputs.len() > 2 && !ctx.inputs[2].is_empty();
 

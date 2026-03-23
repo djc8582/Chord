@@ -216,7 +216,7 @@ fn api_add_node(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     // Create DSP instance and register with engine.
     if let Some(audio_node) = state.registry.create(&node_type) {
         let desc = build_node_descriptor(&node_type);
-        let mut engine = state.engine.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         for param in &desc.parameters {
             engine.set_parameter(node_id, &param.id, param.default);
         }
@@ -225,7 +225,7 @@ fn api_add_node(args: Value, state: &AppState, handle: &AppHandle) -> Value {
         if engine.transport().playing {
             engine.register_node(node_id, audio_node);
         } else {
-            let mut instances = state.node_instances.lock().unwrap();
+            let mut instances = state.node_instances.lock().unwrap_or_else(|e| e.into_inner());
             instances.insert(node_id, audio_node);
         }
     }
@@ -263,15 +263,15 @@ fn api_remove_node(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     };
 
     {
-        let mut graph = state.graph.lock().unwrap();
+        let mut graph = state.graph.lock().unwrap_or_else(|e| e.into_inner());
         graph.remove_node(&node_id);
     }
     {
-        let mut instances = state.node_instances.lock().unwrap();
+        let mut instances = state.node_instances.lock().unwrap_or_else(|e| e.into_inner());
         instances.remove(&node_id);
     }
     {
-        let mut engine = state.engine.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         engine.remove_node(&node_id);
     }
 
@@ -309,7 +309,7 @@ fn api_connect(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     };
 
     let conn_id = {
-        let mut graph = state.graph.lock().unwrap();
+        let mut graph = state.graph.lock().unwrap_or_else(|e| e.into_inner());
 
         // Look up port IDs by name.
         let from_port_id = match graph
@@ -342,7 +342,7 @@ fn api_connect(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     // Store connection ID mapping.
     let conn_id_str = conn_id.0.to_string();
     {
-        let mut conn_ids = state.connection_ids.lock().unwrap();
+        let mut conn_ids = state.connection_ids.lock().unwrap_or_else(|e| e.into_inner());
         conn_ids.insert(conn_id_str.clone(), conn_id);
     }
 
@@ -373,7 +373,7 @@ fn api_disconnect(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     };
 
     let conn_id = {
-        let conn_ids = state.connection_ids.lock().unwrap();
+        let conn_ids = state.connection_ids.lock().unwrap_or_else(|e| e.into_inner());
         match conn_ids.get(&id).copied() {
             Some(c) => c,
             None => return json!({"error": format!("Unknown connection ID: {id}")}),
@@ -381,11 +381,11 @@ fn api_disconnect(args: Value, state: &AppState, handle: &AppHandle) -> Value {
     };
 
     {
-        let mut graph = state.graph.lock().unwrap();
+        let mut graph = state.graph.lock().unwrap_or_else(|e| e.into_inner());
         graph.disconnect(&conn_id);
     }
     {
-        let mut conn_ids = state.connection_ids.lock().unwrap();
+        let mut conn_ids = state.connection_ids.lock().unwrap_or_else(|e| e.into_inner());
         conn_ids.remove(&id);
     }
 
@@ -414,7 +414,7 @@ fn api_set_parameter(args: Value, state: &AppState, handle: &AppHandle) -> Value
         Err(_) => return json!({"error": "Invalid node ID"}),
     };
 
-    let engine = state.engine.lock().unwrap();
+    let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     engine.set_parameter(node_id, &param, value);
 
     let _ = handle.emit(
@@ -451,8 +451,8 @@ fn api_play(state: &AppState) -> Value {
 
     // Move node instances into the engine.
     {
-        let mut engine = state.engine.lock().unwrap();
-        let mut instances = state.node_instances.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+        let mut instances = state.node_instances.lock().unwrap_or_else(|e| e.into_inner());
 
         let node_ids: Vec<NodeId> = instances.keys().copied().collect();
         for nid in node_ids {
@@ -467,12 +467,12 @@ fn api_play(state: &AppState) -> Value {
 
     // Open audio stream.
     {
-        let mut stream_guard = state.audio_stream.lock().unwrap();
+        let mut stream_guard = state.audio_stream.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(existing) = stream_guard.take() {
             existing.stop();
         }
 
-        let audio_host = state.audio_host.lock().unwrap();
+        let audio_host = state.audio_host.lock().unwrap_or_else(|e| e.into_inner());
         let stream_config = chord_audio_io::StreamConfig::default();
         match audio_host.open_stream(stream_config, Arc::clone(&state.engine)) {
             Ok(stream) => {
@@ -487,21 +487,21 @@ fn api_play(state: &AppState) -> Value {
 
 fn api_stop(state: &AppState) -> Value {
     {
-        let mut engine = state.engine.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         engine.transport_mut().stop();
         engine.reset_all_nodes();
     }
     {
-        let mut stream_guard = state.audio_stream.lock().unwrap();
+        let mut stream_guard = state.audio_stream.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(stream) = stream_guard.take() {
             stream.stop();
         }
     }
     // Move nodes back out of engine.
     {
-        let mut engine = state.engine.lock().unwrap();
-        let graph = state.graph.lock().unwrap();
-        let mut instances = state.node_instances.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+        let graph = state.graph.lock().unwrap_or_else(|e| e.into_inner());
+        let mut instances = state.node_instances.lock().unwrap_or_else(|e| e.into_inner());
         for nid in graph.nodes().keys() {
             if let Some(node) = engine.remove_node(nid) {
                 instances.insert(*nid, node);
@@ -577,13 +577,13 @@ fn api_get_patch(state: &AppState) -> Value {
 }
 
 fn api_get_waveform_data(state: &AppState) -> Value {
-    let engine = state.engine.lock().unwrap();
+    let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let buffer = engine.get_last_output_buffer();
     json!(buffer)
 }
 
 fn api_get_signal_stats(state: &AppState) -> Value {
-    let engine = state.engine.lock().unwrap();
+    let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let buffer = engine.get_last_output_buffer();
 
     if buffer.is_empty() {
@@ -671,7 +671,7 @@ fn api_add_modulation(args: Value, state: &AppState) -> Value {
 
     // Resolve the source port name to a port index.
     let src_port_idx = {
-        let graph = state.graph.lock().unwrap();
+        let graph = state.graph.lock().unwrap_or_else(|e| e.into_inner());
         let node_desc = match graph.node(&src_nid) {
             Some(d) => d,
             None => return json!({"error": format!("Source node not found: {source_node_str}")}),
@@ -704,7 +704,7 @@ fn api_add_modulation(args: Value, state: &AppState) -> Value {
     };
 
     {
-        let mut mod_routes = state.modulation_routes.lock().unwrap();
+        let mut mod_routes = state.modulation_routes.lock().unwrap_or_else(|e| e.into_inner());
         mod_routes.push(route);
     }
 
@@ -720,7 +720,7 @@ fn api_remove_modulation(args: Value, state: &AppState) -> Value {
     };
 
     {
-        let mut mod_routes = state.modulation_routes.lock().unwrap();
+        let mut mod_routes = state.modulation_routes.lock().unwrap_or_else(|e| e.into_inner());
         let before_len = mod_routes.len();
         mod_routes.retain(|r| r.id != id);
         if mod_routes.len() == before_len {
@@ -783,7 +783,7 @@ fn api_load_audio_file(args: Value, state: &AppState) -> Value {
 
     // Try engine nodes first (if playing).
     {
-        let mut engine = state.engine.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         if engine.load_audio_into_node(node_id, &samples, sample_rate) {
             return json!({
                 "ok": true,
@@ -796,7 +796,7 @@ fn api_load_audio_file(args: Value, state: &AppState) -> Value {
 
     // Try pending instances.
     {
-        let mut instances = state.node_instances.lock().unwrap();
+        let mut instances = state.node_instances.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(node) = instances.get_mut(&node_id) {
             if node.load_audio_data(&samples, sample_rate) {
                 return json!({
@@ -873,15 +873,15 @@ fn api_load_patch_file(args: Value, state: &AppState, handle: &AppHandle) -> Val
 
     // Clear the existing graph.
     {
-        let mut graph = state.graph.lock().unwrap();
+        let mut graph = state.graph.lock().unwrap_or_else(|e| e.into_inner());
         *graph = chord_audio_graph::Graph::new();
     }
     {
-        let mut instances = state.node_instances.lock().unwrap();
+        let mut instances = state.node_instances.lock().unwrap_or_else(|e| e.into_inner());
         instances.clear();
     }
     {
-        let mut conn_ids = state.connection_ids.lock().unwrap();
+        let mut conn_ids = state.connection_ids.lock().unwrap_or_else(|e| e.into_inner());
         conn_ids.clear();
     }
 
