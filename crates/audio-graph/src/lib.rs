@@ -37,10 +37,12 @@
 mod types;
 mod graph;
 mod compiler;
+pub mod patch_format;
 
 pub use types::*;
 pub use graph::*;
 pub use compiler::*;
+pub use patch_format::PatchFile;
 
 #[cfg(test)]
 mod tests;

@@ -12,6 +12,7 @@ members = [
     "crates/mcp-server",
     "crates/scripting-runtime",
     "crates/testing-framework",
+    "crates/chord-wasm",
     "app/src-tauri",
 ]
 

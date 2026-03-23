@@ -10,7 +10,8 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::thread;
 
-use chord_audio_graph::{GraphCompiler, NodeId};
+use chord_audio_graph::{GraphCompiler, NodeId, PatchFile};
+use chord_audio_graph::patch_format::{ConnectionEntry, NodeEntry, Position};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
@@ -158,6 +159,8 @@ fn route(path: &str, args: Value, state: &AppState, handle: &AppHandle) -> Value
         "/api/v1/add_modulation" => api_add_modulation(args, state),
         "/api/v1/remove_modulation" => api_remove_modulation(args, state),
         "/api/v1/load_audio_file" => api_load_audio_file(args, state),
+        "/api/v1/save_patch_file" => api_save_patch_file(state),
+        "/api/v1/load_patch_file" => api_load_patch_file(args, state, handle),
         _ => json!({"error": format!("Unknown endpoint: {path}")}),
     }
 }
@@ -807,6 +810,139 @@ fn api_load_audio_file(args: Value, state: &AppState) -> Value {
     }
 
     json!({"error": format!("Node {} does not support audio loading", node_id_str)})
+}
+
+// ---------------------------------------------------------------------------
+// Portable patch file endpoints
+// ---------------------------------------------------------------------------
+
+fn api_save_patch_file(state: &AppState) -> Value {
+    let graph = match state.graph.lock() {
+        Ok(g) => g,
+        Err(e) => return json!({"error": e.to_string()}),
+    };
+
+    let mut patch_file = PatchFile::new("patch");
+
+    // Serialize all nodes.
+    for (node_id, desc) in graph.nodes() {
+        let entry = NodeEntry {
+            id: node_id.0.to_string(),
+            node_type: desc.node_type.clone(),
+            params: desc.parameters.iter().map(|p| (p.id.clone(), p.value)).collect(),
+            position: Position { x: desc.position.0, y: desc.position.1 },
+            name: String::new(),
+        };
+        patch_file.nodes.push(entry);
+    }
+
+    // Serialize connections using port names for portability.
+    for conn in graph.connections() {
+        let from_port_name = graph.node(&conn.from_node)
+            .and_then(|n| n.outputs.iter().find(|p| p.id == conn.from_port).map(|p| p.name.clone()))
+            .unwrap_or_else(|| conn.from_port.0.to_string());
+        let to_port_name = graph.node(&conn.to_node)
+            .and_then(|n| n.inputs.iter().find(|p| p.id == conn.to_port).map(|p| p.name.clone()))
+            .unwrap_or_else(|| conn.to_port.0.to_string());
+
+        patch_file.connections.push(ConnectionEntry {
+            from: format!("{}:{}", conn.from_node.0, from_port_name),
+            to: format!("{}:{}", conn.to_node.0, to_port_name),
+        });
+    }
+
+    patch_file.metadata.created_by = "chord-app".into();
+
+    json!({
+        "patch_json": patch_file.to_json(),
+        "node_count": patch_file.nodes.len(),
+        "connection_count": patch_file.connections.len(),
+    })
+}
+
+fn api_load_patch_file(args: Value, state: &AppState, handle: &AppHandle) -> Value {
+    let json_str = match args.get("patch_json").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => return json!({"error": "Missing 'patch_json'"}),
+    };
+
+    let patch_file = match PatchFile::from_json(&json_str) {
+        Ok(pf) => pf,
+        Err(e) => return json!({"error": e}),
+    };
+
+    // Clear the existing graph.
+    {
+        let mut graph = state.graph.lock().unwrap();
+        *graph = chord_audio_graph::Graph::new();
+    }
+    {
+        let mut instances = state.node_instances.lock().unwrap();
+        instances.clear();
+    }
+    {
+        let mut conn_ids = state.connection_ids.lock().unwrap();
+        conn_ids.clear();
+    }
+
+    // Add all nodes, tracking old ID -> new node ID mapping.
+    let mut id_map: std::collections::HashMap<String, NodeId> = std::collections::HashMap::new();
+    for node_entry in &patch_file.nodes {
+        let result = api_add_node(
+            json!({
+                "node_type": node_entry.node_type,
+                "position": {"x": node_entry.position.x, "y": node_entry.position.y}
+            }),
+            state,
+            handle,
+        );
+        if let Some(nid_str) = result.get("node_id").and_then(|v| v.as_str()) {
+            if let Ok(nid) = nid_str.parse::<u64>() {
+                id_map.insert(node_entry.id.clone(), NodeId(nid));
+                // Set parameters.
+                for (param, value) in &node_entry.params {
+                    api_set_parameter(
+                        json!({
+                            "node_id": nid_str,
+                            "param": param,
+                            "value": value
+                        }),
+                        state,
+                        handle,
+                    );
+                }
+            }
+        }
+    }
+
+    // Add connections using port names.
+    let mut connections_loaded = 0;
+    for conn in &patch_file.connections {
+        let (from_id_str, from_port_name) = conn.from.split_once(':').unwrap_or(("", ""));
+        let (to_id_str, to_port_name) = conn.to.split_once(':').unwrap_or(("", ""));
+
+        if let (Some(&from_nid), Some(&to_nid)) = (id_map.get(from_id_str), id_map.get(to_id_str)) {
+            let result = api_connect(
+                json!({
+                    "from_node": from_nid.0.to_string(),
+                    "from_port": from_port_name,
+                    "to_node": to_nid.0.to_string(),
+                    "to_port": to_port_name
+                }),
+                state,
+                handle,
+            );
+            if result.get("error").is_none() {
+                connections_loaded += 1;
+            }
+        }
+    }
+
+    json!({
+        "name": patch_file.name,
+        "nodes_loaded": id_map.len(),
+        "connections_loaded": connections_loaded,
+    })
 }
 
 // ---------------------------------------------------------------------------

@@ -31,6 +31,9 @@ fn list_tools_returns_all_expected_tools() {
         "auto_fix",
         "create_from_description",
         "modify_patch",
+        "save_patch_file",
+        "load_patch_file",
+        "recreate_sound",
     ];
 
     assert_eq!(tools.len(), expected_names.len());

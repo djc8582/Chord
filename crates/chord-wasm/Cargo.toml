@@ -1,0 +1,20 @@
+[package]
+name = "chord-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+chord-audio-graph = { path = "../audio-graph" }
+chord-dsp-runtime = { path = "../dsp-runtime" }
+chord-node-library = { path = "../node-library" }
+chord-diagnostics = { path = "../diagnostics" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
