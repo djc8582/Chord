@@ -21,6 +21,16 @@
  *   createAudioBackground()  Audio-reactive gradient background
  *   createAudioLoader()      Audio-reactive loading spinner
  *
+ * Wave 5 — Advanced:
+ *   createSpectrogram()   Time-frequency heatmap
+ *   createStereoField()   Goniometer/vectorscope
+ *   createTerrain()       3D landscape from spectrum
+ *   createNetwork()       Constellation/network graph
+ *
+ * Wave 6 — Composition:
+ *   createNodeGraph()     Signal flow visualization
+ *   createSequencerGrid() Universal sequencer display
+ *
  * Analysis:
  *   getAnalysisFrame()  Extract analysis from Chord engine
  *
@@ -54,3 +64,13 @@ export { createKaleidoscope, type KaleidoscopeOptions } from './Kaleidoscope.js'
 // Wave 4 — UI Primitives
 export { createAudioBackground, type AudioBackgroundOptions } from './AudioBackground.js';
 export { createAudioLoader, type AudioLoaderOptions } from './AudioLoader.js';
+
+// Wave 5 — Advanced
+export { createSpectrogram, type SpectrogramOptions } from './Spectrogram.js';
+export { createStereoField, type StereoFieldOptions } from './StereoField.js';
+export { createTerrain, type TerrainOptions } from './Terrain.js';
+export { createNetwork, type NetworkOptions } from './Network.js';
+
+// Wave 6 — Composition
+export { createNodeGraph, type NodeGraphOptions } from './NodeGraph.js';
+export { createSequencerGrid, type SequencerGridOptions } from './SequencerGrid.js';

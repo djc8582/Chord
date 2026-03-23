@@ -45,4 +45,12 @@ export {
   // Wave 4 — UI Primitives
   createAudioBackground, type AudioBackgroundOptions,
   createAudioLoader, type AudioLoaderOptions,
+  // Wave 5 — Advanced
+  createSpectrogram, type SpectrogramOptions,
+  createStereoField, type StereoFieldOptions,
+  createTerrain, type TerrainOptions,
+  createNetwork, type NetworkOptions,
+  // Wave 6 — Composition
+  createNodeGraph, type NodeGraphOptions,
+  createSequencerGrid, type SequencerGridOptions,
 } from './visualizers/index.js';
