@@ -6,7 +6,7 @@
  * provides the node search palette.
  *
  * Keyboard shortcuts:
- *   N / Cmd+K      — Open node search palette
+ *   N              — Open node search palette
  *   Delete/Backspace — Delete selected nodes/edges
  *   Cmd+A          — Select all
  *   Cmd+C          — Copy selected
@@ -22,6 +22,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import {
   ReactFlow,
@@ -74,8 +75,17 @@ function CanvasInner() {
   const copySelected = useCanvasStore((s) => s.copySelected);
   const pasteClipboard = useCanvasStore((s) => s.pasteClipboard);
   const duplicateSelected = useCanvasStore((s) => s.duplicateSelected);
+  const undo = useCanvasStore((s) => s.undo);
+  const redo = useCanvasStore((s) => s.redo);
   const reactFlowInstance = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number} | null>(null);
+
+  // Right-click context menu on empty canvas space
+  const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
 
   // Get viewport center for node spawning
   const getViewportCenter = useCallback((): { x: number; y: number } => {
@@ -111,13 +121,6 @@ function CanvasInner() {
 
       // N — open search
       if (e.key === "n" && !isMod && !searchOpen) {
-        e.preventDefault();
-        openSearch();
-        return;
-      }
-
-      // Cmd+K — open search
-      if (e.key === "k" && isMod) {
         e.preventDefault();
         openSearch();
         return;
@@ -169,6 +172,20 @@ function CanvasInner() {
         duplicateSelected();
         return;
       }
+
+      // Cmd+Z — undo
+      if (e.key === "z" && isMod && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+        return;
+      }
+
+      // Cmd+Shift+Z — redo
+      if (e.key === "z" && isMod && e.shiftKey) {
+        e.preventDefault();
+        redo();
+        return;
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -183,6 +200,8 @@ function CanvasInner() {
     copySelected,
     pasteClipboard,
     duplicateSelected,
+    undo,
+    redo,
   ]);
 
   // Handle selection changes from React Flow
@@ -210,6 +229,7 @@ function CanvasInner() {
         height: "100%",
         background: "#ede9fe",
       }}
+      onClick={() => setContextMenu(null)}
     >
       <ReactFlow
         nodes={nodes}
@@ -218,6 +238,7 @@ function CanvasInner() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
+        onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}
         defaultViewport={DEFAULT_VIEWPORT}
         fitView={false}
@@ -290,6 +311,45 @@ function CanvasInner() {
 
       {/* Node search palette overlay */}
       <NodeSearchPalette spawnPosition={spawnPosition} />
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            background: '#fffef0',
+            border: '3px solid #000',
+            borderRadius: 8,
+            padding: 4,
+            zIndex: 1000,
+            fontFamily: '"JetBrains Mono", monospace',
+            fontSize: 13,
+            fontWeight: 700,
+            boxShadow: '4px 4px 0px #000',
+            minWidth: 160,
+          }}
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          <div
+            style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: 4 }}
+            onClick={() => { openSearch(); setContextMenu(null); }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#c8ff00')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            Add Node...
+          </div>
+          <div
+            style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: 4 }}
+            onClick={() => { selectAll(); setContextMenu(null); }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#c8ff00')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            Select All
+          </div>
+        </div>
+      )}
     </div>
   );
 }

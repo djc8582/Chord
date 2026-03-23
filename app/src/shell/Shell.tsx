@@ -88,11 +88,22 @@ export function Shell({ children, panelContent }: ShellProps) {
   }, { label: "New Patch", category: "File", shortcut: "mod+n" });
 
   useCommand("file.open", () => {
-    _bridge.loadPatch("").catch(console.error);
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke("load_patch_dialog").then(() => {
+        // Reload the canvas from backend
+        window.location.reload();
+      }).catch((e: any) => {
+        if (e !== "Open cancelled") console.error("Open failed:", e);
+      });
+    });
   }, { label: "Open Patch", category: "File", shortcut: "mod+o" });
 
   useCommand("file.save", () => {
-    _bridge.savePatch("").catch(console.error);
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke("save_patch_dialog").catch((e: any) => {
+        if (e !== "Save cancelled") console.error("Save failed:", e);
+      });
+    });
   }, { label: "Save Patch", category: "File", shortcut: "mod+s" });
 
   // ---------------------------------------------------------------------------

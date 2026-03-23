@@ -19,6 +19,7 @@ import {
   connect as dmConnect,
   disconnect as dmDisconnect,
   setNodePosition as dmSetNodePosition,
+  createUndoManager,
 } from "@chord/document-model";
 import type { BridgeCommands } from "../bridge/types.js";
 
@@ -587,6 +588,9 @@ export interface CanvasStore {
   // Yjs document reference
   ydoc: Y.Doc;
 
+  // Yjs UndoManager for undo/redo on nodes and connections
+  undoManager: Y.UndoManager | null;
+
   // Maps frontend Yjs node IDs to backend numeric IDs (returned by Rust).
   // Without this mapping, bridge calls like setParameter silently fail because
   // the backend can't parse Yjs-style IDs as u64.
@@ -637,6 +641,10 @@ export interface CanvasStore {
   pasteClipboard: (offset?: XYPosition) => void;
   duplicateSelected: () => void;
 
+  // Undo/Redo
+  undo: () => void;
+  redo: () => void;
+
   // Sync: rebuild from Yjs doc
   syncFromDocument: () => void;
 
@@ -655,6 +663,7 @@ export interface CanvasStore {
 
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   ydoc: createPatchDocument(),
+  undoManager: null,
   backendIds: new Map<string, string>(),
   nodes: [],
   edges: [],
@@ -921,6 +930,22 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     store.pasteClipboard({ x: 50, y: 50 });
   },
 
+  undo: () => {
+    const um = get().undoManager;
+    if (um) {
+      um.undo();
+      get().syncFromDocument();
+    }
+  },
+
+  redo: () => {
+    const um = get().undoManager;
+    if (um) {
+      um.redo();
+      get().syncFromDocument();
+    }
+  },
+
   syncFromDocument: () => {
     const store = get();
     const patch = getPatchDocument(store.ydoc);
@@ -955,7 +980,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   initDocument: (doc) => {
-    set({ ydoc: doc });
+    const um = createUndoManager(doc);
+    set({ ydoc: doc, undoManager: um });
     const store = get();
     store.syncFromDocument();
 

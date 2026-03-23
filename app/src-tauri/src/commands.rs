@@ -947,6 +947,147 @@ pub fn save_patch(path: String, state: State<'_, AppArc>) -> Result<(), String> 
     Ok(())
 }
 
+/// Save the current patch to a file, opening a native save dialog.
+#[tauri::command]
+pub fn save_patch_dialog(state: State<'_, AppArc>) -> Result<String, String> {
+    log::info("save_patch_dialog", "opening save dialog");
+
+    let path = rfd::FileDialog::new()
+        .add_filter("Chord Patch", &["chord.json", "json"])
+        .set_title("Save Patch")
+        .save_file()
+        .ok_or_else(|| "Save cancelled".to_string())?;
+
+    let path_str = path.to_string_lossy().to_string();
+
+    // Serialize the graph to PatchFile JSON
+    let graph = state.graph.lock().map_err(|e| e.to_string())?;
+    let mut patch_file = chord_audio_graph::PatchFile::new("patch");
+
+    for (node_id, desc) in graph.nodes() {
+        use chord_audio_graph::patch_format::{NodeEntry, Position};
+        patch_file.nodes.push(NodeEntry {
+            id: node_id.0.to_string(),
+            node_type: desc.node_type.clone(),
+            params: desc.parameters.iter().map(|p| (p.id.clone(), p.value)).collect(),
+            position: Position { x: desc.position.0, y: desc.position.1 },
+            name: String::new(),
+        });
+    }
+
+    for conn in graph.connections() {
+        use chord_audio_graph::patch_format::ConnectionEntry;
+        let from_port = graph.node(&conn.from_node)
+            .and_then(|n| n.outputs.iter().find(|p| p.id == conn.from_port).map(|p| p.name.clone()))
+            .unwrap_or_default();
+        let to_port = graph.node(&conn.to_node)
+            .and_then(|n| n.inputs.iter().find(|p| p.id == conn.to_port).map(|p| p.name.clone()))
+            .unwrap_or_default();
+        patch_file.connections.push(ConnectionEntry {
+            from: format!("{}:{}", conn.from_node.0, from_port),
+            to: format!("{}:{}", conn.to_node.0, to_port),
+        });
+    }
+
+    drop(graph); // release lock before file I/O
+
+    let json = patch_file.to_json();
+    std::fs::write(&path_str, &json).map_err(|e| format!("Failed to write: {e}"))?;
+
+    Ok(path_str)
+}
+
+/// Load a patch from a file, opening a native open dialog.
+#[tauri::command]
+pub fn load_patch_dialog(state: State<'_, AppArc>, handle: tauri::AppHandle) -> Result<String, String> {
+    log::info("load_patch_dialog", "opening load dialog");
+
+    let path = rfd::FileDialog::new()
+        .add_filter("Chord Patch", &["chord.json", "json"])
+        .set_title("Open Patch")
+        .pick_file()
+        .ok_or_else(|| "Open cancelled".to_string())?;
+
+    let path_str = path.to_string_lossy().to_string();
+    let json = std::fs::read_to_string(&path_str).map_err(|e| format!("Failed to read: {e}"))?;
+
+    let patch_file = chord_audio_graph::PatchFile::from_json(&json)
+        .map_err(|e| format!("Invalid patch: {e}"))?;
+
+    // Clear existing graph
+    {
+        let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
+        *graph = Graph::new();
+    }
+    {
+        let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+        instances.clear();
+    }
+
+    // Rebuild from patch file
+    let mut id_map = std::collections::HashMap::new();
+
+    for node_entry in &patch_file.nodes {
+        let mut descriptor = build_node_descriptor(&node_entry.node_type);
+        descriptor.position = (node_entry.position.x, node_entry.position.y);
+        let node_id = descriptor.id;
+
+        // Set parameter values on the descriptor
+        for param in &mut descriptor.parameters {
+            if let Some(&val) = node_entry.params.get(&param.id) {
+                param.value = val;
+                param.default = val;
+            }
+        }
+
+        id_map.insert(node_entry.id.clone(), node_id);
+
+        {
+            let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
+            graph.add_node(descriptor);
+        }
+
+        // Create DSP instance
+        if let Some(audio_node) = state.registry.create(&node_entry.node_type) {
+            let engine = state.engine.lock().map_err(|e| e.to_string())?;
+            for (param_name, &value) in &node_entry.params {
+                engine.set_parameter(node_id, param_name, value as f64);
+            }
+            let mut instances = state.node_instances.lock().map_err(|e| e.to_string())?;
+            instances.insert(node_id, audio_node);
+        }
+    }
+
+    // Add connections
+    for conn in &patch_file.connections {
+        let (from_id_str, from_port) = conn.from.split_once(':').unwrap_or(("", ""));
+        let (to_id_str, to_port) = conn.to.split_once(':').unwrap_or(("", ""));
+
+        if let (Some(&from_nid), Some(&to_nid)) = (id_map.get(from_id_str), id_map.get(to_id_str)) {
+            let mut graph = state.graph.lock().map_err(|e| e.to_string())?;
+
+            let from_port_id = graph.node(&from_nid)
+                .and_then(|n| n.outputs.iter().find(|p| p.name == from_port).map(|p| p.id));
+            let to_port_id = graph.node(&to_nid)
+                .and_then(|n| n.inputs.iter().find(|p| p.name == to_port).map(|p| p.id));
+
+            if let (Some(fp), Some(tp)) = (from_port_id, to_port_id) {
+                let _ = graph.connect(from_nid, fp, to_nid, tp);
+            }
+        }
+    }
+
+    // Emit event to frontend to sync canvas
+    use tauri::Emitter;
+    let _ = handle.emit("patch-loaded", serde_json::json!({
+        "path": path_str,
+        "nodes": patch_file.nodes.len(),
+        "connections": patch_file.connections.len(),
+    }));
+
+    Ok(path_str)
+}
+
 /// Export the current patch to a target format.
 #[tauri::command]
 pub fn export_patch(

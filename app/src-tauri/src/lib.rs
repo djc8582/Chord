@@ -44,6 +44,8 @@ pub fn run() {
             // File / state
             commands::load_patch,
             commands::save_patch,
+            commands::save_patch_dialog,
+            commands::load_patch_dialog,
             commands::export_patch,
         ])
         .setup(move |app| {
