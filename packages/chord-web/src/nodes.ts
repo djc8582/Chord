@@ -1,6 +1,13 @@
 // Web Audio implementations of Chord's node types.
 // Each node wraps Web Audio API primitives and exposes a unified interface.
 
+/** Smoothly ramp an AudioParam without scheduling conflicts. */
+function smoothRamp(param: AudioParam, value: number, time: number, rampTime: number = 0.05) {
+  param.cancelScheduledValues(time);
+  param.setValueAtTime(param.value, time);
+  param.linearRampToValueAtTime(value, time + rampTime);
+}
+
 export interface ChordNode {
   id: string;
   type: string;
@@ -57,19 +64,18 @@ class OscillatorChordNode implements ChordNode {
   setParameter(param: string, value: number, time: number): void {
     this.params.set(param, value);
     if (!this.osc || !this.gainNode) return;
-    const t = time + 0.02;
     switch (param) {
       case 'frequency':
-        this.osc.frequency.linearRampToValueAtTime(value, t);
+        smoothRamp(this.osc.frequency, value, time);
         break;
       case 'waveform':
         this.applyWaveform();
         break;
       case 'detune':
-        this.osc.detune.linearRampToValueAtTime(value, t);
+        smoothRamp(this.osc.detune, value, time);
         break;
       case 'gain':
-        this.gainNode.gain.linearRampToValueAtTime(value, t);
+        smoothRamp(this.gainNode.gain, value, time);
         break;
     }
   }
@@ -129,13 +135,12 @@ class FilterChordNode implements ChordNode {
   setParameter(param: string, value: number, time: number): void {
     this.params.set(param, value);
     if (!this.filter) return;
-    const t = time + 0.02;
     switch (param) {
       case 'cutoff':
-        this.filter.frequency.linearRampToValueAtTime(value, t);
+        smoothRamp(this.filter.frequency, value, time);
         break;
       case 'resonance':
-        this.filter.Q.linearRampToValueAtTime(value, t);
+        smoothRamp(this.filter.Q, value, time);
         break;
       case 'mode':
         this.applyMode();
@@ -195,7 +200,7 @@ class GainChordNode implements ChordNode {
     this.params.set(param, value);
     if (!this.gainNode) return;
     if (param === 'gain') {
-      this.gainNode.gain.linearRampToValueAtTime(value, time + 0.02);
+      smoothRamp(this.gainNode.gain, value, time);
     }
   }
 
@@ -281,17 +286,16 @@ class DelayChordNode implements ChordNode {
   setParameter(param: string, value: number, time: number): void {
     this.params.set(param, value);
     if (!this.delayNode || !this.feedbackGain || !this.wetGain || !this.dryGain) return;
-    const t = time + 0.02;
     switch (param) {
       case 'time':
-        this.delayNode.delayTime.linearRampToValueAtTime(value, t);
+        smoothRamp(this.delayNode.delayTime, value, time);
         break;
       case 'feedback':
-        this.feedbackGain.gain.linearRampToValueAtTime(Math.min(value, 0.95), t);
+        smoothRamp(this.feedbackGain.gain, Math.min(value, 0.95), time);
         break;
       case 'mix':
-        this.wetGain.gain.linearRampToValueAtTime(value, t);
-        this.dryGain.gain.linearRampToValueAtTime(1 - value, t);
+        smoothRamp(this.wetGain.gain, value, time);
+        smoothRamp(this.dryGain.gain, 1 - value, time);
         break;
     }
   }
@@ -374,15 +378,14 @@ class ReverbChordNode implements ChordNode {
   setParameter(param: string, value: number, time: number): void {
     this.params.set(param, value);
     if (!this.wetGain || !this.dryGain) return;
-    const t = time + 0.02;
     switch (param) {
       case 'room_size':
       case 'damping':
         this.buildIR();
         break;
       case 'mix':
-        this.wetGain.gain.linearRampToValueAtTime(value, t);
-        this.dryGain.gain.linearRampToValueAtTime(1 - value, t);
+        smoothRamp(this.wetGain.gain, value, time);
+        smoothRamp(this.dryGain.gain, 1 - value, time);
         break;
     }
   }
@@ -489,13 +492,12 @@ class LFOChordNode implements ChordNode {
   setParameter(param: string, value: number, time: number): void {
     this.params.set(param, value);
     if (!this.osc || !this.depthGain) return;
-    const t = time + 0.02;
     switch (param) {
       case 'rate':
-        this.osc.frequency.linearRampToValueAtTime(value, t);
+        smoothRamp(this.osc.frequency, value, time);
         break;
       case 'depth':
-        this.depthGain.gain.linearRampToValueAtTime(0.5 * value, t);
+        smoothRamp(this.depthGain.gain, 0.5 * value, time);
         break;
       case 'waveform':
         this.applyWaveform();
@@ -573,7 +575,7 @@ class NoiseChordNode implements ChordNode {
     this.params.set(param, value);
     if (!this.gainNode) return;
     if (param === 'gain') {
-      this.gainNode.gain.linearRampToValueAtTime(value, time + 0.02);
+      smoothRamp(this.gainNode.gain, value, time);
     }
   }
 

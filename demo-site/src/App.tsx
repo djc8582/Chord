@@ -4,6 +4,7 @@ import { Chord } from '@chord/web';
 import { Particles } from './components/Particles';
 import { Visualizer } from './components/Visualizer';
 import { InteractionCards } from './components/InteractionCards';
+import { MusicalTyping } from './components/MusicalTyping';
 import { DebugPanel } from './components/DebugPanel';
 import { VolumeControl } from './components/VolumeControl';
 
@@ -45,6 +46,11 @@ interface PatchNodes {
   noise: string;
   mixer: string;
   output: string;
+  kick: string;
+  snare: string;
+  hat: string;
+  drumMixer: string;
+  drumGain: string;
 }
 
 function App() {
@@ -99,9 +105,9 @@ function App() {
     chord.setParameter(lfo, 'depth', 0.5);
     chord.setParameter(lfo, 'waveform', 0); // sine
 
-    // Noise (subtle texture)
+    // Noise (subtle texture — starts silent)
     const noise = chord.addNode('noise');
-    chord.setParameter(noise, 'gain', 0.02);
+    chord.setParameter(noise, 'gain', 0.0);
 
     // Mixer: combine bass, filtered pads, noise
     const mixer = chord.addNode('mixer');
@@ -121,6 +127,15 @@ function App() {
     // Output (connects to master)
     const output = chord.addNode('output');
 
+    // --- Drum nodes ---
+    const kick = chord.addNode('kick_drum');
+    const snare = chord.addNode('snare_drum');
+    const hat = chord.addNode('hi_hat');
+
+    const drumMixer = chord.addNode('mixer');
+    const drumGain = chord.addNode('gain');
+    chord.setParameter(drumGain, 'gain', 0.0); // starts silent
+
     // --- Wire the patch ---
     // Pads -> filter
     chord.connect(pad1, 'out', filter, 'in');
@@ -139,13 +154,23 @@ function App() {
     // Noise -> mixer in3
     chord.connect(noise, 'out', mixer, 'in3');
 
+    // Drums -> drumMixer -> drumGain -> delay (into FX chain)
+    chord.connect(kick, 'out', drumMixer, 'in1');
+    chord.connect(snare, 'out', drumMixer, 'in2');
+    chord.connect(hat, 'out', drumMixer, 'in3');
+    chord.connect(drumMixer, 'out', drumGain, 'in');
+    chord.connect(drumGain, 'out', delay, 'in');
+
     // Mixer -> delay -> reverb -> output
     chord.connect(mixer, 'out', delay, 'in');
     chord.connect(delay, 'out', reverb, 'in');
     chord.connect(reverb, 'out', output, 'in');
 
     // Store node IDs for interactive control
-    nodesRef.current = { bass, pad1, pad2, pad3, filter, delay, reverb, lfo, noise, mixer, output };
+    nodesRef.current = {
+      bass, pad1, pad2, pad3, filter, delay, reverb, lfo, noise, mixer, output,
+      kick, snare, hat, drumMixer, drumGain,
+    };
 
     // Start the engine
     await chord.start();
@@ -176,7 +201,35 @@ function App() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [chord, started]);
 
-  // Scroll depth -> chord progression
+  // Drum trigger scheduling
+  const drumIntervalRef = useRef<number | null>(null);
+  const drumActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (!started) return;
+    let beatCount = 0;
+    const scheduleDrums = () => {
+      if (!nodesRef.current || !drumActiveRef.current) return;
+      const nodes = nodesRef.current;
+      // Simple pattern: kick on 1,3 — snare on 2,4 — hat on every beat
+      const beatInBar = beatCount % 4;
+      if (beatInBar === 0 || beatInBar === 2) {
+        chord.triggerNode(nodes.kick);
+      }
+      if (beatInBar === 1 || beatInBar === 3) {
+        chord.triggerNode(nodes.snare);
+      }
+      chord.triggerNode(nodes.hat);
+      beatCount++;
+    };
+    // ~120 BPM = 500ms per beat
+    drumIntervalRef.current = window.setInterval(scheduleDrums, 500);
+    return () => {
+      if (drumIntervalRef.current !== null) clearInterval(drumIntervalRef.current);
+    };
+  }, [chord, started]);
+
+  // Scroll depth -> chord progression + section-based sound changes
   useEffect(() => {
     const handleScroll = () => {
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
@@ -189,13 +242,59 @@ function App() {
         const chordFreqs = CHORD_PROGRESSIONS[safeIdx];
         const bassNote = BASS_NOTES[safeIdx];
 
+        // Chord progression follows scroll
         chord.setParameter(nodes.pad1, 'frequency', chordFreqs[0]);
         chord.setParameter(nodes.pad2, 'frequency', chordFreqs[1]);
         chord.setParameter(nodes.pad3, 'frequency', chordFreqs[2]);
         chord.setParameter(nodes.bass, 'frequency', bassNote);
 
-        // Subtle brightness with scroll
-        chord.setParameter(nodes.filter, 'cutoff', 400 + depth * 3000);
+        // Filter opens as you scroll
+        const filterOpen = 400 + depth * 6000;
+        chord.setParameter(nodes.filter, 'cutoff', filterOpen);
+
+        // Section 1 (0-20%): Minimal — just bass drone + soft pad
+        // Section 2 (20-40%): Pad opens up, LFO speed increases
+        // Section 3 (40-60%): Drums fade in
+        // Section 4 (60-80%): Full sound
+        // Section 5 (80-100%): Thins out, more reverb
+
+        // Pad volume ramps up then back down
+        let padVol: number;
+        if (depth < 0.2) {
+          padVol = 0.04;
+        } else if (depth < 0.8) {
+          padVol = 0.04 + (depth - 0.2) * 0.2;
+        } else {
+          padVol = 0.16 - (depth - 0.8) * 0.5;
+          padVol = Math.max(padVol, 0.04);
+        }
+        chord.setParameter(nodes.pad1, 'gain', padVol);
+        chord.setParameter(nodes.pad2, 'gain', padVol);
+        chord.setParameter(nodes.pad3, 'gain', padVol);
+
+        // Bass quieter at start, louder in mid sections
+        const bassVol = depth < 0.8 ? 0.08 + depth * 0.1 : 0.16 - (depth - 0.8) * 0.4;
+        chord.setParameter(nodes.bass, 'gain', Math.max(bassVol, 0.04));
+
+        // Drums come in at 40% depth
+        if (depth > 0.4 && depth < 0.85) {
+          const drumVol = Math.min((depth - 0.4) * 2, 0.5);
+          chord.setParameter(nodes.drumGain, 'gain', drumVol);
+          drumActiveRef.current = true;
+        } else {
+          chord.setParameter(nodes.drumGain, 'gain', 0.0);
+          drumActiveRef.current = false;
+        }
+
+        // LFO speed increases with scroll
+        chord.setParameter(nodes.lfo, 'rate', 0.1 + depth * 0.8);
+
+        // Reverb increases at the end for a peaceful fade
+        if (depth > 0.8) {
+          chord.setParameter(nodes.reverb, 'mix', 0.4 + (depth - 0.8) * 3);
+        } else {
+          chord.setParameter(nodes.reverb, 'mix', 0.4);
+        }
       }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -236,12 +335,12 @@ function App() {
     const resetIdle = () => {
       clearTimeout(timer);
       // Active mode
-      chord.setParameter(nodes.noise, 'gain', 0.02);
+      chord.setParameter(nodes.noise, 'gain', 0.0);
       chord.setParameter(nodes.reverb, 'mix', 0.4);
       chord.setParameter(nodes.lfo, 'depth', 0.5);
       timer = window.setTimeout(() => {
         // Idle mode: quieter, more reverb
-        chord.setParameter(nodes.noise, 'gain', 0.01);
+        chord.setParameter(nodes.noise, 'gain', 0.0);
         chord.setParameter(nodes.reverb, 'mix', 0.7);
         chord.setParameter(nodes.lfo, 'depth', 0.3);
       }, 30000);
@@ -418,8 +517,8 @@ function App() {
               <span className="text-white/40 italic">to you.</span>
             </h2>
             <p className="text-lg text-white/40 max-w-xl leading-relaxed mb-12">
-              Move your mouse. The horizontal axis controls the filter brightness.
-              The vertical axis controls the depth of reverb. Every gesture shapes the sound.
+              {chord.getNodeCount()} nodes. {chord.getConnectionCount()} connections. Zero Web Audio boilerplate. This entire soundscape is a Chord patch.
+              Move your mouse — the horizontal axis controls the filter, the vertical axis controls reverb depth.
             </p>
           </motion.div>
 
@@ -485,8 +584,8 @@ function App() {
               <span className="text-white/40 italic">by frequency.</span>
             </h2>
             <p className="text-lg text-white/40 max-w-xl leading-relaxed">
+              As you scroll, drums fade in — just more Chord nodes joining the graph.
               The terrain below is generated entirely from the audio signal.
-              As you scroll, the chords progress and the landscape transforms.
             </p>
           </motion.div>
 
@@ -553,8 +652,8 @@ function App() {
               <span className="text-white/40 italic">Create.</span>
             </h2>
             <p className="text-lg text-white/40 max-w-xl leading-relaxed">
-              Every element below is a sonic instrument. Hover the cards, draw on the pad,
-              drag the orbs. Each interaction drives a different dimension of the sound.
+              Every hover, every keystroke, every drag — all triggering Chord nodes.
+              Each interaction below drives a different dimension of the sound.
             </p>
           </motion.div>
 
@@ -566,6 +665,18 @@ function App() {
           >
             <InteractionCards chord={started ? chord : null} patchNodes={started ? nodesRef.current : null} />
           </motion.div>
+
+          {started && (
+            <motion.div
+              className="mt-12"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+            >
+              <MusicalTyping chord={chord} />
+            </motion.div>
+          )}
         </div>
       </section>
 

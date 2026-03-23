@@ -170,20 +170,58 @@ export class Chord {
   }
 
   /** Play a quick one-shot note. */
-  playNote(freq: number, duration: number = 0.3): void {
+  playNote(freq: number, duration: number = 0.5, volume: number = 0.25): void {
     if (!this.ctx || !this.masterGain) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.frequency.value = freq;
-    osc.type = 'sine';
     const now = this.ctx.currentTime;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.15, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-    osc.start(now);
-    osc.stop(now + duration + 0.1);
+
+    // Create a rich note with fundamental + soft octave + fifth for warmth
+    const createVoice = (f: number, vol: number, type: OscillatorType) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.frequency.value = f;
+      osc.type = type;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(vol, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.connect(gain);
+      osc.start(now);
+      osc.stop(now + duration + 0.1);
+      return gain;
+    };
+
+    // Fundamental (triangle — warm and soft)
+    const v1 = createVoice(freq, volume, 'triangle');
+    // Soft octave above (sine — pure shimmer)
+    const v2 = createVoice(freq * 2, volume * 0.15, 'sine');
+    // Quiet fifth (sine — harmonic richness)
+    const v3 = createVoice(freq * 1.5, volume * 0.08, 'sine');
+
+    // Route through reverb if available, otherwise master
+    // Find the first reverb or output node to connect through
+    let target: AudioNode = this.masterGain;
+    for (const node of this.nodes.values()) {
+      if (node.type === 'reverb') {
+        const reverbInput = node.getInput('in');
+        if (reverbInput && reverbInput instanceof AudioNode) {
+          target = reverbInput;
+          break;
+        }
+      }
+    }
+
+    v1.connect(target);
+    v2.connect(target);
+    v3.connect(target);
+  }
+
+  /** Play a note from a pentatonic scale (always sounds musical).
+   *  `degree` is 0-based scale degree, `octave` offsets octaves. */
+  playScaleNote(degree: number, octave: number = 0, duration: number = 0.4): void {
+    // C minor pentatonic: C, Eb, F, G, Bb
+    const scale = [261.63, 311.13, 349.23, 392.00, 466.16];
+    const idx = ((degree % scale.length) + scale.length) % scale.length;
+    const freq = scale[idx] * Math.pow(2, octave);
+    this.playNote(freq, duration, 0.2);
   }
 
   /** Set master volume (0 to 1). */

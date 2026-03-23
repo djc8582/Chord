@@ -13,6 +13,11 @@ interface PatchNodes {
   noise: string;
   mixer: string;
   output: string;
+  kick: string;
+  snare: string;
+  hat: string;
+  drumMixer: string;
+  drumGain: string;
 }
 
 interface DebugPanelProps {

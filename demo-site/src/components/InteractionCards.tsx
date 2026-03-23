@@ -19,6 +19,11 @@ interface PatchNodes {
   noise: string;
   mixer: string;
   output: string;
+  kick: string;
+  snare: string;
+  hat: string;
+  drumMixer: string;
+  drumGain: string;
 }
 
 interface CardProps {
@@ -262,15 +267,26 @@ function DraggableOrbs({ chord, patchNodes }: CardProps) {
               const ny = Math.max(0, Math.min(1, (info.point.y - rect.top) / rect.height));
 
               if (orb.id === 'pitch') {
-                chord.setParameter(patchNodes.filter, 'cutoff', 200 + nx * 6000);
+                // Pitch orb: X controls filter cutoff, Y controls pad pitch
+                chord.setParameter(patchNodes.filter, 'cutoff', 200 + nx * 8000);
+                chord.setParameter(patchNodes.pad1, 'detune', (nx - 0.5) * 400);
+                chord.setParameter(patchNodes.pad2, 'detune', (ny - 0.5) * 400);
+                // Play a continuous tone feedback
+                chord.playNote(200 + nx * 800, 0.08, 0.1);
               } else if (orb.id === 'reverb') {
-                chord.setParameter(patchNodes.reverb, 'mix', ny * 0.8);
+                // Space orb: X controls delay time, Y controls reverb mix
+                chord.setParameter(patchNodes.reverb, 'mix', ny * 0.9);
+                chord.setParameter(patchNodes.delay, 'time', 0.05 + nx * 0.7);
+                chord.setParameter(patchNodes.delay, 'feedback', 0.1 + ny * 0.5);
               } else if (orb.id === 'texture') {
-                // Adjust noise gain as a "texture" control
-                chord.setParameter(patchNodes.noise, 'gain', nx * 0.08);
+                // Texture orb: X controls LFO rate, Y controls resonance
+                chord.setParameter(patchNodes.lfo, 'rate', 0.05 + nx * 3);
+                chord.setParameter(patchNodes.filter, 'resonance', 0.5 + ny * 8);
               }
             }}
-            onDragStart={() => chord?.playNote(orb.id === 'pitch' ? 1200 : orb.id === 'reverb' ? 960 : 1200, 0.06)}
+            onDragStart={() => chord?.playNote(
+              orb.id === 'pitch' ? 523 : orb.id === 'reverb' ? 392 : 659, 0.3, 0.2
+            )}
           >
             <span className="text-[10px] font-medium text-white/60 select-none">
               {orb.label}
