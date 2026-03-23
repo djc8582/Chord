@@ -1228,10 +1228,10 @@ fn test_reverb_adds_reverberation() {
     tc.input_buffers[0][0] = 1.0;
     tc.process(&mut reverb).unwrap();
 
-    // Process several more silence buffers until the comb delays are reached.
-    // Need at least ceil(1617 / 256) = 7 buffers total.
+    // Process many silence buffers — reverb has comb delays (1422-1617 samples)
+    // plus pre-delay, so it takes many buffers before output appears.
     let mut max_rms = 0.0_f32;
-    for _ in 0..10 {
+    for _ in 0..30 {
         let mut tc_silence = TestContext::new(1, 1)
             .with_param("room_size", 0.8)
             .with_param("damping", 0.5)
