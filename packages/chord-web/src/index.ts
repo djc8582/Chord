@@ -26,3 +26,10 @@ export { generateAttribution, generateBadgeHTML, DEFAULT_ATTRIBUTION, type Patch
 
 // Discovery
 export { generateChordRC, generateNpmPackageJSON, generatePatchPackageIndex, NPM_KEYWORDS, type ChordRC } from './discovery.js';
+
+// Visualizers
+export {
+  getAnalysisFrame, createWaveform, createSpectrum, createLevelMeter, createParticles,
+  useAudioReactive, bindAudioToCSS, THEMES, getTheme,
+  type AudioAnalysisFrame, type VisualizerTheme
+} from './visualizers/index.js';
