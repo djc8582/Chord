@@ -22,6 +22,22 @@ use crate::sanitize::{sanitize_buffer, set_ftz_daz};
 use crate::transport::TransportState;
 use crate::{AudioBuffer, AudioError, MidiMessage};
 
+/// Fade state for node activation/deactivation (timeline control).
+///
+/// When the timeline playhead enters or exits a region, the engine fades
+/// the node in or out over a configurable number of samples to avoid clicks.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FadeState {
+    /// Node is fully active — output passes through unchanged.
+    Active,
+    /// Node is fully inactive — output is zeroed.
+    Inactive,
+    /// Node is fading in from silence to full volume.
+    FadingIn { progress: f32, duration_samples: f32 },
+    /// Node is fading out from full volume to silence.
+    FadingOut { progress: f32, duration_samples: f32 },
+}
+
 /// A modulation route: maps a source node's audio output to a target node's parameter.
 ///
 /// This enables "map anything to anything" modulation — any audio signal can
@@ -130,6 +146,9 @@ pub struct AudioEngine {
     last_output_buffer: Arc<std::sync::Mutex<Vec<f32>>>,
     /// Number of worker threads.
     _worker_threads: usize,
+    /// Per-node activation state (for timeline control).
+    /// Nodes not present in this map default to Active.
+    node_activations: HashMap<NodeId, FadeState>,
 }
 
 impl AudioEngine {
@@ -161,6 +180,7 @@ impl AudioEngine {
             diagnostic_buffer: AudioBuffer::new(1, buffer_size),
             last_output_buffer: Arc::new(std::sync::Mutex::new(Vec::new())),
             _worker_threads: config.worker_threads,
+            node_activations: HashMap::new(),
         }
     }
 
@@ -192,6 +212,35 @@ impl AudioEngine {
     /// Get a reference to the transport.
     pub fn transport(&self) -> &TransportState {
         &self.transport
+    }
+
+    /// Set a node's active state with optional fade time.
+    /// Called from the main thread when the timeline playhead enters/exits a region.
+    pub fn set_node_active(&mut self, node_id: NodeId, active: bool, fade_ms: f64) {
+        let fade_samples = (fade_ms * 0.001 * self.sample_rate) as f32;
+        let state = if active {
+            if fade_samples > 1.0 {
+                FadeState::FadingIn { progress: 0.0, duration_samples: fade_samples }
+            } else {
+                FadeState::Active
+            }
+        } else {
+            if fade_samples > 1.0 {
+                FadeState::FadingOut { progress: 1.0, duration_samples: fade_samples }
+            } else {
+                FadeState::Inactive
+            }
+        };
+        self.node_activations.insert(node_id, state);
+    }
+
+    /// Check if a node is currently active (including fading states).
+    /// Nodes not in the activation map default to active.
+    pub fn is_node_active(&self, node_id: &NodeId) -> bool {
+        match self.node_activations.get(node_id) {
+            Some(FadeState::Inactive) => false,
+            _ => true, // Active, FadingIn, FadingOut, or not in map (default active)
+        }
     }
 
     /// Register a node type with a factory. Called at startup, NOT on the audio thread.
@@ -549,6 +598,46 @@ impl AudioEngine {
                 if let Err(ref err) = result {
                     if let Some(probe) = &mut self.diagnostic_probe {
                         probe.on_error(node_id, err.clone());
+                    }
+                }
+
+                // Apply node activation fade (timeline control).
+                // Nodes not in the activation map default to Active (pass-through).
+                if let Some(state) = self.node_activations.get_mut(&node_id) {
+                    match state {
+                        FadeState::Inactive => {
+                            // Zero all outputs — node is muted by the timeline.
+                            for buf in &mut output_data {
+                                for s in buf.iter_mut() { *s = 0.0; }
+                            }
+                        }
+                        FadeState::FadingIn { progress, duration_samples } => {
+                            for buf in &mut output_data {
+                                for s in buf.iter_mut() {
+                                    *s *= *progress;
+                                    *progress += 1.0 / *duration_samples;
+                                    if *progress >= 1.0 { *progress = 1.0; }
+                                }
+                            }
+                            if *progress >= 1.0 {
+                                *state = FadeState::Active;
+                            }
+                        }
+                        FadeState::FadingOut { progress, duration_samples } => {
+                            for buf in &mut output_data {
+                                for s in buf.iter_mut() {
+                                    *s *= *progress;
+                                    *progress -= 1.0 / *duration_samples;
+                                    if *progress <= 0.0 { *progress = 0.0; }
+                                }
+                            }
+                            if *progress <= 0.0 {
+                                *state = FadeState::Inactive;
+                            }
+                        }
+                        FadeState::Active => {
+                            // No processing needed — output passes through.
+                        }
                     }
                 }
 

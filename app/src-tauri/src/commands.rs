@@ -556,6 +556,73 @@ pub fn set_tempo(bpm: f64, state: State<'_, AppArc>) -> Result<(), String> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Tauri Commands — Timeline Control
+// ---------------------------------------------------------------------------
+
+/// Set a node's active state with fade time (for timeline regions).
+/// When the timeline playhead enters a region, the node is activated;
+/// when it exits, the node is deactivated. Fade time prevents clicks.
+#[tauri::command]
+pub fn set_node_active(
+    node_id: String,
+    active: bool,
+    fade_ms: f64,
+    state: State<'_, AppArc>,
+) -> Result<(), String> {
+    log::info(
+        "set_node_active",
+        &format!("node={node_id} active={active} fade_ms={fade_ms}"),
+    );
+
+    let nid = resolve_node_id(&node_id, &state)?;
+    let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+    engine.set_node_active(nid, active, fade_ms);
+    Ok(())
+}
+
+/// Set the loop region using bar positions (1-based).
+#[tauri::command]
+pub fn set_loop_region(
+    enabled: bool,
+    start_bar: f64,
+    end_bar: f64,
+    state: State<'_, AppArc>,
+) -> Result<(), String> {
+    log::info(
+        "set_loop_region",
+        &format!("enabled={enabled} start={start_bar} end={end_bar}"),
+    );
+
+    let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+    engine.transport_mut().set_loop_bars(enabled, start_bar, end_bar);
+    Ok(())
+}
+
+/// Get the current transport position as bars:beats:ticks plus state.
+#[tauri::command]
+pub fn get_transport_position(state: State<'_, AppArc>) -> Result<serde_json::Value, String> {
+    let engine = state.engine.lock().map_err(|e| e.to_string())?;
+    let (bar, beat, tick) = engine.transport().position_bars_beats();
+    Ok(serde_json::json!({
+        "bar": bar,
+        "beat": beat,
+        "tick": tick,
+        "playing": engine.transport().playing,
+        "tempo": engine.transport().tempo_bpm,
+    }))
+}
+
+/// Jump to a specific bar position (1-based).
+#[tauri::command]
+pub fn set_transport_position(bar: f64, state: State<'_, AppArc>) -> Result<(), String> {
+    log::info("set_transport_position", &format!("bar={bar}"));
+
+    let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+    engine.transport_mut().set_position_bar(bar);
+    Ok(())
+}
+
 /// Send a MIDI note-on event to the audio engine.
 #[tauri::command]
 pub fn send_midi_note_on(note: u8, velocity: u8, state: State<'_, AppArc>) -> Result<(), String> {

@@ -28,6 +28,11 @@ pub fn run() {
             commands::play,
             commands::stop,
             commands::set_tempo,
+            // Timeline control
+            commands::set_node_active,
+            commands::set_loop_region,
+            commands::get_transport_position,
+            commands::set_transport_position,
             // MIDI
             commands::send_midi_note_on,
             commands::send_midi_note_off,

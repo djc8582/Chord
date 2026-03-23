@@ -103,6 +103,38 @@ impl TransportState {
         self.loop_end_samples = end_samples;
     }
 
+    /// Get the current position as (bar, beat, tick).
+    /// Bar is 1-based, beat is 1-based within the bar. Tick resolution is 960 PPQN.
+    pub fn position_bars_beats(&self) -> (u32, u32, u32) {
+        let beats_per_bar = self.time_sig_numerator as f64;
+        let samples_per_beat = self.sample_rate * 60.0 / self.tempo_bpm;
+        let total_beats = self.position_samples as f64 / samples_per_beat;
+        let bar = (total_beats / beats_per_bar).floor() as u32 + 1;
+        let beat_in_bar = (total_beats % beats_per_bar).floor() as u32 + 1;
+        let tick = ((total_beats % 1.0) * 960.0) as u32; // 960 PPQN
+        (bar, beat_in_bar, tick)
+    }
+
+    /// Convert a bar count (0-based) to a sample position.
+    pub fn bars_to_samples(&self, bars: f64) -> u64 {
+        let beats_per_bar = self.time_sig_numerator as f64;
+        let samples_per_beat = self.sample_rate * 60.0 / self.tempo_bpm;
+        (bars * beats_per_bar * samples_per_beat) as u64
+    }
+
+    /// Set the loop region using bar positions (1-based).
+    pub fn set_loop_bars(&mut self, enabled: bool, start_bar: f64, end_bar: f64) {
+        self.looping = enabled;
+        self.loop_start_samples = self.bars_to_samples(start_bar - 1.0);
+        self.loop_end_samples = self.bars_to_samples(end_bar - 1.0);
+    }
+
+    /// Jump to a specific bar position (1-based).
+    pub fn set_position_bar(&mut self, bar: f64) {
+        let target = self.bars_to_samples(bar - 1.0);
+        self.seek_samples(target);
+    }
+
     /// Seek to a position in samples.
     pub fn seek_samples(&mut self, position: u64) {
         self.position_samples = position;
