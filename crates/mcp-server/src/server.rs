@@ -11,12 +11,14 @@ use std::time::Duration;
 
 use chord_audio_graph::{
     CompileError, ConnectionId, Graph, GraphCompiler, NodeDescriptor, NodeId, ParameterDescriptor,
-    PortDataType, PortDescriptor, PortId,
+    PatchFile, PortDataType, PortDescriptor, PortId,
+    patch_format::{ConnectionEntry, NodeEntry, Position},
 };
 use chord_diagnostics::{DiagnosticEngine, DiagnosticReport};
 use chord_node_library::NodeRegistry;
 use serde_json::{json, Value};
 
+use crate::sound_planner;
 use crate::tools::all_tool_definitions;
 use crate::types::{McpError, McpResult, ToolDefinition};
 use crate::vibe;
@@ -221,6 +223,9 @@ impl ChordMcpServer {
             "auto_fix" => self.tool_auto_fix(&args),
             "create_from_description" => self.tool_create_from_description(&args),
             "modify_patch" => self.tool_modify_patch(&args),
+            "save_patch_file" => self.tool_save_patch_file(&args),
+            "load_patch_file" => self.tool_load_patch_file(&args),
+            "recreate_sound" => self.tool_recreate_sound(&args),
             _ => Err(McpError::UnknownTool(name.to_string())),
         }
     }
@@ -1190,6 +1195,37 @@ impl ChordMcpServer {
         }))
     }
 
+    /// `recreate_sound` — Recreate a sound through synthesis from a description.
+    fn tool_recreate_sound(&mut self, args: &Value) -> McpResult<Value> {
+        let description = get_string(args, "description")?;
+
+        // 1. Classify the sound
+        let category = sound_planner::classify_sound(&description);
+
+        // 2. Get expert recipe for this category
+        let recipe = sound_planner::get_expert_recipe(category, &description);
+
+        // 3. Create a new patch
+        let create_result = self.tool_create_patch()?;
+        let patch_id = create_result["patch_id"]
+            .as_str()
+            .ok_or_else(|| McpError::Internal("Failed to get patch_id".into()))?
+            .to_string();
+
+        // 4. Build the patch from the recipe
+        let build_result = self.build_patch_from_recipe(&patch_id, &recipe)?;
+
+        Ok(json!({
+            "patch_id": patch_id,
+            "category": format!("{:?}", category),
+            "name": recipe.name,
+            "description": recipe.description,
+            "layers": recipe.layers.len(),
+            "node_count": build_result["node_count"],
+            "approach": recipe.description,
+        }))
+    }
+
     /// Build a complete patch from a `PatchRecipe`.
     ///
     /// Creates a clock LFO, builds each layer, routes through a mixer,
@@ -1694,6 +1730,129 @@ impl ChordMcpServer {
             "description": format!("Bypassed node {} — reconnected {} input(s) to {} output(s)", target_node_id.0, incoming.len(), outgoing.len()),
             "removed_connections": removed_ids,
             "new_connections": new_connections,
+        }))
+    }
+
+    // ────────────────────────────────────────────
+    // Portable patch file tools
+    // ────────────────────────────────────────────
+
+    /// `save_patch_file` — Serialize the current patch to the portable JSON format.
+    fn tool_save_patch_file(&self, args: &Value) -> McpResult<Value> {
+        let patch_id = get_string(args, "patch_id")?;
+
+        let patch_state = self.patches.get(&patch_id)
+            .ok_or_else(|| McpError::PatchNotFound(patch_id.clone()))?;
+
+        let mut patch_file = PatchFile::new(&patch_id);
+
+        // Serialize all nodes.
+        for (node_id, desc) in patch_state.graph.nodes() {
+            let entry = NodeEntry {
+                id: node_id.0.to_string(),
+                node_type: desc.node_type.clone(),
+                params: desc.parameters.iter().map(|p| (p.id.clone(), p.value)).collect(),
+                position: Position { x: desc.position.0, y: desc.position.1 },
+                name: String::new(),
+            };
+            patch_file.nodes.push(entry);
+        }
+
+        // Serialize connections using port names for portability.
+        for conn in patch_state.graph.connections() {
+            let from_port_name = patch_state.graph.node(&conn.from_node)
+                .and_then(|n| n.outputs.iter().find(|p| p.id == conn.from_port).map(|p| p.name.clone()))
+                .unwrap_or_else(|| conn.from_port.0.to_string());
+            let to_port_name = patch_state.graph.node(&conn.to_node)
+                .and_then(|n| n.inputs.iter().find(|p| p.id == conn.to_port).map(|p| p.name.clone()))
+                .unwrap_or_else(|| conn.to_port.0.to_string());
+
+            patch_file.connections.push(ConnectionEntry {
+                from: format!("{}:{}", conn.from_node.0, from_port_name),
+                to: format!("{}:{}", conn.to_node.0, to_port_name),
+            });
+        }
+
+        patch_file.metadata.created_by = "chord-mcp".into();
+
+        Ok(json!({
+            "patch_json": patch_file.to_json(),
+            "node_count": patch_file.nodes.len(),
+            "connection_count": patch_file.connections.len(),
+        }))
+    }
+
+    /// `load_patch_file` — Load a patch from the portable JSON format and rebuild it.
+    fn tool_load_patch_file(&mut self, args: &Value) -> McpResult<Value> {
+        let json_str = get_string(args, "patch_json")?;
+        let patch_file = PatchFile::from_json(&json_str)
+            .map_err(|e| McpError::InvalidArguments(e))?;
+
+        // Create a new patch.
+        let patch_id = format!("patch_{}", self.next_patch_id);
+        self.next_patch_id += 1;
+        self.patches.insert(patch_id.clone(), PatchState {
+            graph: Graph::new(),
+            diagnostics: DiagnosticEngine::default(),
+        });
+
+        // Add all nodes, tracking old ID → new node_id mapping.
+        let mut id_map: HashMap<String, u64> = HashMap::new();
+        for node_entry in &patch_file.nodes {
+            let add_result = self.tool_add_node(&json!({
+                "patch_id": patch_id,
+                "node_type": node_entry.node_type,
+                "position": {"x": node_entry.position.x, "y": node_entry.position.y}
+            }))?;
+            if let Some(nid) = add_result.get("node_id").and_then(|v| v.as_u64()) {
+                id_map.insert(node_entry.id.clone(), nid);
+                // Set parameters.
+                for (param, value) in &node_entry.params {
+                    let _ = self.tool_set_parameter(&json!({
+                        "patch_id": patch_id,
+                        "node_id": nid,
+                        "parameter": param,
+                        "value": value
+                    }));
+                }
+            }
+        }
+
+        // Add connections using port names — resolve to port IDs via the graph.
+        let mut connections_loaded = 0;
+        for conn in &patch_file.connections {
+            let (from_id_str, from_port_name) = conn.from.split_once(':').unwrap_or(("", ""));
+            let (to_id_str, to_port_name) = conn.to.split_once(':').unwrap_or(("", ""));
+
+            if let (Some(&from_nid), Some(&to_nid)) = (id_map.get(from_id_str), id_map.get(to_id_str)) {
+                let from_node_id = NodeId(from_nid);
+                let to_node_id = NodeId(to_nid);
+
+                // Resolve port names to port IDs.
+                let patch = self.patches.get(&patch_id).unwrap();
+                let from_port_id = patch.graph.node(&from_node_id)
+                    .and_then(|n| n.outputs.iter().find(|p| p.name == from_port_name).map(|p| p.id));
+                let to_port_id = patch.graph.node(&to_node_id)
+                    .and_then(|n| n.inputs.iter().find(|p| p.name == to_port_name).map(|p| p.id));
+
+                if let (Some(from_port), Some(to_port)) = (from_port_id, to_port_id) {
+                    let _ = self.tool_connect(&json!({
+                        "patch_id": patch_id,
+                        "from_node": from_nid,
+                        "from_port": from_port.0,
+                        "to_node": to_nid,
+                        "to_port": to_port.0
+                    }));
+                    connections_loaded += 1;
+                }
+            }
+        }
+
+        Ok(json!({
+            "patch_id": patch_id,
+            "name": patch_file.name,
+            "nodes_loaded": id_map.len(),
+            "connections_loaded": connections_loaded,
         }))
     }
 }

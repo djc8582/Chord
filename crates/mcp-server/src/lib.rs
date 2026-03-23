@@ -26,6 +26,7 @@
 //! ```
 
 mod server;
+pub mod sound_planner;
 mod tools;
 mod types;
 pub mod vibe;

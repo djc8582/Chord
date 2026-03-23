@@ -338,5 +338,50 @@ pub fn all_tool_definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         },
+        ToolDefinition {
+            name: "save_patch_file".to_string(),
+            description: "Serialize the current patch to a portable JSON format that can be saved/loaded across the desktop app, browser, and MCP server.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patch_id": {
+                        "type": "string",
+                        "description": "The patch to serialize."
+                    }
+                },
+                "required": ["patch_id"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "load_patch_file".to_string(),
+            description: "Load a patch from the portable JSON format. Creates a new patch with all nodes, connections, and parameters restored.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patch_json": {
+                        "type": "string",
+                        "description": "The patch JSON string to load."
+                    }
+                },
+                "required": ["patch_json"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "recreate_sound".to_string(),
+            description: "Recreate any sound through synthesis. Describe the sound and get a pure synthesis patch. Examples: 'bird chirping', '808 kick', 'rain on window', 'laser gun'.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the sound to recreate"
+                    }
+                },
+                "required": ["description"],
+                "additionalProperties": false
+            }),
+        },
     ]
 }
