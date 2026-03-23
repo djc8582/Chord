@@ -1,22 +1,37 @@
 import { useState, useEffect } from 'react';
-import type { ChordEngine } from '../audio/ChordEngine';
+import type { Chord } from '@chord/web';
+
+interface PatchNodes {
+  bass: string;
+  pad1: string;
+  pad2: string;
+  pad3: string;
+  filter: string;
+  delay: string;
+  reverb: string;
+  lfo: string;
+  noise: string;
+  mixer: string;
+  output: string;
+}
 
 interface DebugPanelProps {
-  engine: ChordEngine | null;
+  chord: Chord | null;
+  patchNodes: PatchNodes | null;
   visible: boolean;
 }
 
-export function DebugPanel({ engine, visible }: DebugPanelProps) {
+export function DebugPanel({ chord, patchNodes, visible }: DebugPanelProps) {
   const [stats, setStats] = useState({
     rms: 0,
     peak: 0,
   });
 
   useEffect(() => {
-    if (!visible || !engine || !engine.started) return;
+    if (!visible || !chord || !chord.started) return;
 
     const interval = setInterval(() => {
-      const waveform = engine.getWaveformData();
+      const waveform = chord.getWaveformData();
       let sum = 0;
       let peak = 0;
       for (let i = 0; i < waveform.length; i++) {
@@ -31,15 +46,26 @@ export function DebugPanel({ engine, visible }: DebugPanelProps) {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [visible, engine]);
+  }, [visible, chord]);
 
   if (!visible) return null;
 
-  const params = [
-    'filterCutoff', 'reverbMix', 'masterVolume', 'shimmerRate',
-    'rhythmDensity', 'distortion', 'padChord', 'scrollDepth',
-    'idle', 'timeOfDay',
-  ];
+  // Parameter display: show actual node parameters from the Chord graph
+  const paramDisplay: Array<{ label: string; value: number }> = [];
+  if (patchNodes && chord) {
+    paramDisplay.push(
+      { label: 'filter.cutoff', value: chord.getParameter(patchNodes.filter, 'cutoff') },
+      { label: 'filter.resonance', value: chord.getParameter(patchNodes.filter, 'resonance') },
+      { label: 'reverb.mix', value: chord.getParameter(patchNodes.reverb, 'mix') },
+      { label: 'reverb.room_size', value: chord.getParameter(patchNodes.reverb, 'room_size') },
+      { label: 'delay.time', value: chord.getParameter(patchNodes.delay, 'time') },
+      { label: 'delay.feedback', value: chord.getParameter(patchNodes.delay, 'feedback') },
+      { label: 'lfo.rate', value: chord.getParameter(patchNodes.lfo, 'rate') },
+      { label: 'lfo.depth', value: chord.getParameter(patchNodes.lfo, 'depth') },
+      { label: 'noise.gain', value: chord.getParameter(patchNodes.noise, 'gain') },
+      { label: 'bass.frequency', value: chord.getParameter(patchNodes.bass, 'frequency') },
+    );
+  }
 
   return (
     <div className="fixed bottom-4 left-4 z-50 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl p-4 font-mono text-xs text-white/70 min-w-[280px]">
@@ -51,17 +77,21 @@ export function DebugPanel({ engine, visible }: DebugPanelProps) {
         <div>Peak</div>
         <div className="text-right">{stats.peak.toFixed(4)}</div>
         <div>Engine</div>
-        <div className="text-right">{engine?.started ? 'Running' : 'Stopped'}</div>
+        <div className="text-right">{chord?.started ? 'Running' : 'Stopped'}</div>
+        <div>Nodes</div>
+        <div className="text-right">{chord?.getNodeCount() ?? 0}</div>
+        <div>Connections</div>
+        <div className="text-right">{chord?.getConnectionCount() ?? 0}</div>
       </div>
 
       <div className="border-t border-white/10 pt-2 mt-2">
-        <div className="text-white/50 mb-1">Parameters</div>
+        <div className="text-white/50 mb-1">Node Parameters</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-          {params.map((p) => (
-            <div key={p} className="contents">
-              <div className="text-white/40">{p}</div>
+          {paramDisplay.map((p) => (
+            <div key={p.label} className="contents">
+              <div className="text-white/40">{p.label}</div>
               <div className="text-right">
-                {(engine?.getParameter(p) ?? 0).toFixed(3)}
+                {p.value.toFixed(3)}
               </div>
             </div>
           ))}

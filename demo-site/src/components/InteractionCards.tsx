@@ -1,9 +1,29 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import type { ChordEngine } from '../audio/ChordEngine';
+import type { Chord } from '@chord/web';
+
+// Pentatonic scale notes for card interactions
+const SCALE_NOTES = [
+  523.25, 622.25, 783.99, 830.61, 932.33, 1046.5, 1244.5, 1567.98,
+];
+
+interface PatchNodes {
+  bass: string;
+  pad1: string;
+  pad2: string;
+  pad3: string;
+  filter: string;
+  delay: string;
+  reverb: string;
+  lfo: string;
+  noise: string;
+  mixer: string;
+  output: string;
+}
 
 interface CardProps {
-  engine: ChordEngine | null;
+  chord: Chord | null;
+  patchNodes: PatchNodes | null;
 }
 
 interface InteractionCard {
@@ -59,12 +79,13 @@ const CARDS: InteractionCard[] = [
   },
 ];
 
-function SoundCard({ card, engine }: { card: InteractionCard; engine: ChordEngine | null }) {
+function SoundCard({ card, chord }: { card: InteractionCard; chord: Chord | null }) {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleEnter = () => {
     setIsHovered(true);
-    engine?.playScaleNote(card.noteIndex, 0.8);
+    const note = SCALE_NOTES[card.noteIndex % SCALE_NOTES.length];
+    chord?.playNote(note, 0.8);
   };
 
   const handleLeave = () => {
@@ -107,7 +128,7 @@ function SoundCard({ card, engine }: { card: InteractionCard; engine: ChordEngin
 }
 
 // Drawing pad that creates waveform from strokes
-function DrawingPad({ engine }: CardProps) {
+function DrawingPad({ chord }: CardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const lastPosRef = useRef({ x: 0, y: 0 });
@@ -145,13 +166,13 @@ function DrawingPad({ engine }: CardProps) {
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
 
-    // Map Y position to frequency
+    // Map Y position to frequency and play via Chord
     const normalizedY = 1 - pos.y / canvas.height;
     const freq = 200 + normalizedY * 1500;
-    engine?.playNote(freq, 0.15, 0.05);
+    chord?.playNote(freq, 0.15);
 
     lastPosRef.current = pos;
-  }, [isDrawing, engine]);
+  }, [isDrawing, chord]);
 
   const endDraw = () => {
     setIsDrawing(false);
@@ -198,7 +219,7 @@ function DrawingPad({ engine }: CardProps) {
 }
 
 // Draggable orbs
-function DraggableOrbs({ engine }: CardProps) {
+function DraggableOrbs({ chord, patchNodes }: CardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const orbs = [
@@ -235,20 +256,21 @@ function DraggableOrbs({ engine }: CardProps) {
             whileDrag={{ scale: 1.2 }}
             onDrag={(_e, info) => {
               const container = containerRef.current;
-              if (!container) return;
+              if (!container || !chord || !patchNodes) return;
               const rect = container.getBoundingClientRect();
-              const nx = (info.point.x - rect.left) / rect.width;
-              const ny = (info.point.y - rect.top) / rect.height;
+              const nx = Math.max(0, Math.min(1, (info.point.x - rect.left) / rect.width));
+              const ny = Math.max(0, Math.min(1, (info.point.y - rect.top) / rect.height));
 
               if (orb.id === 'pitch') {
-                engine?.setParameter('filterCutoff', Math.max(0, Math.min(1, nx)));
+                chord.setParameter(patchNodes.filter, 'cutoff', 200 + nx * 6000);
               } else if (orb.id === 'reverb') {
-                engine?.setParameter('reverbMix', Math.max(0, Math.min(1, ny)));
+                chord.setParameter(patchNodes.reverb, 'mix', ny * 0.8);
               } else if (orb.id === 'texture') {
-                engine?.setParameter('distortion', Math.max(0, Math.min(1, nx)));
+                // Adjust noise gain as a "texture" control
+                chord.setParameter(patchNodes.noise, 'gain', nx * 0.08);
               }
             }}
-            onDragStart={() => engine?.playClick(orb.id === 'pitch' ? 1.2 : orb.id === 'reverb' ? 0.8 : 1.0)}
+            onDragStart={() => chord?.playNote(orb.id === 'pitch' ? 1200 : orb.id === 'reverb' ? 960 : 1200, 0.06)}
           >
             <span className="text-[10px] font-medium text-white/60 select-none">
               {orb.label}
@@ -260,20 +282,20 @@ function DraggableOrbs({ engine }: CardProps) {
   );
 }
 
-export function InteractionCards({ engine }: CardProps) {
+export function InteractionCards({ chord, patchNodes }: CardProps) {
   return (
     <div className="space-y-8">
       {/* Sound cards grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {CARDS.map((card) => (
-          <SoundCard key={card.title} card={card} engine={engine} />
+          <SoundCard key={card.title} card={card} chord={chord} />
         ))}
       </div>
 
       {/* Drawing pad and orbs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DrawingPad engine={engine} />
-        <DraggableOrbs engine={engine} />
+        <DrawingPad chord={chord} patchNodes={patchNodes} />
+        <DraggableOrbs chord={chord} patchNodes={patchNodes} />
       </div>
     </div>
   );

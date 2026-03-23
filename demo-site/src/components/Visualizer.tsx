@@ -1,8 +1,8 @@
 import { useRef, useEffect } from 'react';
-import type { ChordEngine } from '../audio/ChordEngine';
+import type { Chord } from '@chord/web';
 
 interface VisualizerProps {
-  engine: ChordEngine | null;
+  chord: Chord | null;
   mode?: 'waveform' | 'frequency' | 'terrain';
   color?: string;
   height?: number;
@@ -12,7 +12,7 @@ interface VisualizerProps {
 }
 
 export function Visualizer({
-  engine,
+  chord,
   mode = 'waveform',
   color = 'rgba(200, 255, 0, 0.5)',
   height = 200,
@@ -41,13 +41,13 @@ export function Visualizer({
 
       ctx.clearRect(0, 0, w, h);
 
-      if (!engine || !engine.started) {
+      if (!chord || !chord.started) {
         raf = requestAnimationFrame(draw);
         return;
       }
 
       if (mode === 'waveform') {
-        const waveform = engine.getWaveformData();
+        const waveform = chord.getWaveformData();
 
         // Main waveform
         ctx.strokeStyle = color;
@@ -80,7 +80,7 @@ export function Visualizer({
           ctx.stroke();
         }
       } else if (mode === 'frequency') {
-        const freq = engine.getFrequencyData();
+        const freq = chord.getFrequencyData();
         const barCount = 64;
         const barWidth = w / barCount;
 
@@ -101,8 +101,8 @@ export function Visualizer({
           );
         }
       } else if (mode === 'terrain') {
-        const waveform = engine.getWaveformData();
-        const rms = engine.getRMS();
+        const waveform = chord.getWaveformData();
+        const rms = chord.getRMS();
 
         // Draw multiple terrain lines stacked
         const layers = 5;
@@ -134,7 +134,7 @@ export function Visualizer({
 
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [engine, mode, color, lineWidth, mirror]);
+  }, [chord, mode, color, lineWidth, mirror]);
 
   return (
     <canvas

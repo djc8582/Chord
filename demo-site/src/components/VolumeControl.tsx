@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import type { ChordEngine } from '../audio/ChordEngine';
+import type { Chord } from '@chord/web';
 
 interface VolumeControlProps {
-  engine: ChordEngine | null;
+  chord: Chord | null;
 }
 
-export function VolumeControl({ engine }: VolumeControlProps) {
+export function VolumeControl({ chord }: VolumeControlProps) {
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.25);
 
   const toggleMute = () => {
     if (muted) {
-      engine?.setParameter('masterVolume', volume);
+      chord?.setMasterVolume(volume);
       setMuted(false);
     } else {
-      engine?.setParameter('masterVolume', 0);
+      chord?.setMasterVolume(0);
       setMuted(true);
     }
   };
@@ -24,7 +24,7 @@ export function VolumeControl({ engine }: VolumeControlProps) {
     const v = parseFloat(e.target.value);
     setVolume(v);
     if (!muted) {
-      engine?.setParameter('masterVolume', v);
+      chord?.setMasterVolume(v);
     }
   };
 
@@ -59,7 +59,7 @@ export function VolumeControl({ engine }: VolumeControlProps) {
       <input
         type="range"
         min="0"
-        max="0.35"
+        max="0.5"
         step="0.01"
         value={muted ? 0 : volume}
         onChange={handleVolumeChange}

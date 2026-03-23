@@ -1,42 +1,180 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChordEngine } from './audio/ChordEngine';
+import { Chord } from '@chord/web';
 import { Particles } from './components/Particles';
 import { Visualizer } from './components/Visualizer';
 import { InteractionCards } from './components/InteractionCards';
 import { DebugPanel } from './components/DebugPanel';
 import { VolumeControl } from './components/VolumeControl';
 
+// Pentatonic scale frequencies for chord progressions
+const PENTATONIC_NOTES = {
+  C2: 65.41, D2: 73.42, Eb2: 77.78, G2: 98.0, Ab2: 103.83, Bb2: 116.54,
+  C3: 130.81, D3: 146.83, Eb3: 155.56, G3: 196.0, Ab3: 207.65, Bb3: 233.08,
+  C4: 261.63, Eb4: 311.13, G4: 392.0, Ab4: 415.30, Bb4: 466.16,
+  C5: 523.25, Eb5: 622.25, G5: 783.99, Ab5: 830.61, Bb5: 932.33,
+  C6: 1046.5, Eb6: 1244.5, G6: 1567.98,
+};
+
+const CHORD_PROGRESSIONS = [
+  [PENTATONIC_NOTES.C4, PENTATONIC_NOTES.Eb4, PENTATONIC_NOTES.G4],
+  [PENTATONIC_NOTES.Ab3, PENTATONIC_NOTES.C4, PENTATONIC_NOTES.Eb4],
+  [PENTATONIC_NOTES.Bb3, PENTATONIC_NOTES.Eb4, PENTATONIC_NOTES.G4],
+  [PENTATONIC_NOTES.G3, PENTATONIC_NOTES.Bb3, PENTATONIC_NOTES.Eb4],
+  [PENTATONIC_NOTES.Ab3, PENTATONIC_NOTES.C4, PENTATONIC_NOTES.Eb5],
+];
+
+const BASS_NOTES = [
+  PENTATONIC_NOTES.C2,
+  PENTATONIC_NOTES.Ab2,
+  PENTATONIC_NOTES.Bb2,
+  PENTATONIC_NOTES.G2,
+  PENTATONIC_NOTES.Ab2,
+];
+
+// Node IDs stored as refs so interactions can address them
+interface PatchNodes {
+  bass: string;
+  pad1: string;
+  pad2: string;
+  pad3: string;
+  filter: string;
+  delay: string;
+  reverb: string;
+  lfo: string;
+  noise: string;
+  mixer: string;
+  output: string;
+}
+
 function App() {
-  const [engine] = useState(() => new ChordEngine());
+  const [chord] = useState(() => new Chord());
   const [started, setStarted] = useState(false);
   const [bloomed, setBloomed] = useState(false);
   const [debugVisible, setDebugVisible] = useState(false);
   const [rms, setRms] = useState(0);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [scrollDepth, setScrollDepth] = useState(0);
+  const nodesRef = useRef<PatchNodes | null>(null);
 
-  // Start audio on first click
+  // Start audio on first click — build the entire patch with Chord's API
   const handleStart = useCallback(async () => {
     if (started) return;
-    await engine.start();
+
+    // --- Build the patch: addNode + connect + setParameter ---
+
+    // Bass drone
+    const bass = chord.addNode('oscillator');
+    chord.setParameter(bass, 'frequency', PENTATONIC_NOTES.C2);
+    chord.setParameter(bass, 'waveform', 0); // sine
+    chord.setParameter(bass, 'gain', 0.12);
+
+    // Pad voices (3 detuned saws)
+    const pad1 = chord.addNode('oscillator');
+    chord.setParameter(pad1, 'frequency', PENTATONIC_NOTES.C4);
+    chord.setParameter(pad1, 'waveform', 1); // sawtooth
+    chord.setParameter(pad1, 'detune', -8);
+    chord.setParameter(pad1, 'gain', 0.08);
+
+    const pad2 = chord.addNode('oscillator');
+    chord.setParameter(pad2, 'frequency', PENTATONIC_NOTES.Eb4);
+    chord.setParameter(pad2, 'waveform', 1);
+    chord.setParameter(pad2, 'detune', 0);
+    chord.setParameter(pad2, 'gain', 0.08);
+
+    const pad3 = chord.addNode('oscillator');
+    chord.setParameter(pad3, 'frequency', PENTATONIC_NOTES.G4);
+    chord.setParameter(pad3, 'waveform', 1);
+    chord.setParameter(pad3, 'detune', 8);
+    chord.setParameter(pad3, 'gain', 0.08);
+
+    // Filter (pad -> filter -> mixer)
+    const filter = chord.addNode('filter');
+    chord.setParameter(filter, 'cutoff', 800);
+    chord.setParameter(filter, 'resonance', 1.5);
+
+    // LFO -> filter cutoff modulation (audio-rate!)
+    const lfo = chord.addNode('lfo');
+    chord.setParameter(lfo, 'rate', 0.2);
+    chord.setParameter(lfo, 'depth', 0.5);
+    chord.setParameter(lfo, 'waveform', 0); // sine
+
+    // Noise (subtle texture)
+    const noise = chord.addNode('noise');
+    chord.setParameter(noise, 'gain', 0.02);
+
+    // Mixer: combine bass, filtered pads, noise
+    const mixer = chord.addNode('mixer');
+
+    // Delay
+    const delay = chord.addNode('delay');
+    chord.setParameter(delay, 'time', 0.375);
+    chord.setParameter(delay, 'feedback', 0.3);
+    chord.setParameter(delay, 'mix', 0.25);
+
+    // Reverb
+    const reverb = chord.addNode('reverb');
+    chord.setParameter(reverb, 'room_size', 0.7);
+    chord.setParameter(reverb, 'damping', 0.4);
+    chord.setParameter(reverb, 'mix', 0.4);
+
+    // Output (connects to master)
+    const output = chord.addNode('output');
+
+    // --- Wire the patch ---
+    // Pads -> filter
+    chord.connect(pad1, 'out', filter, 'in');
+    chord.connect(pad2, 'out', filter, 'in');
+    chord.connect(pad3, 'out', filter, 'in');
+
+    // LFO -> filter cutoff (audio-rate modulation!)
+    chord.connect(lfo, 'out', filter, 'cutoff_mod');
+
+    // Bass -> mixer in1
+    chord.connect(bass, 'out', mixer, 'in1');
+
+    // Filtered pads -> mixer in2
+    chord.connect(filter, 'out', mixer, 'in2');
+
+    // Noise -> mixer in3
+    chord.connect(noise, 'out', mixer, 'in3');
+
+    // Mixer -> delay -> reverb -> output
+    chord.connect(mixer, 'out', delay, 'in');
+    chord.connect(delay, 'out', reverb, 'in');
+    chord.connect(reverb, 'out', output, 'in');
+
+    // Store node IDs for interactive control
+    nodesRef.current = { bass, pad1, pad2, pad3, filter, delay, reverb, lfo, noise, mixer, output };
+
+    // Start the engine
+    await chord.start();
+
+    // Apply time-of-day initial settings
+    const hour = new Date().getHours();
+    const brightness = Math.sin((hour / 24) * Math.PI);
+    chord.setParameter(filter, 'cutoff', 400 + brightness * 4000);
+
     setStarted(true);
     setTimeout(() => setBloomed(true), 100);
-  }, [engine, started]);
+  }, [chord, started]);
 
   // Mouse tracking -> audio parameters
   useEffect(() => {
-    if (!started) return;
+    if (!started || !nodesRef.current) return;
+    const nodes = nodesRef.current;
     const handleMouseMove = (e: MouseEvent) => {
       const nx = e.clientX / window.innerWidth;
       const ny = e.clientY / window.innerHeight;
       setMousePos({ x: nx, y: ny });
-      engine.setParameter('filterCutoff', nx);
-      engine.setParameter('reverbMix', ny);
+      // X -> filter cutoff (200Hz to 6200Hz)
+      chord.setParameter(nodes.filter, 'cutoff', 200 + nx * 6000);
+      // Y -> reverb mix
+      chord.setParameter(nodes.reverb, 'mix', Math.min(ny * 0.8, 0.8));
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [engine, started]);
+  }, [chord, started]);
 
   // Scroll depth -> chord progression
   useEffect(() => {
@@ -44,50 +182,68 @@ function App() {
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       const depth = maxScroll > 0 ? window.scrollY / maxScroll : 0;
       setScrollDepth(depth);
-      if (started) {
-        engine.setParameter('scrollDepth', depth);
-        engine.setParameter('padChord', depth);
+      if (started && nodesRef.current) {
+        const nodes = nodesRef.current;
+        const idx = Math.floor(depth * (CHORD_PROGRESSIONS.length - 0.01));
+        const safeIdx = Math.min(idx, CHORD_PROGRESSIONS.length - 1);
+        const chordFreqs = CHORD_PROGRESSIONS[safeIdx];
+        const bassNote = BASS_NOTES[safeIdx];
+
+        chord.setParameter(nodes.pad1, 'frequency', chordFreqs[0]);
+        chord.setParameter(nodes.pad2, 'frequency', chordFreqs[1]);
+        chord.setParameter(nodes.pad3, 'frequency', chordFreqs[2]);
+        chord.setParameter(nodes.bass, 'frequency', bassNote);
+
+        // Subtle brightness with scroll
+        chord.setParameter(nodes.filter, 'cutoff', 400 + depth * 3000);
       }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [engine, started]);
+  }, [chord, started]);
 
   // RMS polling for visuals
   useEffect(() => {
     if (!started) return;
     let raf: number;
     const poll = () => {
-      setRms(engine.getRMS());
+      setRms(chord.getRMS());
       raf = requestAnimationFrame(poll);
     };
     poll();
     return () => cancelAnimationFrame(raf);
-  }, [engine, started]);
+  }, [chord, started]);
 
   // Tab visibility -> volume
   useEffect(() => {
     if (!started) return;
     const handleVisibility = () => {
       if (document.hidden) {
-        engine.setParameter('masterVolume', 0.05);
+        chord.setMasterVolume(0.05);
       } else {
-        engine.setParameter('masterVolume', 0.25);
+        chord.setMasterVolume(0.25);
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [engine, started]);
+  }, [chord, started]);
 
   // Idle detection
   useEffect(() => {
-    if (!started) return;
+    if (!started || !nodesRef.current) return;
+    const nodes = nodesRef.current;
     let timer: number;
     const resetIdle = () => {
       clearTimeout(timer);
-      engine.setParameter('idle', 0);
+      // Active mode
+      chord.setParameter(nodes.noise, 'gain', 0.02);
+      chord.setParameter(nodes.reverb, 'mix', 0.4);
+      chord.setParameter(nodes.lfo, 'depth', 0.5);
       timer = window.setTimeout(() => {
-        engine.setParameter('idle', 1);
+        // Idle mode: quieter, more reverb
+        chord.setParameter(nodes.noise, 'gain', 0.01);
+        chord.setParameter(nodes.reverb, 'mix', 0.7);
+        chord.setParameter(nodes.lfo, 'depth', 0.3);
       }, 30000);
     };
     window.addEventListener('mousemove', resetIdle);
@@ -100,7 +256,7 @@ function App() {
       window.removeEventListener('keydown', resetIdle);
       window.removeEventListener('scroll', resetIdle);
     };
-  }, [engine, started]);
+  }, [chord, started]);
 
   // Debug panel toggle
   useEffect(() => {
@@ -110,6 +266,14 @@ function App() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
+
+  // Compute derived filter cutoff normalized for display
+  const filterCutoffNormalized = nodesRef.current
+    ? (chord.getParameter(nodesRef.current.filter, 'cutoff') - 200) / 6000
+    : 0;
+  const reverbMixValue = nodesRef.current
+    ? chord.getParameter(nodesRef.current.reverb, 'mix')
+    : 0;
 
   // Dynamic background color based on scroll
   const bgHue = 260 - scrollDepth * 40;
@@ -164,7 +328,7 @@ function App() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 1 }}
           >
-            A Chord Experience
+            Built with @chord/web
           </motion.p>
 
           {/* Main title */}
@@ -226,7 +390,7 @@ function App() {
         {/* Hero visualizer (behind everything) */}
         {started && (
           <div className="absolute bottom-0 left-0 right-0 opacity-30">
-            <Visualizer engine={engine} mode="waveform" color="rgba(200, 255, 0, 0.3)" height={150} mirror />
+            <Visualizer chord={chord} mode="waveform" color="rgba(200, 255, 0, 0.3)" height={150} mirror />
           </div>
         )}
       </section>
@@ -268,7 +432,7 @@ function App() {
             transition={{ duration: 0.8, delay: 0.2 }}
           >
             <Visualizer
-              engine={engine}
+              chord={chord}
               mode="waveform"
               color="rgba(200, 255, 0, 0.5)"
               height={250}
@@ -289,8 +453,8 @@ function App() {
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
             >
-              <span>Filter: {(engine.getParameter('filterCutoff') * 100).toFixed(0)}%</span>
-              <span>Reverb: {(engine.getParameter('reverbMix') * 100).toFixed(0)}%</span>
+              <span>Filter: {(filterCutoffNormalized * 100).toFixed(0)}%</span>
+              <span>Reverb: {(reverbMixValue * 100).toFixed(0)}%</span>
               <span>RMS: {rms.toFixed(4)}</span>
             </motion.div>
           )}
@@ -335,7 +499,7 @@ function App() {
             transition={{ duration: 0.8 }}
           >
             <Visualizer
-              engine={engine}
+              chord={chord}
               mode="terrain"
               color="rgba(124, 58, 237, 0.6)"
               height={400}
@@ -356,7 +520,7 @@ function App() {
             transition={{ duration: 0.8, delay: 0.3 }}
           >
             <Visualizer
-              engine={engine}
+              chord={chord}
               mode="frequency"
               color="rgba(124, 58, 237, 0.5)"
               height={120}
@@ -400,7 +564,7 @@ function App() {
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <InteractionCards engine={started ? engine : null} />
+            <InteractionCards chord={started ? chord : null} patchNodes={started ? nodesRef.current : null} />
           </motion.div>
         </div>
       </section>
@@ -419,23 +583,23 @@ function App() {
             <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-lime-400/20 bg-lime-400/5 mb-8">
               <div className="w-2 h-2 rounded-full bg-lime-400" />
               <span className="text-sm text-lime-400/80 font-medium tracking-wide">
-                Powered by Chord
+                Built with @chord/web
               </span>
             </div>
 
             <p className="text-white/30 text-sm leading-relaxed max-w-md mx-auto mb-8">
-              Every sound on this page was generated in real-time by the browser
-              using the Web Audio API. No samples. No recordings. Just math.
+              Every sound on this page is a Chord patch running in your browser.
+              {chord.getNodeCount()} nodes, {chord.getConnectionCount()} connections, zero Web Audio boilerplate.
             </p>
 
             <div className="flex items-center justify-center gap-6 text-xs text-white/20">
+              <span>@chord/web SDK</span>
+              <span className="w-1 h-1 rounded-full bg-white/10" />
               <span>Web Audio API</span>
               <span className="w-1 h-1 rounded-full bg-white/10" />
               <span>React</span>
               <span className="w-1 h-1 rounded-full bg-white/10" />
               <span>Canvas 2D</span>
-              <span className="w-1 h-1 rounded-full bg-white/10" />
-              <span>Framer Motion</span>
             </div>
 
             <div className="mt-16 pt-8 border-t border-white/5">
@@ -450,8 +614,8 @@ function App() {
       {/* ============================================================ */}
       {/* PERSISTENT UI                                                */}
       {/* ============================================================ */}
-      {started && <VolumeControl engine={engine} />}
-      <DebugPanel engine={engine} visible={debugVisible} />
+      {started && <VolumeControl chord={chord} />}
+      <DebugPanel chord={chord} patchNodes={nodesRef.current} visible={debugVisible} />
     </div>
   );
 }
