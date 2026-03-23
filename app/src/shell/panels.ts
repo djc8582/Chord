@@ -26,7 +26,7 @@ export const defaultPanels: PanelConfig[] = [
     position: "left",
     defaultSize: 220,
     minSize: 150,
-    defaultVisible: false,
+    defaultVisible: true,
     icon: "folder",
   },
   {

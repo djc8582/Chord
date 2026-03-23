@@ -250,6 +250,44 @@ function CanvasInner() {
         />
       </ReactFlow>
 
+      {/* Empty canvas hint */}
+      {nodes.length === 0 && !searchOpen && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            textAlign: "center",
+            color: "#64748b",
+            fontSize: 16,
+            fontWeight: 700,
+            fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
+            pointerEvents: "none",
+            lineHeight: 1.6,
+          }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.5 }}>&#9835;</div>
+          <div>
+            Press{" "}
+            <span
+              style={{
+                color: "#c8ff00",
+                background: "#000",
+                padding: "2px 8px",
+                borderRadius: 4,
+              }}
+            >
+              N
+            </span>{" "}
+            to add a node
+          </div>
+          <div style={{ fontSize: 13, marginTop: 4, opacity: 0.6 }}>
+            or open the Browser panel
+          </div>
+        </div>
+      )}
+
       {/* Node search palette overlay */}
       <NodeSearchPalette spawnPosition={spawnPosition} />
     </div>
