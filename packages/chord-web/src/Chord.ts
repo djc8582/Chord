@@ -35,7 +35,7 @@ export class Chord {
 
     // Master chain: masterGain -> limiter -> analyser -> destination
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 0;
+    this.masterGain.gain.value = 0.5;
 
     this.limiter = this.ctx.createDynamicsCompressor();
     this.limiter.threshold.value = -6;

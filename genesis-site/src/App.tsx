@@ -11,10 +11,16 @@ function App() {
   const [activePanel, setActivePanel] = useState(0);
 
   const handleStart = useCallback(async () => {
-    await chord.start();
-    setStarted(true);
-    chord.playNote(65, 4, 0.4);
-    chord.playNote(44, 5, 0.25);
+    try {
+      await chord.start();
+      chord.setMasterVolume(0.5);
+      setStarted(true);
+      chord.playNote(65, 4, 0.4);
+      chord.playNote(44, 5, 0.25);
+    } catch (e) {
+      console.error('Chord start failed:', e);
+      setStarted(true); // show panels anyway
+    }
   }, [chord]);
 
   useEffect(() => {
