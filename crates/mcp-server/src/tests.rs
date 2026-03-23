@@ -29,6 +29,8 @@ fn list_tools_returns_all_expected_tools() {
         "find_problems",
         "get_cpu_profile",
         "auto_fix",
+        "create_from_description",
+        "modify_patch",
     ];
 
     assert_eq!(tools.len(), expected_names.len());

@@ -304,5 +304,39 @@ pub fn all_tool_definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         },
+        ToolDefinition {
+            name: "create_from_description".to_string(),
+            description: "Create a complete audio patch from a natural language description. Examples: 'chill lo-fi beats', 'dark ambient drone', 'upbeat jazz with walking bass'.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Natural language description of the sound you want"
+                    }
+                },
+                "required": ["description"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "modify_patch".to_string(),
+            description: "Modify an existing patch using natural language. Examples: 'make it darker', 'more reverb', 'speed it up', 'louder bass'.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "patch_id": {
+                        "type": "string",
+                        "description": "The patch to modify."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "What to change about the patch"
+                    }
+                },
+                "required": ["patch_id", "description"],
+                "additionalProperties": false
+            }),
+        },
     ]
 }

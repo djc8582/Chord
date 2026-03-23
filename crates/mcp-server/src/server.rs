@@ -19,6 +19,7 @@ use serde_json::{json, Value};
 
 use crate::tools::all_tool_definitions;
 use crate::types::{McpError, McpResult, ToolDefinition};
+use crate::vibe;
 
 /// Well-known port for the Chord app's API server.
 const APP_API_PORT: u16 = 19475;
@@ -218,6 +219,8 @@ impl ChordMcpServer {
             "find_problems" => self.tool_find_problems(&args),
             "get_cpu_profile" => self.tool_get_cpu_profile(&args),
             "auto_fix" => self.tool_auto_fix(&args),
+            "create_from_description" => self.tool_create_from_description(&args),
+            "modify_patch" => self.tool_modify_patch(&args),
             _ => Err(McpError::UnknownTool(name.to_string())),
         }
     }
@@ -1089,6 +1092,550 @@ impl ChordMcpServer {
             })
     }
 
+    // ────────────────────────────────────────────
+    // Vibe-to-Sound tools
+    // ────────────────────────────────────────────
+
+    /// `create_from_description` — Create a patch from a natural language description.
+    fn tool_create_from_description(&mut self, args: &Value) -> McpResult<Value> {
+        let description = get_string(args, "description")?;
+        let recipe = vibe::translate(&description);
+
+        // Create a new patch.
+        let create_result = self.tool_create_patch()?;
+        let patch_id = create_result["patch_id"]
+            .as_str()
+            .ok_or_else(|| McpError::Internal("Failed to get patch_id".into()))?
+            .to_string();
+
+        // Build the patch from the recipe.
+        let build_result = self.build_patch_from_recipe(&patch_id, &recipe)?;
+
+        Ok(json!({
+            "patch_id": patch_id,
+            "name": recipe.name,
+            "description": recipe.description,
+            "tempo": recipe.tempo,
+            "layers": recipe.layers.len(),
+            "node_count": build_result["node_count"],
+            "suggestions": [
+                "Try: modify this patch with 'make it darker'",
+                "Try: modify this patch with 'add more reverb'",
+                "Try: modify this patch with 'speed it up'",
+            ]
+        }))
+    }
+
+    /// `modify_patch` — Modify an existing patch using natural language.
+    fn tool_modify_patch(&mut self, args: &Value) -> McpResult<Value> {
+        let patch_id = get_string(args, "patch_id")?;
+        let description = get_string(args, "description")?;
+        let changes = vibe::translate_modification(&description);
+
+        if changes.is_empty() {
+            return Ok(json!({
+                "modified": 0,
+                "message": "No recognized modifications in the description. Try: 'darker', 'brighter', 'more reverb', 'faster', 'louder', etc."
+            }));
+        }
+
+        // Verify patch exists.
+        if !self.patches.contains_key(&patch_id) {
+            return Err(McpError::PatchNotFound(patch_id));
+        }
+
+        let mut applied = 0;
+        let mut applied_changes: Vec<Value> = Vec::new();
+
+        for (target_hint, param, value) in &changes {
+            // Collect node IDs that match the target hint.
+            let matching_node_ids: Vec<(u64, String)> = {
+                let patch = self.patches.get(&patch_id).unwrap();
+                patch
+                    .graph
+                    .nodes()
+                    .iter()
+                    .filter(|(_, desc)| {
+                        desc.node_type.contains(target_hint.as_str())
+                            || (target_hint == "master" && desc.node_type == "gain")
+                            || (target_hint == "clock" && desc.node_type == "lfo")
+                            || (target_hint == "bass" && desc.node_type == "gain")
+                    })
+                    .map(|(id, desc)| (id.0, desc.node_type.clone()))
+                    .collect()
+            };
+
+            for (node_id, node_type) in &matching_node_ids {
+                let set_result = self.tool_set_parameter(&json!({
+                    "patch_id": patch_id,
+                    "node_id": node_id,
+                    "parameter": param,
+                    "value": value
+                }));
+                if set_result.is_ok() {
+                    applied += 1;
+                    applied_changes.push(json!({
+                        "node_id": node_id,
+                        "node_type": node_type,
+                        "parameter": param,
+                        "value": value,
+                    }));
+                }
+            }
+        }
+
+        Ok(json!({
+            "modified": applied,
+            "changes": applied_changes
+        }))
+    }
+
+    /// Build a complete patch from a `PatchRecipe`.
+    ///
+    /// Creates a clock LFO, builds each layer, routes through a mixer,
+    /// adds delay/reverb/gain effects chain, and connects to output.
+    fn build_patch_from_recipe(
+        &mut self,
+        patch_id: &str,
+        recipe: &vibe::PatchRecipe,
+    ) -> McpResult<Value> {
+        // Clock LFO (tempo source)
+        let clock_rate = recipe.tempo / 60.0 * 2.0;
+        let clock_result = self.tool_add_node(&json!({
+            "patch_id": patch_id,
+            "node_type": "lfo",
+            "position": {"x": 50, "y": 400}
+        }))?;
+        let clock_id = clock_result["node_id"].as_u64().unwrap();
+        let clock_out_port = clock_result["outputs"][0]["id"].as_u64().unwrap();
+
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": clock_id,
+            "parameter": "rate", "value": clock_rate
+        }))?;
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": clock_id,
+            "parameter": "waveform", "value": 2.0 // square wave
+        }))?;
+
+        // Build each layer.
+        let mut layer_output_ids: Vec<(u64, u64)> = Vec::new(); // (node_id, out_port_id)
+        for (i, layer) in recipe.layers.iter().enumerate() {
+            let y = 100 + i as i32 * 250;
+            let (output_id, output_port) =
+                self.build_layer(patch_id, layer, clock_id, clock_out_port, &recipe.key, y)?;
+            layer_output_ids.push((output_id, output_port));
+        }
+
+        // Mixer
+        let mixer_result = self.tool_add_node(&json!({
+            "patch_id": patch_id, "node_type": "mixer",
+            "position": {"x": 1200, "y": 400}
+        }))?;
+        let mixer_id = mixer_result["node_id"].as_u64().unwrap();
+        let mixer_inputs: Vec<u64> = mixer_result["inputs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["id"].as_u64().unwrap())
+            .collect();
+        let mixer_out_port = mixer_result["outputs"][0]["id"].as_u64().unwrap();
+
+        // Connect layers to mixer (max 4 inputs).
+        for (i, &(output_id, output_port)) in layer_output_ids.iter().take(4).enumerate() {
+            let _ = self.tool_connect(&json!({
+                "patch_id": patch_id,
+                "from_node": output_id, "from_port": output_port,
+                "to_node": mixer_id, "to_port": mixer_inputs[i]
+            }));
+        }
+
+        // If we have more than 4 layers, add a second mixer and feed it into the first.
+        if layer_output_ids.len() > 4 {
+            let mixer2_result = self.tool_add_node(&json!({
+                "patch_id": patch_id, "node_type": "mixer",
+                "position": {"x": 1100, "y": 700}
+            }))?;
+            let mixer2_id = mixer2_result["node_id"].as_u64().unwrap();
+            let mixer2_inputs: Vec<u64> = mixer2_result["inputs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| p["id"].as_u64().unwrap())
+                .collect();
+            let mixer2_out_port = mixer2_result["outputs"][0]["id"].as_u64().unwrap();
+
+            for (i, &(output_id, output_port)) in
+                layer_output_ids.iter().skip(4).take(4).enumerate()
+            {
+                let _ = self.tool_connect(&json!({
+                    "patch_id": patch_id,
+                    "from_node": output_id, "from_port": output_port,
+                    "to_node": mixer2_id, "to_port": mixer2_inputs[i]
+                }));
+            }
+
+            // Connect second mixer to last input of first mixer.
+            let last_mixer_input = mixer_inputs[3];
+            let _ = self.tool_connect(&json!({
+                "patch_id": patch_id,
+                "from_node": mixer2_id, "from_port": mixer2_out_port,
+                "to_node": mixer_id, "to_port": last_mixer_input
+            }));
+        }
+
+        // Delay
+        let delay_result = self.tool_add_node(&json!({
+            "patch_id": patch_id, "node_type": "delay",
+            "position": {"x": 1400, "y": 400}
+        }))?;
+        let delay_id = delay_result["node_id"].as_u64().unwrap();
+        let delay_in_port = delay_result["inputs"][0]["id"].as_u64().unwrap();
+        let delay_out_port = delay_result["outputs"][0]["id"].as_u64().unwrap();
+
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": delay_id,
+            "parameter": "time", "value": recipe.delay_time
+        }))?;
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": delay_id,
+            "parameter": "feedback", "value": recipe.delay_feedback
+        }))?;
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": delay_id,
+            "parameter": "mix", "value": recipe.delay_mix
+        }))?;
+
+        // Reverb
+        let reverb_result = self.tool_add_node(&json!({
+            "patch_id": patch_id, "node_type": "reverb",
+            "position": {"x": 1600, "y": 400}
+        }))?;
+        let reverb_id = reverb_result["node_id"].as_u64().unwrap();
+        let reverb_in_port = reverb_result["inputs"][0]["id"].as_u64().unwrap();
+        let reverb_out_port = reverb_result["outputs"][0]["id"].as_u64().unwrap();
+
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": reverb_id,
+            "parameter": "room_size", "value": recipe.reverb_size
+        }))?;
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": reverb_id,
+            "parameter": "mix", "value": recipe.reverb_mix
+        }))?;
+
+        // Master gain
+        let gain_result = self.tool_add_node(&json!({
+            "patch_id": patch_id, "node_type": "gain",
+            "position": {"x": 1800, "y": 400}
+        }))?;
+        let gain_id = gain_result["node_id"].as_u64().unwrap();
+        let gain_in_port = gain_result["inputs"][0]["id"].as_u64().unwrap();
+        let gain_out_port = gain_result["outputs"][0]["id"].as_u64().unwrap();
+
+        self.tool_set_parameter(&json!({
+            "patch_id": patch_id, "node_id": gain_id,
+            "parameter": "gain", "value": recipe.master_gain
+        }))?;
+
+        // Output
+        let out_result = self.tool_add_node(&json!({
+            "patch_id": patch_id, "node_type": "output",
+            "position": {"x": 2000, "y": 400}
+        }))?;
+        let out_id = out_result["node_id"].as_u64().unwrap();
+        let out_in_port = out_result["inputs"][0]["id"].as_u64().unwrap();
+
+        // Connect chain: mixer → delay → reverb → gain → output
+        self.tool_connect(&json!({
+            "patch_id": patch_id,
+            "from_node": mixer_id, "from_port": mixer_out_port,
+            "to_node": delay_id, "to_port": delay_in_port
+        }))?;
+        self.tool_connect(&json!({
+            "patch_id": patch_id,
+            "from_node": delay_id, "from_port": delay_out_port,
+            "to_node": reverb_id, "to_port": reverb_in_port
+        }))?;
+        self.tool_connect(&json!({
+            "patch_id": patch_id,
+            "from_node": reverb_id, "from_port": reverb_out_port,
+            "to_node": gain_id, "to_port": gain_in_port
+        }))?;
+        self.tool_connect(&json!({
+            "patch_id": patch_id,
+            "from_node": gain_id, "from_port": gain_out_port,
+            "to_node": out_id, "to_port": out_in_port
+        }))?;
+
+        // Count nodes: clock + layers (variable) + mixer + delay + reverb + gain + output = layers*N + 5 + clock
+        let patch = self.patches.get(patch_id).unwrap();
+        let node_count = patch.graph.node_count();
+
+        Ok(json!({
+            "built": true,
+            "node_count": node_count,
+            "layers": recipe.layers.len()
+        }))
+    }
+
+    /// Build a single layer from a `LayerRecipe`.
+    ///
+    /// Returns `(output_node_id, output_port_id)` — the final gain node's output
+    /// that should be connected to the mixer.
+    fn build_layer(
+        &mut self,
+        patch_id: &str,
+        layer: &vibe::LayerRecipe,
+        clock_id: u64,
+        clock_out_port: u64,
+        key: &vibe::Key,
+        y: i32,
+    ) -> McpResult<(u64, u64)> {
+        match layer.role {
+            vibe::LayerRole::Rhythm => {
+                // Drum: clock → sequencer → drum_node → gain
+                let seq_type = layer.sequencer.as_deref().unwrap_or("euclidean");
+
+                let seq_result = self.tool_add_node(&json!({
+                    "patch_id": patch_id, "node_type": seq_type,
+                    "position": {"x": 200, "y": y}
+                }))?;
+                let seq_id = seq_result["node_id"].as_u64().unwrap();
+                let seq_clock_port = seq_result["inputs"][0]["id"].as_u64().unwrap();
+
+                // Find the gate output port on the sequencer.
+                let seq_gate_port = seq_result["outputs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|p| p["name"] == "gate")
+                    .or_else(|| seq_result["outputs"].as_array().unwrap().first())
+                    .map(|p| p["id"].as_u64().unwrap())
+                    .unwrap();
+
+                // Set sequencer params.
+                for (k, v) in &layer.sequencer_params {
+                    let _ = self.tool_set_parameter(&json!({
+                        "patch_id": patch_id, "node_id": seq_id,
+                        "parameter": k, "value": v
+                    }));
+                }
+
+                // Drum node.
+                let drum_result = self.tool_add_node(&json!({
+                    "patch_id": patch_id, "node_type": layer.node_type,
+                    "position": {"x": 450, "y": y}
+                }))?;
+                let drum_id = drum_result["node_id"].as_u64().unwrap();
+                let drum_trigger_port = drum_result["inputs"][0]["id"].as_u64().unwrap();
+                let drum_out_port = drum_result["outputs"][0]["id"].as_u64().unwrap();
+
+                // Gain node.
+                let gain_result = self.tool_add_node(&json!({
+                    "patch_id": patch_id, "node_type": "gain",
+                    "position": {"x": 700, "y": y}
+                }))?;
+                let gain_id = gain_result["node_id"].as_u64().unwrap();
+                let gain_in_port = gain_result["inputs"][0]["id"].as_u64().unwrap();
+                let gain_out_port = gain_result["outputs"][0]["id"].as_u64().unwrap();
+
+                self.tool_set_parameter(&json!({
+                    "patch_id": patch_id, "node_id": gain_id,
+                    "parameter": "gain", "value": layer.volume
+                }))?;
+
+                // Connect: clock → sequencer
+                self.tool_connect(&json!({
+                    "patch_id": patch_id,
+                    "from_node": clock_id, "from_port": clock_out_port,
+                    "to_node": seq_id, "to_port": seq_clock_port
+                }))?;
+
+                // Connect: sequencer gate → drum trigger
+                self.tool_connect(&json!({
+                    "patch_id": patch_id,
+                    "from_node": seq_id, "from_port": seq_gate_port,
+                    "to_node": drum_id, "to_port": drum_trigger_port
+                }))?;
+
+                // Connect: drum → gain
+                self.tool_connect(&json!({
+                    "patch_id": patch_id,
+                    "from_node": drum_id, "from_port": drum_out_port,
+                    "to_node": gain_id, "to_port": gain_in_port
+                }))?;
+
+                Ok((gain_id, gain_out_port))
+            }
+            _ => {
+                // Melodic/pad/texture: [clock → sequencer →] source → filter → gain
+                let mut last_id;
+                let mut last_out_port;
+
+                // Optionally add a sequencer.
+                if let Some(seq_type) = &layer.sequencer {
+                    let seq_result = self.tool_add_node(&json!({
+                        "patch_id": patch_id, "node_type": seq_type,
+                        "position": {"x": 200, "y": y}
+                    }))?;
+                    let seq_id = seq_result["node_id"].as_u64().unwrap();
+                    let seq_clock_port = seq_result["inputs"][0]["id"].as_u64().unwrap();
+
+                    // Find the freq output port.
+                    let seq_freq_port = seq_result["outputs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .find(|p| p["name"] == "freq")
+                        .or_else(|| seq_result["outputs"].as_array().unwrap().first())
+                        .map(|p| p["id"].as_u64().unwrap())
+                        .unwrap();
+
+                    // Set sequencer params.
+                    for (k, v) in &layer.sequencer_params {
+                        let _ = self.tool_set_parameter(&json!({
+                            "patch_id": patch_id, "node_id": seq_id,
+                            "parameter": k, "value": v
+                        }));
+                    }
+
+                    // Connect clock → sequencer.
+                    self.tool_connect(&json!({
+                        "patch_id": patch_id,
+                        "from_node": clock_id, "from_port": clock_out_port,
+                        "to_node": seq_id, "to_port": seq_clock_port
+                    }))?;
+
+                    // Source node.
+                    if layer.node_type == "noise" {
+                        let noise_result = self.tool_add_node(&json!({
+                            "patch_id": patch_id, "node_type": "noise",
+                            "position": {"x": 450, "y": y}
+                        }))?;
+                        last_id = noise_result["node_id"].as_u64().unwrap();
+                        last_out_port = noise_result["outputs"][0]["id"].as_u64().unwrap();
+                    } else {
+                        let osc_result = self.tool_add_node(&json!({
+                            "patch_id": patch_id, "node_type": "oscillator",
+                            "position": {"x": 450, "y": y}
+                        }))?;
+                        last_id = osc_result["node_id"].as_u64().unwrap();
+                        last_out_port = osc_result["outputs"][0]["id"].as_u64().unwrap();
+
+                        self.tool_set_parameter(&json!({
+                            "patch_id": patch_id, "node_id": last_id,
+                            "parameter": "waveform", "value": layer.waveform as f64
+                        }))?;
+
+                        // Set frequency based on octave + key.
+                        let base_freq =
+                            vibe::key_to_freq(*key) * 2.0f64.powi(layer.octave - 4);
+                        self.tool_set_parameter(&json!({
+                            "patch_id": patch_id, "node_id": last_id,
+                            "parameter": "frequency", "value": base_freq
+                        }))?;
+
+                        // Connect sequencer freq → oscillator freq input.
+                        // The oscillator has a "freq" input port (index 2).
+                        let osc_freq_in = osc_result["inputs"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .find(|p| p["name"] == "freq")
+                            .map(|p| p["id"].as_u64().unwrap());
+                        if let Some(freq_port) = osc_freq_in {
+                            let _ = self.tool_connect(&json!({
+                                "patch_id": patch_id,
+                                "from_node": seq_id, "from_port": seq_freq_port,
+                                "to_node": last_id, "to_port": freq_port
+                            }));
+                        }
+                    }
+                } else {
+                    // No sequencer — direct source.
+                    if layer.node_type == "noise" {
+                        let noise_result = self.tool_add_node(&json!({
+                            "patch_id": patch_id, "node_type": "noise",
+                            "position": {"x": 450, "y": y}
+                        }))?;
+                        last_id = noise_result["node_id"].as_u64().unwrap();
+                        last_out_port = noise_result["outputs"][0]["id"].as_u64().unwrap();
+                    } else {
+                        let osc_result = self.tool_add_node(&json!({
+                            "patch_id": patch_id, "node_type": "oscillator",
+                            "position": {"x": 450, "y": y}
+                        }))?;
+                        last_id = osc_result["node_id"].as_u64().unwrap();
+                        last_out_port = osc_result["outputs"][0]["id"].as_u64().unwrap();
+
+                        self.tool_set_parameter(&json!({
+                            "patch_id": patch_id, "node_id": last_id,
+                            "parameter": "waveform", "value": layer.waveform as f64
+                        }))?;
+
+                        let base_freq =
+                            vibe::key_to_freq(*key) * 2.0f64.powi(layer.octave - 4);
+                        self.tool_set_parameter(&json!({
+                            "patch_id": patch_id, "node_id": last_id,
+                            "parameter": "frequency", "value": base_freq
+                        }))?;
+                    }
+                }
+
+                // Filter
+                let filt_result = self.tool_add_node(&json!({
+                    "patch_id": patch_id, "node_type": "filter",
+                    "position": {"x": 700, "y": y}
+                }))?;
+                let filt_id = filt_result["node_id"].as_u64().unwrap();
+                let filt_in_port = filt_result["inputs"][0]["id"].as_u64().unwrap();
+                let filt_out_port = filt_result["outputs"][0]["id"].as_u64().unwrap();
+
+                self.tool_set_parameter(&json!({
+                    "patch_id": patch_id, "node_id": filt_id,
+                    "parameter": "cutoff", "value": layer.filter_cutoff
+                }))?;
+                self.tool_set_parameter(&json!({
+                    "patch_id": patch_id, "node_id": filt_id,
+                    "parameter": "resonance", "value": layer.filter_resonance
+                }))?;
+
+                // Gain
+                let gain_result = self.tool_add_node(&json!({
+                    "patch_id": patch_id, "node_type": "gain",
+                    "position": {"x": 950, "y": y}
+                }))?;
+                let gain_id = gain_result["node_id"].as_u64().unwrap();
+                let gain_in_port = gain_result["inputs"][0]["id"].as_u64().unwrap();
+                let gain_out_port = gain_result["outputs"][0]["id"].as_u64().unwrap();
+
+                self.tool_set_parameter(&json!({
+                    "patch_id": patch_id, "node_id": gain_id,
+                    "parameter": "gain", "value": layer.volume
+                }))?;
+
+                // Connect: source → filter → gain
+                self.tool_connect(&json!({
+                    "patch_id": patch_id,
+                    "from_node": last_id, "from_port": last_out_port,
+                    "to_node": filt_id, "to_port": filt_in_port
+                }))?;
+                self.tool_connect(&json!({
+                    "patch_id": patch_id,
+                    "from_node": filt_id, "from_port": filt_out_port,
+                    "to_node": gain_id, "to_port": gain_in_port
+                }))?;
+
+                Ok((gain_id, gain_out_port))
+            }
+        }
+    }
+
+    // ────────────────────────────────────────────
+    // Auto-fix helpers
+    // ────────────────────────────────────────────
+
     /// Bypass a node by disconnecting it and reconnecting its inputs to its outputs.
     fn apply_bypass_node(
         &mut self,
@@ -1469,6 +2016,41 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
         "dc_blocker" => NodeDescriptor::new("dc_blocker")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
             .with_output(PortDescriptor::new("out", PortDataType::Audio)),
+
+        "kick_drum" => NodeDescriptor::new("kick_drum")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("pitch_start", "Pitch Start", 150.0, 50.0, 500.0).with_unit("Hz"))
+            .with_parameter(ParameterDescriptor::new("pitch_end", "Pitch End", 45.0, 20.0, 200.0).with_unit("Hz"))
+            .with_parameter(ParameterDescriptor::new("pitch_decay", "Pitch Decay", 0.05, 0.01, 0.3).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("decay", "Decay", 0.3, 0.05, 2.0).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("click", "Click", 0.3, 0.0, 1.0))
+            .with_parameter(ParameterDescriptor::new("drive", "Drive", 0.2, 0.0, 1.0)),
+
+        "snare_drum" => NodeDescriptor::new("snare_drum")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("tone", "Tone", 200.0, 100.0, 400.0).with_unit("Hz"))
+            .with_parameter(ParameterDescriptor::new("decay", "Decay", 0.15, 0.05, 1.0).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("snappy", "Snappy", 0.5, 0.0, 1.0)),
+
+        "hi_hat" => NodeDescriptor::new("hi_hat")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("decay", "Decay", 0.05, 0.01, 0.5).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("tone", "Tone", 8000.0, 2000.0, 16000.0).with_unit("Hz")),
+
+        "clap" => NodeDescriptor::new("clap")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("decay", "Decay", 0.15, 0.05, 0.5).with_unit("s"))
+            .with_parameter(ParameterDescriptor::new("tone", "Tone", 1000.0, 500.0, 4000.0).with_unit("Hz")),
+
+        "tom" => NodeDescriptor::new("tom")
+            .with_input(PortDescriptor::new("trigger", PortDataType::Audio))
+            .with_output(PortDescriptor::new("out", PortDataType::Audio))
+            .with_parameter(ParameterDescriptor::new("pitch", "Pitch", 100.0, 40.0, 300.0).with_unit("Hz"))
+            .with_parameter(ParameterDescriptor::new("decay", "Decay", 0.2, 0.05, 1.0).with_unit("s")),
 
         // Fallback for unknown types — creates a minimal pass-through descriptor.
         other => NodeDescriptor::new(other)

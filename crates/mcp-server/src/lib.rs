@@ -28,6 +28,7 @@
 mod server;
 mod tools;
 mod types;
+pub mod vibe;
 
 pub use server::ChordMcpServer;
 pub use types::{McpError, McpResult, ToolDefinition};
