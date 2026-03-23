@@ -29,7 +29,20 @@ export { generateChordRC, generateNpmPackageJSON, generatePatchPackageIndex, NPM
 
 // Visualizers
 export {
+  // Wave 1
   getAnalysisFrame, createWaveform, createSpectrum, createLevelMeter, createParticles,
   useAudioReactive, bindAudioToCSS, THEMES, getTheme,
-  type AudioAnalysisFrame, type VisualizerTheme
+  type AudioAnalysisFrame, type VisualizerTheme,
+  type WaveformOptions, type SpectrumOptions, type LevelMeterOptions, type ParticlesOptions,
+  // Wave 2 — Musical
+  createPianoRoll, type PianoRollOptions,
+  createChordDisplay, type ChordDisplayOptions,
+  createDrumGrid, type DrumGridOptions,
+  createMelodyContour, type MelodyContourOptions,
+  // Wave 3 — Creative
+  createGeometry, type GeometryOptions,
+  createKaleidoscope, type KaleidoscopeOptions,
+  // Wave 4 — UI Primitives
+  createAudioBackground, type AudioBackgroundOptions,
+  createAudioLoader, type AudioLoaderOptions,
 } from './visualizers/index.js';

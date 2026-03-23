@@ -1,11 +1,25 @@
 /**
  * Chord Visualizer Ecosystem
  *
- * Visualizers:
+ * Wave 1 — Core:
  *   createWaveform()    Oscilloscope display
  *   createSpectrum()    Frequency analyzer
  *   createLevelMeter()  RMS/Peak meter
  *   createParticles()   Audio-reactive particles
+ *
+ * Wave 2 — Musical:
+ *   createPianoRoll()     Live piano roll
+ *   createChordDisplay()  Chord/note detection display
+ *   createDrumGrid()      Step sequencer grid
+ *   createMelodyContour() Pitch contour tracker
+ *
+ * Wave 3 — Creative:
+ *   createGeometry()      Audio-reactive wireframe sphere
+ *   createKaleidoscope()  Kaleidoscope mirror effect
+ *
+ * Wave 4 — UI Primitives:
+ *   createAudioBackground()  Audio-reactive gradient background
+ *   createAudioLoader()      Audio-reactive loading spinner
  *
  * Analysis:
  *   getAnalysisFrame()  Extract analysis from Chord engine
@@ -18,6 +32,7 @@
  *   THEMES, getTheme()  Built-in visual themes
  */
 
+// Wave 1
 export { getAnalysisFrame } from './analysis.js';
 export { createWaveform, type WaveformOptions } from './Waveform.js';
 export { createSpectrum, type SpectrumOptions } from './Spectrum.js';
@@ -25,3 +40,17 @@ export { createLevelMeter, type LevelMeterOptions } from './LevelMeter.js';
 export { createParticles, type ParticlesOptions } from './Particles.js';
 export { useAudioReactive, bindAudioToCSS } from './hooks.js';
 export { THEMES, getTheme, type AudioAnalysisFrame, type VisualizerTheme } from './types.js';
+
+// Wave 2 — Musical
+export { createPianoRoll, type PianoRollOptions } from './PianoRoll.js';
+export { createChordDisplay, type ChordDisplayOptions } from './ChordDisplay.js';
+export { createDrumGrid, type DrumGridOptions } from './DrumGrid.js';
+export { createMelodyContour, type MelodyContourOptions } from './MelodyContour.js';
+
+// Wave 3 — Creative
+export { createGeometry, type GeometryOptions } from './Geometry.js';
+export { createKaleidoscope, type KaleidoscopeOptions } from './Kaleidoscope.js';
+
+// Wave 4 — UI Primitives
+export { createAudioBackground, type AudioBackgroundOptions } from './AudioBackground.js';
+export { createAudioLoader, type AudioLoaderOptions } from './AudioLoader.js';
