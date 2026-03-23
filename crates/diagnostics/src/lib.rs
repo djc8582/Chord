@@ -13,6 +13,7 @@
 //! - **Comprehensive detection**: Clipping, clicks, NaN/Inf, DC offset, digital silence.
 //! - **Auto-fix suggestions**: Each detected problem includes a suggested fix.
 
+pub mod analysis;
 mod detector;
 mod engine;
 mod profiler;
@@ -20,6 +21,7 @@ mod report;
 mod signal_monitor;
 mod stats;
 
+pub use analysis::{analyze, SoundAnalysis};
 pub use detector::*;
 pub use engine::*;
 pub use profiler::*;
