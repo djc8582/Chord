@@ -13,3 +13,7 @@ export { osc, filter, gain, delay, reverb, noise, mixer, output, lfo, envelope }
 export { kickDrum, snareDrum, hiHat, clap, tom } from './dsl/index.js';
 export { stepSequencer, euclidean, markovSequencer, gravitySequencer, gameOfLife, polyrhythm } from './dsl/index.js';
 export { compressor, eq, chorus, phaser, waveshaper, limiter, granular } from './dsl/index.js';
+export { subpatch } from './dsl/index.js';
+
+// Config
+export { defineConfig, type ChordConfig } from './config.js';

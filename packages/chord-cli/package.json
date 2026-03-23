@@ -1,0 +1,10 @@
+{
+  "name": "chord-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for Chord audio projects",
+  "type": "module",
+  "bin": {
+    "chord": "./src/index.ts"
+  },
+  "dependencies": {}
+}

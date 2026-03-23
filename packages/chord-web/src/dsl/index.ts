@@ -19,7 +19,8 @@ export {
   stepSequencer, euclidean, markovSequencer, gravitySequencer,
   gameOfLife, polyrhythm,
   compressor, eq, chorus, phaser, waveshaper, limiter, granular,
+  subpatch,
 } from './nodes.js';
 export type { NodeRef } from './types.js';
-export type { NodeParams } from './nodes.js';
+export type { NodeParams, SubpatchConfig } from './nodes.js';
 export { compile, decompile } from './compiler.js';

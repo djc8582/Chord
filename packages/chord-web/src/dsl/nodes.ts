@@ -152,3 +152,105 @@ export function granular(p: { grainSize?: number; density?: number; scatter?: nu
 }
 
 export type NodeParams = OscParams | FilterParams | DelayParams | ReverbParams | LfoParams | EnvelopeParams;
+
+// ─── Subpatch ───
+
+export interface SubpatchConfig {
+  description?: string;
+  parameters?: Record<string, { min?: number; max?: number; default?: number; unit?: string }>;
+  inputs?: string[];
+  outputs?: string[];
+}
+
+export function subpatch(
+  name: string,
+  config: SubpatchConfig,
+  builder: (s: SubpatchBuilder) => void,
+): SubpatchRef {
+  // Save and reset global state
+  const savedNodes = [..._nodes];
+  const savedConns = [..._connections];
+  const savedId = _nextId;
+  _reset();
+
+  const inputs: Record<string, NodeRef> = {};
+  const outputs: Record<string, NodeRef> = {};
+
+  const s: SubpatchBuilder = {
+    input(inputName: string): NodeRef {
+      if (!inputs[inputName]) {
+        // Create a passthrough gain node as input
+        inputs[inputName] = makeNode('gain', { gain: 1.0 });
+      }
+      return inputs[inputName];
+    },
+    output(outputName: string): NodeRef {
+      if (!outputs[outputName]) {
+        outputs[outputName] = makeNode('gain', { gain: 1.0 });
+      }
+      return outputs[outputName];
+    },
+    param(paramName: string): number {
+      return config.parameters?.[paramName]?.default ?? 0;
+    },
+  };
+
+  builder(s);
+
+  const subNodes = [..._nodes];
+  const subConns = [..._connections];
+
+  // Restore global state
+  _nodes.length = 0;
+  _connections.length = 0;
+  _nodes.push(...savedNodes);
+  _connections.push(...savedConns);
+  _nextId = savedId;
+
+  return {
+    name,
+    config,
+    nodes: subNodes,
+    connections: subConns,
+    inputs,
+    outputs,
+    instantiate(): NodeRef {
+      // Add all subpatch nodes to the global state
+      const idMap = new Map<string, string>();
+      for (const node of subNodes) {
+        const newId = `${name}_${_nextId++}`;
+        idMap.set(node.id, newId);
+        _nodes.push({ ...node, id: newId });
+      }
+      // Remap connections
+      for (const conn of subConns) {
+        _connections.push({
+          fromId: idMap.get(conn.fromId) ?? conn.fromId,
+          fromPort: conn.fromPort,
+          toId: idMap.get(conn.toId) ?? conn.toId,
+          toPort: conn.toPort,
+        });
+      }
+      // Return the first output as the NodeRef
+      const firstOutput = Object.values(outputs)[0];
+      const remappedId = idMap.get(firstOutput?.id ?? '') ?? '';
+      return createNodeRef(remappedId, 'subpatch_output');
+    },
+  };
+}
+
+interface SubpatchBuilder {
+  input(name: string): NodeRef;
+  output(name: string): NodeRef;
+  param(name: string): number;
+}
+
+interface SubpatchRef {
+  name: string;
+  config: SubpatchConfig;
+  nodes: NodeDef[];
+  connections: ConnectionDef[];
+  inputs: Record<string, NodeRef>;
+  outputs: Record<string, NodeRef>;
+  instantiate(): NodeRef;
+}
