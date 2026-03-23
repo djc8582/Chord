@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 chord-dsp-runtime = { path = "../dsp-runtime" }
 chord-audio-graph = { path = "../audio-graph" }
-chord-midi-engine = { path = "../midi-engine" }
 chord-scripting-runtime = { path = "../scripting-runtime" }
 
 [dev-dependencies]
