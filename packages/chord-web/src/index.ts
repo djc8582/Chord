@@ -17,3 +17,12 @@ export { subpatch } from './dsl/index.js';
 
 // Config
 export { defineConfig, type ChordConfig } from './config.js';
+
+// Tiers
+export { TIER_LIMITS, TIER_PRICING, checkTierAccess, checkNodeLimit, type Tier, type TierLimits } from './tiers.js';
+
+// Attribution
+export { generateAttribution, generateBadgeHTML, DEFAULT_ATTRIBUTION, type PatchLineage, type AttributionConfig } from './attribution.js';
+
+// Discovery
+export { generateChordRC, generateNpmPackageJSON, generatePatchPackageIndex, NPM_KEYWORDS, type ChordRC } from './discovery.js';
