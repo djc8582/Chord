@@ -108,12 +108,17 @@ impl AudioNode for Gate {
                 self.envelope = 0.0;
             }
 
-            let above_threshold = self.envelope >= threshold_linear;
+            // Hysteresis: once the gate opens, the close threshold is 3 dB lower
+            // than the open threshold.  This prevents chatter when the signal
+            // hovers near the threshold.
+            let hysteresis_factor = 0.708; // ~-3 dB
+            let above_open = self.envelope >= threshold_linear;
+            let above_close = self.envelope >= threshold_linear * hysteresis_factor;
 
             // State machine.
             match self.state {
                 GateState::Closed => {
-                    if above_threshold {
+                    if above_open {
                         self.state = GateState::Attack;
                     }
                 }
@@ -123,18 +128,19 @@ impl AudioNode for Gate {
                         self.gain = 1.0;
                         self.state = GateState::Open;
                     }
-                    if !above_threshold {
+                    // Use lower (close) threshold during attack to avoid premature release.
+                    if !above_close {
                         self.state = GateState::Release;
                     }
                 }
                 GateState::Open => {
-                    if !above_threshold {
+                    if !above_close {
                         self.hold_counter = hold_samples;
                         self.state = GateState::Hold;
                     }
                 }
                 GateState::Hold => {
-                    if above_threshold {
+                    if above_close {
                         self.state = GateState::Open;
                     } else if self.hold_counter == 0 {
                         self.state = GateState::Release;
@@ -143,7 +149,7 @@ impl AudioNode for Gate {
                     }
                 }
                 GateState::Release => {
-                    if above_threshold {
+                    if above_open {
                         self.state = GateState::Attack;
                     } else {
                         self.gain -= release_dec;

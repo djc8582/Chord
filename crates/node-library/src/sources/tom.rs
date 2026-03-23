@@ -108,8 +108,8 @@ impl AudioNode for Tom {
             let out = osc * self.amp_env;
             self.amp_env *= 1.0 - amp_decay_rate;
 
-            // Gentle soft clip to prevent harsh peaks.
-            output[i] = (out * 1.2).tanh();
+            // Apply boost and soft clip to match other drums in peak level.
+            output[i] = (out * 3.0).tanh();
 
             // Denormal protection.
             if self.amp_env.abs() < 1e-10 {

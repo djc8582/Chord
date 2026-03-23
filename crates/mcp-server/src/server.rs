@@ -1897,7 +1897,9 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("frequency", "Frequency", 440.0, 0.1, 20000.0).with_unit("Hz"))
             .with_parameter(ParameterDescriptor::new("detune", "Detune", 0.0, -1200.0, 1200.0).with_unit("cents"))
-            .with_parameter(ParameterDescriptor::new("waveform", "Waveform", 0.0, 0.0, 3.0)),
+            .with_parameter(ParameterDescriptor::new("waveform", "Waveform", 0.0, 0.0, 3.0))
+            .with_parameter(ParameterDescriptor::new("gain", "Gain", 1.0, 0.0, 2.0))
+            .with_parameter(ParameterDescriptor::new("pulse_width", "Pulse Width", 0.5, 0.01, 0.99)),
 
         "filter" => NodeDescriptor::new("filter")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))
@@ -1906,7 +1908,7 @@ fn build_node_descriptor(node_type: &str) -> NodeDescriptor {
             .with_output(PortDescriptor::new("out", PortDataType::Audio))
             .with_parameter(ParameterDescriptor::new("cutoff", "Cutoff", 1000.0, 20.0, 20000.0).with_unit("Hz"))
             .with_parameter(ParameterDescriptor::new("resonance", "Resonance", 0.707, 0.1, 30.0))
-            .with_parameter(ParameterDescriptor::new("mode", "Mode", 0.0, 0.0, 2.0)),
+            .with_parameter(ParameterDescriptor::new("mode", "Mode", 0.0, 0.0, 3.0)),
 
         "gain" => NodeDescriptor::new("gain")
             .with_input(PortDescriptor::new("in", PortDataType::Audio))

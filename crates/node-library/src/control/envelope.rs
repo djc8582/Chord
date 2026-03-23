@@ -53,7 +53,7 @@ impl Default for AdsrEnvelope {
     }
 }
 
-/// Compute the per-sample increment for an envelope segment.
+/// Compute the per-sample linear increment for an envelope segment.
 /// `time_seconds` is the segment duration, `sample_rate` is in Hz.
 /// Returns a rate (fraction per sample). If time is near zero, returns a large value
 /// to snap instantly.
@@ -64,6 +64,21 @@ fn rate_for_time(time_seconds: f64, sample_rate: f64) -> f64 {
         1.0
     } else {
         1.0 / (time_seconds * sample_rate)
+    }
+}
+
+/// Compute the per-sample exponential coefficient for decay/release.
+/// The coefficient is used as: level *= coeff each sample.
+/// After `time_seconds`, the level will have decayed to approx 0.001 (-60 dB).
+/// If time is near zero, returns 0.0 to snap instantly.
+#[inline]
+fn exp_coeff_for_time(time_seconds: f64, sample_rate: f64) -> f64 {
+    if time_seconds < 1e-6 {
+        0.0
+    } else {
+        // e^(-ln(1000) / (time * sr)) — reaches -60dB in `time` seconds.
+        let n_samples = time_seconds * sample_rate;
+        (-6.907755 / n_samples).exp() // ln(1000) ≈ 6.907755
     }
 }
 
@@ -115,11 +130,14 @@ impl AudioNode for AdsrEnvelope {
             self.gate_was_high = gate;
 
             // Process the current stage.
+            // Attack is linear (sounds punchy). Decay and release are exponential
+            // (sounds natural — fast initial drop, slow tail).
             match self.stage {
                 EnvelopeStage::Idle => {
                     self.level = 0.0;
                 }
                 EnvelopeStage::Attack => {
+                    // Linear attack: rises from current level to 1.0.
                     let rate = rate_for_time(attack_time, sr);
                     self.level += rate;
                     if self.level >= 1.0 {
@@ -128,9 +146,12 @@ impl AudioNode for AdsrEnvelope {
                     }
                 }
                 EnvelopeStage::Decay => {
-                    let rate = rate_for_time(decay_time, sr);
-                    self.level -= rate * (1.0 - sustain_level);
-                    if self.level <= sustain_level {
+                    // Exponential decay: from 1.0 toward sustain level.
+                    let coeff = exp_coeff_for_time(decay_time, sr);
+                    // Exponential approach: level = sustain + (level - sustain) * coeff
+                    self.level = sustain_level + (self.level - sustain_level) * coeff;
+                    // Snap to sustain when close enough to avoid asymptotic tail.
+                    if (self.level - sustain_level).abs() < 1e-6 {
                         self.level = sustain_level;
                         self.stage = EnvelopeStage::Sustain;
                     }
@@ -139,9 +160,11 @@ impl AudioNode for AdsrEnvelope {
                     self.level = sustain_level;
                 }
                 EnvelopeStage::Release => {
-                    let rate = rate_for_time(release_time, sr);
-                    self.level -= rate * self.release_start_level;
-                    if self.level <= 0.0 {
+                    // Exponential release: from release_start_level toward 0.
+                    let coeff = exp_coeff_for_time(release_time, sr);
+                    self.level *= coeff;
+                    // Snap to zero when below audibility threshold.
+                    if self.level < 1e-6 {
                         self.level = 0.0;
                         self.stage = EnvelopeStage::Idle;
                     }

@@ -1,4 +1,4 @@
-//! Biquad filter node — low-pass, high-pass, band-pass.
+//! Biquad filter node — low-pass, high-pass, band-pass, notch.
 //!
 //! Implements a standard biquad (second-order IIR) filter with cutoff and resonance parameters.
 //! Includes denormal protection on filter state variables.
@@ -11,15 +11,17 @@ pub enum FilterMode {
     LowPass,
     HighPass,
     BandPass,
+    Notch,
 }
 
 impl FilterMode {
-    /// Parse from a float parameter: 0=low-pass, 1=high-pass, 2=band-pass.
+    /// Parse from a float parameter: 0=low-pass, 1=high-pass, 2=band-pass, 3=notch.
     fn from_param(v: f32) -> Self {
         match v as u32 {
             0 => Self::LowPass,
             1 => Self::HighPass,
             2 => Self::BandPass,
+            3 => Self::Notch,
             _ => Self::LowPass,
         }
     }
@@ -76,6 +78,16 @@ impl BiquadCoeffs {
                 let a2 = 1.0 - alpha;
                 (b0, b1, b2, a0, a1, a2)
             }
+            FilterMode::Notch => {
+                // Notch (band-reject): passes everything except a band around cutoff.
+                let b0 = 1.0;
+                let b1 = -2.0 * cos_omega;
+                let b2 = 1.0;
+                let a0 = 1.0 + alpha;
+                let a1 = -2.0 * cos_omega;
+                let a2 = 1.0 - alpha;
+                (b0, b1, b2, a0, a1, a2)
+            }
         };
 
         // Normalize by a0.
@@ -94,7 +106,7 @@ impl BiquadCoeffs {
 /// ## Parameters
 /// - `cutoff` — Cutoff frequency in Hz (default 1000.0, range 20..20000).
 /// - `resonance` — Resonance / Q factor (default 0.707, range 0.1..30.0).
-/// - `mode` — 0=low-pass, 1=high-pass, 2=band-pass (default 0).
+/// - `mode` — 0=low-pass, 1=high-pass, 2=band-pass, 3=notch (default 0).
 ///
 /// ## Inputs
 /// - `[0]` audio input.

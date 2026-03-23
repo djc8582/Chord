@@ -1,7 +1,8 @@
 //! Limiter node — brick-wall limiter with ceiling and release.
 //!
-//! Prevents audio from exceeding the ceiling level. Uses a simple envelope
-//! follower with instant attack and configurable release for gain reduction.
+//! Prevents audio from exceeding the ceiling level. Uses peak envelope tracking
+//! with instant attack and configurable release. The gain reduction is computed as
+//! ceiling/peak so the output is guaranteed not to exceed the ceiling.
 //! Lookahead-free for simplicity and zero latency.
 
 use chord_dsp_runtime::{AudioNode, ProcessContext, ProcessResult, ProcessStatus};
@@ -15,16 +16,19 @@ use chord_dsp_runtime::{AudioNode, ProcessContext, ProcessResult, ProcessStatus}
 /// ## Inputs
 /// - `[0]` audio input.
 ///
+/// ## Modulation Inputs
+/// - `[1]` ceiling_mod — bipolar modulation of ceiling level.
+///
 /// ## Outputs
 /// - `[0]` limited audio output.
 pub struct Limiter {
-    /// Envelope follower state (linear gain reduction factor).
-    envelope: f64,
+    /// Peak envelope follower state (linear amplitude).
+    peak_envelope: f64,
 }
 
 impl Limiter {
     pub fn new() -> Self {
-        Self { envelope: 0.0 }
+        Self { peak_envelope: 0.0 }
     }
 }
 
@@ -60,29 +64,23 @@ impl AudioNode for Limiter {
             let ceiling_db = (base_ceiling_db + ceil_mod * 24.0).clamp(-24.0, 0.0);
             let ceiling_linear = 10.0_f64.powf(ceiling_db / 20.0);
 
-            // Compute required gain reduction for this sample.
-            let target_envelope = if abs_sample > ceiling_linear {
-                abs_sample - ceiling_linear
+            // Peak envelope: instant attack, smooth release.
+            if abs_sample > self.peak_envelope {
+                self.peak_envelope = abs_sample; // Instant attack.
             } else {
-                0.0
-            };
-
-            // Envelope: instant attack, smooth release.
-            if target_envelope > self.envelope {
-                self.envelope = target_envelope; // Instant attack.
-            } else {
-                self.envelope = release_coeff * self.envelope + (1.0 - release_coeff) * target_envelope;
+                self.peak_envelope = release_coeff * self.peak_envelope
+                    + (1.0 - release_coeff) * abs_sample;
             }
 
             // Denormal protection.
-            if self.envelope < 1e-30 {
-                self.envelope = 0.0;
+            if self.peak_envelope < 1e-30 {
+                self.peak_envelope = 0.0;
             }
 
-            // Apply gain reduction.
-            let gain = if abs_sample > 1e-30 {
-                let reduced = abs_sample - self.envelope;
-                (reduced / abs_sample).clamp(0.0, 1.0)
+            // Compute gain: if peak exceeds ceiling, reduce gain so output = ceiling.
+            // gain = ceiling / peak, clamped to 1.0 (never boost).
+            let gain = if self.peak_envelope > ceiling_linear {
+                ceiling_linear / self.peak_envelope
             } else {
                 1.0
             };
@@ -94,6 +92,6 @@ impl AudioNode for Limiter {
     }
 
     fn reset(&mut self) {
-        self.envelope = 0.0;
+        self.peak_envelope = 0.0;
     }
 }
