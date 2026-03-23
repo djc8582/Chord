@@ -43,19 +43,25 @@ function App() {
 
   return (
     <div className="bg-[#0a0a0f] text-white">
-      <section className="min-h-screen flex flex-col items-center justify-center p-8">
+      {/* Header after start */}
+      <div className="text-center py-12">
+        <h1 className="text-5xl font-light text-white/70 tracking-[0.2em]">GENESIS</h1>
+        <p className="text-[#c8ff00] mt-2 text-xs font-mono">Every sound below is powered by @chord/web</p>
+      </div>
+
+      <section className="min-h-screen flex flex-col items-center justify-center p-8 border-t border-white/10">
         <CollisionPanel chord={chord} active={activePanel === 0} />
       </section>
-      <section className="min-h-screen flex flex-col items-center justify-center p-8">
+      <section className="min-h-screen flex flex-col items-center justify-center p-8 border-t border-white/10">
         <DrumPanel chord={chord} active={activePanel === 1} />
       </section>
-      <section className="min-h-screen flex flex-col items-center justify-center p-8">
+      <section className="min-h-screen flex flex-col items-center justify-center p-8 border-t border-white/10">
         <SculptPanel chord={chord} active={activePanel === 2} />
       </section>
-      <section className="min-h-screen flex flex-col items-center justify-center p-8">
+      <section className="min-h-screen flex flex-col items-center justify-center p-8 border-t border-white/10">
         <SwarmPanel chord={chord} active={activePanel === 3} />
       </section>
-      <footer className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center">
+      <footer className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center border-t border-white/10">
         <p className="text-white/40 max-w-xl text-sm leading-relaxed">
           4 panels. 0 audio files. Every sound synthesized in real-time by Chord.
         </p>

@@ -46,7 +46,7 @@ export function SculptPanel({ chord, active }: { chord: Chord; active: boolean }
       <h2 className="text-3xl font-light mb-2">Time Sculptor</h2>
       <p className="text-white/40 text-sm mb-4 font-mono">Draw = play. Y → chord.setParameter(osc, 'frequency', f)</p>
       <canvas ref={canvasRef} width={800} height={400}
-        className="w-full rounded-lg cursor-crosshair border border-white/10" style={{background:'#0a0a0f'}}
+        className="w-full rounded-lg cursor-crosshair border border-white/10" style={{background:'#111118'}}
         onMouseDown={()=>setDrawing(true)}
         onMouseUp={()=>{setDrawing(false);chord.setParameter(oscId.current,'gain',0);}}
         onMouseLeave={()=>{setDrawing(false);chord.setParameter(oscId.current,'gain',0);}}

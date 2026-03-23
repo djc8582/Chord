@@ -78,7 +78,7 @@ export function SwarmPanel({ chord, active }: { chord: Chord; active: boolean })
     <div className="w-full max-w-4xl">
       <h2 className="text-3xl font-light mb-2">Swarm Intelligence</h2>
       <p className="text-white/40 text-sm mb-4 font-mono">{agents.current.length} agents × chord.addNode('oscillator'). Move mouse to attract.</p>
-      <canvas ref={canvasRef} onMouseMove={onMove} className="w-full rounded-lg cursor-crosshair border border-white/10" style={{height:500,background:'#0a0a0f'}}/>
+      <canvas ref={canvasRef} onMouseMove={onMove} className="w-full rounded-lg cursor-crosshair border border-white/10" style={{height:500,background:'#111118'}}/>
     </div>
   );
 }

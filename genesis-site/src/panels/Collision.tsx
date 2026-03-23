@@ -68,7 +68,7 @@ export function CollisionPanel({ chord, active }: { chord: Chord; active: boolea
     <div className="w-full max-w-4xl">
       <h2 className="text-3xl font-light mb-2">Collision Orchestra</h2>
       <p className="text-white/40 text-sm mb-4 font-mono">Click to throw. Every collision → chord.playNote()</p>
-      <canvas ref={canvasRef} onClick={handleClick} className="w-full rounded-lg cursor-crosshair border border-white/10" style={{height:500,background:'#0a0a0f'}}/>
+      <canvas ref={canvasRef} onClick={handleClick} className="w-full rounded-lg cursor-crosshair border border-white/10" style={{height:500,background:'#111118'}}/>
       <p className="text-white/20 text-xs mt-2 font-mono">{count} balls active</p>
     </div>
   );
