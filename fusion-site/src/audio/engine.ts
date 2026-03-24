@@ -1,23 +1,31 @@
 /**
- * Jazz Fusion Trio Audio Engine
+ * Jazz Fusion Trio Audio Engine — v2
+ *
+ * Now uses Chord's generative music systems:
+ *   - RhythmEngine for evolving drum patterns with swing + humanization
+ *   - HarmonicSequencer for jazz comping with varied voicings
+ *   - WalkingBassGenerator for chromatic approach bass lines
+ *   - SoloGenerator for melodic phrases during mouse idle
+ *
+ * Plus the new node types: compressor, distortion, chorus, bitcrusher
  *
  * Three instruments sharing one Chord engine:
- *   1. Rhodes keys — FM-style electric piano with chorus + tremolo
- *   2. Electric bass — rich saw+sub with filter envelope
- *   3. Drums — kick, snare (sticks/brushes), ride, hi-hat, ghost notes
- *
- * All generative. All through Chord's node graph.
- * The arrangement is driven by scroll position (0-1).
+ *   1. Rhodes keys — filtered through chorus + tremolo
+ *   2. Electric bass — saw+sub through filter + distortion + compressor
+ *   3. Drums — kick, snare, ride with bus compression
  */
 
 import { Chord } from '@chord/web';
 import { bindAudioToCSS } from '@chord/web';
+import { RhythmEngine } from '@chord/web';
+import { HarmonicSequencer, type ChordSymbol } from '@chord/web';
+import { WalkingBassGenerator } from '@chord/web';
+import { SoloGenerator } from '@chord/web';
 import {
-  midiToFreq, bpmToMs, swingEighth,
+  midiToFreq,
   PROGRESSION, PROGRESSION_MODULATED,
-  APPROACH_PATTERNS, getScaleNotes,
-  BASE_TEMPO, RUBATO_TEMPO,
-  type ChordVoicing,
+  getScaleNotes,
+  BASE_TEMPO, RUBATO_TEMPO, DORIAN_INTERVALS,
 } from './constants.js';
 
 // ─── Types ───
@@ -26,19 +34,12 @@ export interface FusionEngine {
   chord: Chord;
   start: () => Promise<void>;
   stop: () => void;
-  /** Set scroll position 0-1 driving the arrangement */
   setScroll: (t: number) => void;
-  /** Set mouse X normalized 0-1 (harmonic tension) */
   setMouseX: (x: number) => void;
-  /** Set mouse Y normalized 0-1 (energy/register) */
   setMouseY: (y: number) => void;
-  /** Set mouse velocity 0-1 (rhythmic density) */
   setMouseVelocity: (v: number) => void;
-  /** Mouse has been idle for 5+ seconds */
   setMouseIdle: (idle: boolean) => void;
-  /** Fast scroll triggers micro-glitch */
   triggerScrollGlitch: (intensity: number) => void;
-  /** Get current state for visualizers */
   getState: () => EngineState;
   destroy: () => void;
 }
@@ -51,10 +52,8 @@ export interface EngineState {
   isGlitching: boolean;
   isSilent: boolean;
   modulated: boolean;
-  keysPlaying: number[];  // MIDI notes currently sounding
+  keysPlaying: number[];
 }
-
-// ─── Internal state ───
 
 interface InternalState {
   scroll: number;
@@ -63,7 +62,6 @@ interface InternalState {
   mouseVelocity: number;
   mouseIdle: boolean;
   tempo: number;
-  currentChordIndex: number;
   currentChordName: string;
   modulated: boolean;
   section: string;
@@ -74,6 +72,22 @@ interface InternalState {
   keysGainTarget: number;
   bassGainTarget: number;
   drumGainTarget: number;
+}
+
+// ─── Convert our progression format to ChordSymbol for the sequencers ───
+
+function makeChordSymbols(modulated: boolean): ChordSymbol[] {
+  const prog = modulated ? PROGRESSION_MODULATED : PROGRESSION;
+  return prog.map(cv => ({
+    name: cv.name,
+    root: cv.bassNote + 24, // keys register
+    tones: cv.offsets,
+  }));
+}
+
+function getScale(modulated: boolean): number[] {
+  const root = modulated ? 8 : 3; // Ab=8, Eb=3 (pitch class)
+  return DORIAN_INTERVALS.map(i => root + i);
 }
 
 // ─── Create the engine ───
@@ -88,7 +102,6 @@ export function createFusionEngine(): FusionEngine {
     mouseVelocity: 0,
     mouseIdle: false,
     tempo: RUBATO_TEMPO,
-    currentChordIndex: 0,
     currentChordName: 'Ebm9',
     modulated: false,
     section: 'intro',
@@ -102,7 +115,7 @@ export function createFusionEngine(): FusionEngine {
   };
 
   // ═══════════════════════════════════════════
-  // NODE GRAPH — shared signal path
+  // NODE GRAPH — full signal chain with new node types
   // ═══════════════════════════════════════════
 
   // Master effects chain
@@ -110,123 +123,122 @@ export function createFusionEngine(): FusionEngine {
   const masterRev = chord.addNode('reverb');
   const masterDelay = chord.addNode('delay');
   const masterFilter = chord.addNode('filter');
+  const masterLimiter = chord.addNode('limiter');
+  const masterOut = chord.addNode('output');
 
-  // Master reverb — warm room
-  chord.setParameter(masterRev, 'decay', 2.5);
+  chord.setParameter(masterRev, 'room_size', 0.55);
+  chord.setParameter(masterRev, 'damping', 0.55);
   chord.setParameter(masterRev, 'mix', 0.18);
-  chord.setParameter(masterRev, 'damping', 0.6);
 
-  // Master delay — subtle depth
   chord.setParameter(masterDelay, 'time', 0.28);
   chord.setParameter(masterDelay, 'feedback', 0.15);
   chord.setParameter(masterDelay, 'mix', 0.08);
 
-  // Master compressor — glue
   chord.setParameter(masterComp, 'threshold', -14);
   chord.setParameter(masterComp, 'ratio', 2.5);
   chord.setParameter(masterComp, 'attack', 0.02);
   chord.setParameter(masterComp, 'release', 0.15);
 
-  // Master filter — for sweeps and glitch
   chord.setParameter(masterFilter, 'cutoff', 18000);
   chord.setParameter(masterFilter, 'resonance', 0);
 
-  // Signal path: instruments → reverb → delay → comp → filter → output
+  chord.setParameter(masterLimiter, 'ceiling', -1);
+
+  // instruments → reverb → delay → comp → filter → limiter → output
   chord.connect(masterRev, 'out', masterDelay, 'in');
   chord.connect(masterDelay, 'out', masterComp, 'in');
   chord.connect(masterComp, 'out', masterFilter, 'in');
+  chord.connect(masterFilter, 'out', masterLimiter, 'in');
+  chord.connect(masterLimiter, 'out', masterOut, 'in');
 
   // ═══════════════════════════════════════════
-  // RHODES KEYS — FM-like electric piano
+  // RHODES KEYS — with chorus + tremolo
   // ═══════════════════════════════════════════
-  // Rhodes tone: sine fundamental + sine at ~2x freq (FM carrier/modulator)
-  // Plus chorus and tremolo for that warm, shimmering character
 
   const keysTrem = chord.addNode('lfo');
-  chord.setParameter(keysTrem, 'rate', 4.5);    // tremolo rate
-  chord.setParameter(keysTrem, 'depth', 0.08);  // subtle amplitude wobble
+  chord.setParameter(keysTrem, 'rate', 4.5);
+  chord.setParameter(keysTrem, 'depth', 0.08);
+
+  const keysFilter = chord.addNode('filter');
+  chord.setParameter(keysFilter, 'cutoff', 4000);
+  chord.setParameter(keysFilter, 'resonance', 0.1);
 
   const keysChorus = chord.addNode('chorus');
   chord.setParameter(keysChorus, 'rate', 0.8);
   chord.setParameter(keysChorus, 'depth', 0.25);
   chord.setParameter(keysChorus, 'mix', 0.15);
 
-  const keysFilter = chord.addNode('filter');
-  chord.setParameter(keysFilter, 'cutoff', 4000);
-  chord.setParameter(keysFilter, 'resonance', 0.1);
-
   const keysGain = chord.addNode('gain');
   chord.setParameter(keysGain, 'gain', 0.35);
 
-  // Keys signal path: [per-note oscillators] → keysFilter → keysChorus → keysGain → masterRev
   chord.connect(keysFilter, 'out', keysChorus, 'in');
   chord.connect(keysChorus, 'out', keysGain, 'in');
   chord.connect(keysTrem, 'out', keysGain, 'gain');
   chord.connect(keysGain, 'out', masterRev, 'in');
 
   // ═══════════════════════════════════════════
-  // BASS — rich tone with sub
+  // BASS — saw + sub → filter → distortion → compressor
   // ═══════════════════════════════════════════
 
   const bassOsc = chord.addNode('oscillator');
   const bassSub = chord.addNode('oscillator');
   const bassFilter = chord.addNode('filter');
-  const bassDrive = chord.addNode('waveshaper');
+  const bassDist = chord.addNode('distortion');
+  const bassComp = chord.addNode('compressor');
   const bassGain = chord.addNode('gain');
 
-  chord.setParameter(bassOsc, 'waveform', 1);  // saw
-  chord.setParameter(bassOsc, 'frequency', 82.41); // E2 default
+  chord.setParameter(bassOsc, 'waveform', 1); // saw
+  chord.setParameter(bassOsc, 'frequency', 82.41);
   chord.setParameter(bassOsc, 'gain', 0.2);
-  chord.setParameter(bassSub, 'waveform', 0);  // sine sub
+  chord.setParameter(bassSub, 'waveform', 0); // sine sub
   chord.setParameter(bassSub, 'frequency', 41.2);
   chord.setParameter(bassSub, 'gain', 0.15);
   chord.setParameter(bassFilter, 'cutoff', 900);
   chord.setParameter(bassFilter, 'resonance', 0.25);
-  chord.setParameter(bassDrive, 'drive', 0.12);
-  chord.setParameter(bassDrive, 'mode', 2); // tape
-  chord.setParameter(bassDrive, 'mix', 0.3);
-  chord.setParameter(bassGain, 'gain', 0);  // starts silent
+  chord.setParameter(bassDist, 'drive', 0.12);
+  chord.setParameter(bassDist, 'mix', 0.3);
+  chord.setParameter(bassComp, 'threshold', -10);
+  chord.setParameter(bassComp, 'ratio', 4);
+  chord.setParameter(bassComp, 'attack', 0.005);
+  chord.setParameter(bassComp, 'release', 0.1);
+  chord.setParameter(bassGain, 'gain', 0);
 
   chord.connect(bassOsc, 'out', bassFilter, 'in');
   chord.connect(bassSub, 'out', bassFilter, 'in');
-  chord.connect(bassFilter, 'out', bassDrive, 'in');
-  chord.connect(bassDrive, 'out', bassGain, 'in');
+  chord.connect(bassFilter, 'out', bassDist, 'in');
+  chord.connect(bassDist, 'out', bassComp, 'in');
+  chord.connect(bassComp, 'out', bassGain, 'in');
   chord.connect(bassGain, 'out', masterRev, 'in');
 
   // ═══════════════════════════════════════════
-  // DRUMS
+  // DRUMS — kick, snare, hat → compressor → gain
   // ═══════════════════════════════════════════
 
-  const kick = chord.addNode('kickDrum');
-  const snare = chord.addNode('snareDrum');
-  const hat = chord.addNode('hiHat');
-  const drumGain = chord.addNode('gain');
+  const kick = chord.addNode('kick_drum');
+  const snare = chord.addNode('snare_drum');
+  const hat = chord.addNode('hi_hat');
   const drumComp = chord.addNode('compressor');
+  const drumGain = chord.addNode('gain');
 
-  // Kick: jazz kick — not too deep, tight
-  chord.setParameter(kick, 'frequency', 60);
-  chord.setParameter(kick, 'body_decay', 0.2);
-  chord.setParameter(kick, 'click', 0.3);
-  chord.setParameter(kick, 'drive', 0.08);
+  chord.setParameter(kick, 'pitch_start', 140);
+  chord.setParameter(kick, 'pitch_end', 45);
+  chord.setParameter(kick, 'decay', 0.25);
+  chord.setParameter(kick, 'drive', 0.1);
 
-  // Snare: starts as brushes (quiet, long decay)
-  chord.setParameter(snare, 'body_freq', 180);
-  chord.setParameter(snare, 'noise_decay', 0.2);
-  chord.setParameter(snare, 'crack', 0.15);
-  chord.setParameter(snare, 'mix', 0.6);
+  chord.setParameter(snare, 'tone', 180);
+  chord.setParameter(snare, 'snap', 0.2);
+  chord.setParameter(snare, 'decay', 0.25);
 
-  // Hi-hat: ride cymbal character (longer decay, lower tone)
+  chord.setParameter(hat, 'tone', 4000);
   chord.setParameter(hat, 'decay', 0.15);
-  chord.setParameter(hat, 'tone', 0.35);
-  chord.setParameter(hat, 'ring_mod', 0.5);
+  chord.setParameter(hat, 'openness', 0.3);
 
-  // Drum bus compression
   chord.setParameter(drumComp, 'threshold', -12);
   chord.setParameter(drumComp, 'ratio', 3);
   chord.setParameter(drumComp, 'attack', 0.005);
   chord.setParameter(drumComp, 'release', 0.08);
 
-  chord.setParameter(drumGain, 'gain', 0);  // starts silent
+  chord.setParameter(drumGain, 'gain', 0);
 
   chord.connect(kick, 'out', drumComp, 'in');
   chord.connect(snare, 'out', drumComp, 'in');
@@ -235,183 +247,185 @@ export function createFusionEngine(): FusionEngine {
   chord.connect(drumGain, 'out', masterRev, 'in');
 
   // ═══════════════════════════════════════════
-  // SEQUENCING LOOP
+  // GLITCH — bitcrusher on master for glitch sections
   // ═══════════════════════════════════════════
 
-  let loopTimer: ReturnType<typeof setTimeout> | null = null;
-  let beatCount = 0;
-  let subBeat = 0;
+  const glitchCrush = chord.addNode('bitcrusher');
+  chord.setParameter(glitchCrush, 'bits', 16); // clean by default
+  chord.setParameter(glitchCrush, 'rate', 1);
+  chord.setParameter(glitchCrush, 'mix', 0); // off by default
 
-  function getProgression(): ChordVoicing[] {
-    return state.modulated ? PROGRESSION_MODULATED : PROGRESSION;
-  }
+  // Insert between comp and filter in master chain
+  chord.connect(masterComp, 'out', glitchCrush, 'in');
+  chord.connect(glitchCrush, 'out', masterFilter, 'in');
 
-  function getCurrentChord(): ChordVoicing {
-    return getProgression()[state.currentChordIndex % 4];
-  }
+  // ═══════════════════════════════════════════
+  // GENERATIVE MUSIC SYSTEMS
+  // ═══════════════════════════════════════════
 
-  // ─── KEYS: play chord voicing ───
-  function playKeysChord() {
-    if (state.isSilent || state.section === 'silence') return;
+  // Rhythm engine — evolving jazz drum patterns
+  const rhythmEngine = new RhythmEngine(chord, RUBATO_TEMPO);
+  rhythmEngine.swing = 0.55;
 
-    const cv = getCurrentChord();
-    state.currentChordName = cv.name;
+  // Ride cymbal pattern — jazz ride (ding-ga-da-ding)
+  rhythmEngine.addTrack('ride', {
+    nodeId: hat,
+    //            1 e & a 2 e & a 3 e & a 4 e & a
+    steps:       [0.8,0,0.4,0, 0.6,0,0.3,0, 0.8,0,0.4,0, 0.7,0,0.5,0],
+    probability: [1,  0,0.8,0, 0.9,0,0.6,0, 1,  0,0.7,0, 0.9,0,0.8,0],
+    velocityVariance: 0.15,
+    humanize: 8,
+    mutateEvery: 8,
+    velocityMap: {
+      decay: [0.06, 0.2],
+      openness: [0.1, 0.5],
+    },
+  });
 
-    // Determine voicing register based on mouseY
-    const registerShift = state.mouseY > 0.5 ? 12 : 0; // higher register when mouse is high
-    const root = cv.bassNote + 24 + registerShift; // keys play 2 octaves above bass
+  // Kick — sparse jazz kick
+  rhythmEngine.addTrack('kick', {
+    nodeId: kick,
+    steps:       [0.9,0,0,0, 0,0,0,0, 0.7,0,0,0, 0,0,0.3,0],
+    probability: [1,  0,0,0, 0,0,0,0, 0.6,0,0,0, 0,0,0.2,0],
+    velocityVariance: 0.12,
+    humanize: 5,
+    mutateEvery: 4,
+    velocityMap: {
+      pitch_start: [120, 180],
+      drive: [0.05, 0.25],
+    },
+  });
 
-    // Harmonic tension from mouseX — add chromatic alterations
-    const tension = state.mouseX;
-    const detuneAmount = tension * 15; // cents of harmonic "roughness"
+  // Snare — ghost notes + backbeat hits
+  rhythmEngine.addTrack('snare', {
+    nodeId: snare,
+    steps:       [0, 0.1,0,0.12, 0,0,0,0.08, 0.7,0.1,0,0.15, 0,0,0,0.1],
+    probability: [0, 0.3,0,0.2,  0,0,0,0.25, 1,  0.2,0,0.3,  0,0,0,0.15],
+    velocityVariance: 0.2,
+    humanize: 10,
+    mutateEvery: 4,
+    velocityMap: {
+      snap: [0.05, 0.5],
+      tone: [150, 220],
+    },
+  });
 
-    const noteFreqs: number[] = [];
-    for (const offset of cv.offsets) {
-      const midi = root + offset;
-      let freq = midiToFreq(midi);
-      // Add tension-based micro-detuning
-      if (tension > 0.6) {
-        freq *= 1 + (Math.random() - 0.5) * 0.005 * tension;
+  // Harmonic sequencer — jazz comping
+  const harmSeq = new HarmonicSequencer(chord);
+  harmSeq.setProgression(makeChordSymbols(false));
+
+  // Walking bass generator
+  const bassGen = new WalkingBassGenerator(chord);
+
+  // Solo generator (for mouse idle)
+  const soloGen = new SoloGenerator(chord);
+
+  // ═══════════════════════════════════════════
+  // COMPING + BASS SCHEDULING LOOP
+  // ═══════════════════════════════════════════
+
+  let compTimer: ReturnType<typeof setTimeout> | null = null;
+  let barCount = 0;
+
+  function scheduleBar() {
+    if (state.destroyed || state.isSilent) {
+      compTimer = setTimeout(scheduleBar, 500);
+      return;
+    }
+
+    const beatMs = 60000 / state.tempo;
+    const barMs = beatMs * 4;
+
+    // ─── Keys: generate and play comping for this bar ───
+    if (state.keysGainTarget > 0) {
+      const density = 0.3 + state.mouseVelocity * 0.3 + (state.section === 'peak' ? 0.2 : 0);
+      const tension = state.mouseX;
+      const events = harmSeq.generateBar(density, tension);
+
+      state.keysActive = [];
+      for (const event of events) {
+        const delayMs = (event.time / 16) * barMs;
+        setTimeout(() => {
+          if (state.isSilent) return;
+          const vol = event.velocity * 0.08 * (state.keysGainTarget / 0.35);
+          for (const midi of event.voicing) {
+            const freq = midiToFreq(midi);
+            chord.playNote(freq, event.duration, vol);
+            state.keysActive.push(midi);
+          }
+        }, delayMs);
       }
-      noteFreqs.push(freq);
+
+      // Update chord name from sequencer
+      state.currentChordName = harmSeq.getCurrentChord().name;
     }
 
-    // Play each note as a quick playNote with varying velocity
-    const velocity = 0.06 + state.mouseY * 0.06;
-    const duration = state.section === 'intro' ? 3.0 : 0.8 + Math.random() * 0.5;
+    // ─── Bass: generate walking line for this bar ───
+    if (state.bassGainTarget > 0) {
+      const currentChord = harmSeq.getCurrentChord();
+      const nextChord = (() => {
+        const symbols = makeChordSymbols(state.modulated);
+        const prog = state.modulated ? PROGRESSION_MODULATED : PROGRESSION;
+        const idx = prog.findIndex(p => p.name === currentChord.name);
+        return symbols[(idx + 1) % symbols.length];
+      })();
 
-    state.keysActive = [];
-    for (const freq of noteFreqs) {
-      chord.playNote(freq, duration, velocity + Math.random() * 0.02);
-      state.keysActive.push(Math.round(69 + 12 * Math.log2(freq / 440)));
-    }
+      const scale = getScale(state.modulated);
+      const energy = state.mouseY;
+      const bassNotes = bassGen.generateBar(currentChord, nextChord, scale, energy);
 
-    // If mouse is idle, add a melodic solo line
-    if (state.mouseIdle && state.section !== 'intro') {
-      playSoloNote();
-    }
-  }
-
-  // ─── SOLO: melodic line during mouse idle ───
-  function playSoloNote() {
-    const scaleRoot = state.modulated ? 68 : 63; // Ab or Eb
-    const scale = getScaleNotes(scaleRoot);
-    const note = scale[Math.floor(Math.random() * scale.length)];
-    const freq = midiToFreq(note + 12); // one octave up for clarity
-    chord.playNote(freq, 0.3 + Math.random() * 0.4, 0.08);
-  }
-
-  // ─── BASS: walking bass ───
-  function playBassNote() {
-    if (state.isSilent || state.bassGainTarget === 0) return;
-
-    const cv = getCurrentChord();
-    const pattern = APPROACH_PATTERNS[Math.floor(Math.random() * APPROACH_PATTERNS.length)];
-
-    // Pick the note based on where we are in the pattern
-    const approachIdx = subBeat % pattern.length;
-    const targetMidi = cv.bassNote + pattern[approachIdx];
-    const freq = midiToFreq(targetMidi);
-
-    chord.setParameter(bassOsc, 'frequency', freq);
-    chord.setParameter(bassSub, 'frequency', freq / 2);
-
-    // Filter envelope — pluck character
-    const baseFilterCutoff = 600 + state.mouseY * 800;
-    chord.setParameter(bassFilter, 'cutoff', baseFilterCutoff + 400);
-    setTimeout(() => {
-      chord.setParameter(bassFilter, 'cutoff', baseFilterCutoff);
-    }, 60);
-  }
-
-  // ─── DRUMS: swing pattern ───
-  function playDrumHit() {
-    if (state.isSilent || state.drumGainTarget === 0) return;
-
-    const energy = state.mouseY;
-    const density = state.mouseVelocity;
-    const isOnBeat = subBeat % 2 === 0;
-    const isBeat2or4 = beatCount % 4 >= 2;
-
-    // Ride cymbal — jazz ride pattern (ding-da-ding-da-ding)
-    if (isOnBeat || Math.random() < 0.4 + density * 0.3) {
-      chord.setParameter(hat, 'decay', 0.08 + energy * 0.12);
-      chord.triggerNode(hat);
-    }
-
-    // Kick — beats 1 and 3 (sometimes)
-    if (beatCount % 4 === 0 || (beatCount % 4 === 2 && Math.random() < 0.4 + energy * 0.3)) {
-      chord.triggerNode(kick);
-    }
-
-    // Snare — ghost notes + backbeats
-    if (isBeat2or4 && isOnBeat) {
-      // Backbeat
-      chord.setParameter(snare, 'crack', 0.2 + energy * 0.3);
-      chord.triggerNode(snare);
-    } else if (Math.random() < 0.15 + density * 0.2) {
-      // Ghost note — very quiet
-      chord.setParameter(snare, 'crack', 0.05);
-      chord.triggerNode(snare);
-    }
-  }
-
-  // ─── Main sequencing loop ───
-  function scheduleNext() {
-    if (state.destroyed) return;
-
-    const beatMs = bpmToMs(state.tempo);
-    const [longEighth, shortEighth] = swingEighth(beatMs / 2, 0.58);
-    const nextDelay = subBeat % 2 === 0 ? longEighth : shortEighth;
-
-    // Play drums on every sub-beat
-    playDrumHit();
-
-    // Bass on every sub-beat (walking)
-    if (subBeat % 2 === 0) {
-      playBassNote();
-    }
-
-    // Keys on beat 1 of each bar, sometimes beat 3
-    if (subBeat === 0) {
-      playKeysChord();
-    } else if (subBeat === 4 && Math.random() < 0.3 + state.mouseVelocity * 0.3) {
-      playKeysChord();
-    }
-
-    subBeat++;
-    if (subBeat >= 8) {
-      subBeat = 0;
-      beatCount++;
-
-      // Advance chord every 2 bars (8 beats)
-      if (beatCount % 8 === 0) {
-        state.currentChordIndex = (state.currentChordIndex + 1) % 4;
+      for (let i = 0; i < bassNotes.length; i++) {
+        const delayMs = (i / bassNotes.length) * barMs;
+        setTimeout(() => {
+          if (state.isSilent || state.bassGainTarget === 0) return;
+          const note = bassNotes[i];
+          if (note.ghost) {
+            // Ghost note: very brief filter blip
+            chord.setParameter(bassFilter, 'cutoff', 1200);
+            setTimeout(() => chord.setParameter(bassFilter, 'cutoff', 900), 30);
+          } else {
+            bassGen.playNote(note, bassOsc, bassSub, bassFilter);
+          }
+        }, delayMs);
       }
     }
 
-    loopTimer = setTimeout(scheduleNext, nextDelay);
+    // ─── Solo: generate a phrase if mouse is idle ───
+    if (state.mouseIdle && state.section !== 'intro' && state.section !== 'silence') {
+      const currentChord = harmSeq.getCurrentChord();
+      const scaleNotes = getScaleNotes(state.modulated ? 68 : 63);
+      const phrase = soloGen.generatePhrase(currentChord, scaleNotes, state.mouseY, state.mouseX);
+      soloGen.playPhrase(phrase);
+    }
+
+    // ─── Advance chord every 2 bars ───
+    barCount++;
+    if (barCount % 2 === 0) {
+      harmSeq.advanceChord();
+      // Keep progression in sync with modulation state
+      harmSeq.setProgression(makeChordSymbols(state.modulated));
+    }
+
+    compTimer = setTimeout(scheduleBar, barMs);
   }
 
   // ═══════════════════════════════════════════
   // ARRANGEMENT — scroll position drives everything
   // ═══════════════════════════════════════════
 
-  // Hidden internal state for smooth gain targets
-  state.keysGainTarget = 0.35;
-  state.bassGainTarget = 0;
-  state.drumGainTarget = 0;
-
   function updateArrangement(t: number) {
     state.scroll = t;
     state.isGlitching = false;
     state.isSilent = false;
 
-    // ── Section mapping ──
+    // Reset glitch effects
+    chord.setParameter(glitchCrush, 'mix', 0);
+    chord.setParameter(glitchCrush, 'bits', 16);
+
     if (t < 0.10) {
       // INTRO: keys alone, rubato
       state.section = 'intro';
-      state.tempo = RUBATO_TEMPO + t * 200; // gradually speed up
+      state.tempo = RUBATO_TEMPO + t * 200;
       state.keysGainTarget = 0.35;
       state.bassGainTarget = 0;
       state.drumGainTarget = 0;
@@ -435,7 +449,7 @@ export function createFusionEngine(): FusionEngine {
       state.drumGainTarget = Math.min(p * 2, 1) * 0.35;
       state.modulated = false;
     } else if (t < 0.50) {
-      // TENSION — everything intensifies
+      // TENSION
       state.section = 'tension';
       const p = (t - 0.40) / 0.10;
       state.tempo = BASE_TEMPO + p * 12;
@@ -443,22 +457,23 @@ export function createFusionEngine(): FusionEngine {
       state.bassGainTarget = 0.35 + p * 0.1;
       state.drumGainTarget = 0.35 + p * 0.15;
       chord.setParameter(masterFilter, 'resonance', p * 0.3);
+      chord.setParameter(bassDist, 'drive', 0.12 + p * 0.2);
       state.modulated = false;
     } else if (t < 0.55) {
       // GLITCH BREAKDOWN
       state.section = 'glitch-1';
       state.isGlitching = true;
       state.tempo = BASE_TEMPO + 12;
-      applyGlitch(((t - 0.50) / 0.05));
+      applyGlitch((t - 0.50) / 0.05);
     } else if (t < 0.57) {
       // SILENCE
       state.section = 'silence';
       state.isSilent = true;
       chord.setMasterVolume(0);
       state.tempo = BASE_TEMPO;
-      state.modulated = true; // prepare modulation
+      state.modulated = true;
     } else if (t < 0.60) {
-      // THE DROP — new key
+      // THE DROP
       state.section = 'drop';
       const p = (t - 0.57) / 0.03;
       state.isSilent = false;
@@ -470,10 +485,9 @@ export function createFusionEngine(): FusionEngine {
       state.drumGainTarget = 0.4;
       chord.setParameter(masterFilter, 'cutoff', 18000);
       chord.setParameter(masterFilter, 'resonance', 0);
-      // Impact on entry
-      if (p < 0.1) chord.playNote(midiToFreq(44), 1.5, 0.35); // Ab sub impact
+      if (p < 0.1) chord.playNote(midiToFreq(44), 1.5, 0.35);
     } else if (t < 0.80) {
-      // PEAK — maximum energy
+      // PEAK
       state.section = 'peak';
       state.tempo = BASE_TEMPO + 4;
       state.modulated = true;
@@ -486,9 +500,9 @@ export function createFusionEngine(): FusionEngine {
       state.isGlitching = true;
       state.modulated = true;
       state.tempo = BASE_TEMPO + 8;
-      applyGlitch(((t - 0.80) / 0.05) * 1.5); // 1.5x intensity
+      applyGlitch(((t - 0.80) / 0.05) * 1.5);
     } else {
-      // OUTRO — strip away
+      // OUTRO
       state.section = 'outro';
       const p = (t - 0.85) / 0.15;
       state.modulated = false;
@@ -499,10 +513,13 @@ export function createFusionEngine(): FusionEngine {
       chord.setMasterVolume(0.5 * (1 - p * 0.8));
     }
 
-    // Smoothly apply gain targets
+    // Apply gain targets
     chord.setParameter(keysGain, 'gain', state.keysGainTarget);
     chord.setParameter(bassGain, 'gain', state.bassGainTarget);
     chord.setParameter(drumGain, 'gain', state.drumGainTarget);
+
+    // Update rhythm engine tempo
+    rhythmEngine.setTempo(state.tempo);
 
     // Restore master volume for non-silent sections
     if (!state.isSilent && state.section !== 'outro') {
@@ -510,25 +527,30 @@ export function createFusionEngine(): FusionEngine {
     }
   }
 
-  // ─── Glitch effects ───
+  // ─── Glitch effects — now with bitcrusher + distortion ───
   function applyGlitch(intensity: number) {
     const i = Math.min(intensity, 1.5);
 
-    // Rapid filter sweeps
+    // Bitcrusher: reduce bits and sample rate
+    chord.setParameter(glitchCrush, 'mix', 0.3 + i * 0.4);
+    chord.setParameter(glitchCrush, 'bits', Math.max(2, 16 - Math.floor(i * 12)));
+    chord.setParameter(glitchCrush, 'rate', Math.max(0.1, 1 - i * 0.7));
+
+    // Filter sweeps
     chord.setParameter(masterFilter, 'cutoff', 200 + Math.random() * 6000 * i);
     chord.setParameter(masterFilter, 'resonance', 0.3 + Math.random() * 0.4 * i);
 
-    // Distort the bass
-    chord.setParameter(bassDrive, 'drive', 0.3 + i * 0.5);
+    // Bass distortion cranks up
+    chord.setParameter(bassDist, 'drive', 0.3 + i * 0.5);
+    chord.setParameter(bassDist, 'mix', 0.5 + i * 0.3);
 
-    // Make drums chaotic
-    chord.setParameter(snare, 'crack', 0.1 + Math.random() * 0.7);
+    // Drum chaos
+    chord.setParameter(snare, 'snap', 0.1 + Math.random() * 0.7);
     chord.setParameter(hat, 'decay', 0.01 + Math.random() * 0.2);
 
     // Random note bursts
     if (Math.random() < 0.3 * i) {
-      const freq = 200 + Math.random() * 2000;
-      chord.playNote(freq, 0.05, 0.15 * i);
+      chord.playNote(200 + Math.random() * 2000, 0.05, 0.15 * i);
     }
   }
 
@@ -536,18 +558,26 @@ export function createFusionEngine(): FusionEngine {
     if (state.section === 'silence') return;
     const i = Math.min(intensity, 1);
 
+    // Brief bitcrush burst
+    chord.setParameter(glitchCrush, 'mix', i * 0.3);
+    chord.setParameter(glitchCrush, 'bits', Math.max(6, 16 - Math.floor(i * 8)));
+    setTimeout(() => {
+      if (!state.isGlitching) {
+        chord.setParameter(glitchCrush, 'mix', 0);
+        chord.setParameter(glitchCrush, 'bits', 16);
+      }
+    }, 80);
+
     // Brief filter sweep
-    const origCutoff = 18000;
     chord.setParameter(masterFilter, 'cutoff', 1000 + Math.random() * 3000);
     chord.setParameter(masterFilter, 'resonance', 0.2 * i);
     setTimeout(() => {
       if (!state.isGlitching) {
-        chord.setParameter(masterFilter, 'cutoff', origCutoff);
+        chord.setParameter(masterFilter, 'cutoff', 18000);
         chord.setParameter(masterFilter, 'resonance', 0);
       }
     }, 80);
 
-    // Micro stutter — retrigger the current chord
     if (i > 0.3) {
       chord.playNote(midiToFreq(63 + Math.floor(Math.random() * 12)), 0.04, 0.1 * i);
     }
@@ -564,11 +594,13 @@ export function createFusionEngine(): FusionEngine {
       await chord.start();
       chord.setMasterVolume(0.5);
       bindAudioToCSS(chord, document.documentElement);
-      scheduleNext();
+      rhythmEngine.start();
+      scheduleBar();
     },
 
     stop() {
-      if (loopTimer) clearTimeout(loopTimer);
+      rhythmEngine.stop();
+      if (compTimer) clearTimeout(compTimer);
       chord.stop();
     },
 
@@ -578,20 +610,16 @@ export function createFusionEngine(): FusionEngine {
 
     setMouseX(x: number) {
       state.mouseX = Math.max(0, Math.min(1, x));
-      // Harmonic tension drives reverb and delay
       chord.setParameter(masterRev, 'mix', 0.15 + state.mouseX * 0.15);
       chord.setParameter(masterDelay, 'feedback', 0.1 + state.mouseX * 0.2);
     },
 
     setMouseY(y: number) {
       state.mouseY = Math.max(0, Math.min(1, y));
-      // Energy drives drum character
       const energy = state.mouseY;
-      // High energy: sticks, bright, tight
-      // Low energy: brushes, dark, loose
-      chord.setParameter(snare, 'noise_decay', 0.1 + (1 - energy) * 0.15);
-      chord.setParameter(snare, 'crack', 0.1 + energy * 0.3);
-      chord.setParameter(hat, 'tone', 0.2 + energy * 0.4);
+      chord.setParameter(snare, 'decay', 0.1 + (1 - energy) * 0.15);
+      chord.setParameter(snare, 'snap', 0.1 + energy * 0.3);
+      chord.setParameter(hat, 'tone', 3000 + energy * 6000);
       chord.setParameter(keysFilter, 'cutoff', 2000 + energy * 4000);
     },
 
@@ -620,7 +648,8 @@ export function createFusionEngine(): FusionEngine {
 
     destroy() {
       state.destroyed = true;
-      if (loopTimer) clearTimeout(loopTimer);
+      rhythmEngine.stop();
+      if (compTimer) clearTimeout(compTimer);
       chord.stop();
     },
   };
