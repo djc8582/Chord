@@ -52,6 +52,25 @@ export class Chord {
     this.limiter.connect(this.analyser);
     this.analyser.connect(this.ctx.destination);
 
+    // Auto-add output node if missing
+    const hasOutput = [...this.nodes.values()].some(n => n.type === 'output');
+    if (!hasOutput && this.nodes.size > 0) {
+      // Find leaf nodes (nodes with no outgoing connections)
+      const nodesWithOutgoing = new Set(this.connections.map(c => c.fromId));
+      const leaves = [...this.nodes.entries()]
+        .filter(([id, n]) => !nodesWithOutgoing.has(id) && n.type !== 'output')
+        .map(([id]) => id);
+
+      const outputId = `node-${this.nextId++}`;
+      const outputNode = createWebAudioNode('output', outputId);
+      this.nodes.set(outputId, outputNode);
+
+      for (const leafId of leaves) {
+        this.connections.push({ fromId: leafId, fromPort: 'out', toId: outputId, toPort: 'in' });
+      }
+      console.info(`[Chord] Auto-added output node and connected ${leaves.length} leaf node(s)`);
+    }
+
     // Start all existing nodes
     for (const node of this.nodes.values()) {
       node.start(this.ctx, this.masterGain);
@@ -130,7 +149,13 @@ export class Chord {
   /** Set a parameter on a node. */
   setParameter(nodeId: string, param: string, value: number): void {
     const node = this.nodes.get(nodeId);
-    if (node) node.setParameter(param, value, this.ctx?.currentTime ?? 0);
+    if (!node) {
+      if (this.nodes.size > 0) {
+        console.warn(`[Chord] Node "${nodeId}" not found. Active nodes: ${[...this.nodes.keys()].join(', ')}`);
+      }
+      return;
+    }
+    node.setParameter(param, value, this.ctx?.currentTime ?? 0);
   }
 
   /** Get a parameter value from a node. */

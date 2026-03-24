@@ -939,10 +939,723 @@ class HiHatChordNode implements ChordNode {
   }
 }
 
+// --- Compressor Node ---
+// Wraps DynamicsCompressorNode
+// Params: threshold (dB), ratio, attack (s), release (s), knee (dB)
+// Input: "in", Output: "out"
+
+class CompressorChordNode implements ChordNode {
+  id: string;
+  type = 'compressor';
+  private compressor: DynamicsCompressorNode | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('threshold', -12);
+    this.params.set('ratio', 4);
+    this.params.set('attack', 0.01);
+    this.params.set('release', 0.15);
+    this.params.set('knee', 6);
+  }
+
+  start(ctx: AudioContext): void {
+    this.compressor = ctx.createDynamicsCompressor();
+    this.compressor.threshold.value = this.params.get('threshold')!;
+    this.compressor.ratio.value = this.params.get('ratio')!;
+    this.compressor.attack.value = this.params.get('attack')!;
+    this.compressor.release.value = this.params.get('release')!;
+    this.compressor.knee.value = this.params.get('knee')!;
+  }
+
+  stop(): void {
+    this.compressor?.disconnect();
+    this.compressor = null;
+  }
+
+  setParameter(param: string, value: number, time: number): void {
+    this.params.set(param, value);
+    if (!this.compressor) return;
+    switch (param) {
+      case 'threshold':
+        smoothRamp(this.compressor.threshold, value, time);
+        break;
+      case 'ratio':
+        smoothRamp(this.compressor.ratio, value, time);
+        break;
+      case 'attack':
+        smoothRamp(this.compressor.attack, value, time);
+        break;
+      case 'release':
+        smoothRamp(this.compressor.release, value, time);
+        break;
+      case 'knee':
+        smoothRamp(this.compressor.knee, value, time);
+        break;
+    }
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(port: string): AudioNode | AudioParam | null {
+    if (port === 'in') return this.compressor;
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.compressor;
+    return null;
+  }
+}
+
+// --- Distortion Node ---
+// Wraps WaveShaperNode with drive curve + wet/dry mix
+// Params: drive (0-1), mix (0-1)
+// Input: "in", Output: "out"
+
+function makeSoftClipCurve(drive: number): Float32Array {
+  const samples = 256;
+  const curve = new Float32Array(samples);
+  const k = drive * 50 + 1;
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    curve[i] = Math.tanh(k * x) / Math.tanh(k);
+  }
+  return curve;
+}
+
+class DistortionChordNode implements ChordNode {
+  id: string;
+  type = 'distortion';
+  private inputGain: GainNode | null = null;
+  private waveshaper: WaveShaperNode | null = null;
+  private wetGain: GainNode | null = null;
+  private dryGain: GainNode | null = null;
+  private outputGain: GainNode | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('drive', 0.2);
+    this.params.set('mix', 0.5);
+  }
+
+  start(ctx: AudioContext): void {
+    this.inputGain = ctx.createGain();
+    this.waveshaper = ctx.createWaveShaper();
+    this.wetGain = ctx.createGain();
+    this.dryGain = ctx.createGain();
+    this.outputGain = ctx.createGain();
+
+    const drive = this.params.get('drive')!;
+    const mix = this.params.get('mix')!;
+    this.waveshaper.curve = makeSoftClipCurve(drive) as Float32Array<ArrayBuffer>;
+    this.waveshaper.oversample = '2x';
+    this.wetGain.gain.value = mix;
+    this.dryGain.gain.value = 1 - mix;
+
+    // Routing: input -> dry -> output
+    //          input -> waveshaper -> wet -> output
+    this.inputGain.connect(this.dryGain);
+    this.inputGain.connect(this.waveshaper);
+    this.waveshaper.connect(this.wetGain);
+    this.wetGain.connect(this.outputGain);
+    this.dryGain.connect(this.outputGain);
+  }
+
+  stop(): void {
+    this.inputGain?.disconnect();
+    this.waveshaper?.disconnect();
+    this.wetGain?.disconnect();
+    this.dryGain?.disconnect();
+    this.outputGain?.disconnect();
+    this.inputGain = null;
+    this.waveshaper = null;
+    this.wetGain = null;
+    this.dryGain = null;
+    this.outputGain = null;
+  }
+
+  setParameter(param: string, value: number, time: number): void {
+    this.params.set(param, value);
+    if (!this.waveshaper || !this.wetGain || !this.dryGain) return;
+    switch (param) {
+      case 'drive':
+        this.waveshaper.curve = makeSoftClipCurve(value) as Float32Array<ArrayBuffer>;
+        break;
+      case 'mix':
+        smoothRamp(this.wetGain.gain, value, time);
+        smoothRamp(this.dryGain.gain, 1 - value, time);
+        break;
+    }
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(port: string): AudioNode | AudioParam | null {
+    if (port === 'in') return this.inputGain;
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.outputGain;
+    return null;
+  }
+}
+
+// --- Chorus Node ---
+// Short modulated delay mixed with dry signal
+// Params: rate (Hz), depth (0-1), mix (0-1)
+// Input: "in", Output: "out"
+
+class ChorusChordNode implements ChordNode {
+  id: string;
+  type = 'chorus';
+  private inputGain: GainNode | null = null;
+  private delayNode: DelayNode | null = null;
+  private lfo: OscillatorNode | null = null;
+  private lfoGain: GainNode | null = null;
+  private wetGain: GainNode | null = null;
+  private dryGain: GainNode | null = null;
+  private outputGain: GainNode | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('rate', 0.8);
+    this.params.set('depth', 0.3);
+    this.params.set('mix', 0.2);
+  }
+
+  start(ctx: AudioContext): void {
+    this.inputGain = ctx.createGain();
+    this.delayNode = ctx.createDelay(0.1);
+    this.lfo = ctx.createOscillator();
+    this.lfoGain = ctx.createGain();
+    this.wetGain = ctx.createGain();
+    this.dryGain = ctx.createGain();
+    this.outputGain = ctx.createGain();
+
+    const rate = this.params.get('rate')!;
+    const depth = this.params.get('depth')!;
+    const mix = this.params.get('mix')!;
+
+    // Delay oscillates around 7ms
+    this.delayNode.delayTime.value = 0.007;
+    this.lfo.frequency.value = rate;
+    this.lfo.type = 'sine';
+    // LFO amplitude controls how much the delay time wobbles (depth * 3ms)
+    this.lfoGain.gain.value = depth * 0.003;
+    this.wetGain.gain.value = mix;
+    this.dryGain.gain.value = 1 - mix;
+
+    // LFO -> delay time modulation
+    this.lfo.connect(this.lfoGain);
+    this.lfoGain.connect(this.delayNode.delayTime);
+
+    // Routing: input -> dry -> output
+    //          input -> delay -> wet -> output
+    this.inputGain.connect(this.dryGain);
+    this.inputGain.connect(this.delayNode);
+    this.delayNode.connect(this.wetGain);
+    this.wetGain.connect(this.outputGain);
+    this.dryGain.connect(this.outputGain);
+
+    this.lfo.start();
+  }
+
+  stop(): void {
+    try { this.lfo?.stop(); } catch { /* already stopped */ }
+    this.inputGain?.disconnect();
+    this.delayNode?.disconnect();
+    this.lfo?.disconnect();
+    this.lfoGain?.disconnect();
+    this.wetGain?.disconnect();
+    this.dryGain?.disconnect();
+    this.outputGain?.disconnect();
+    this.inputGain = null;
+    this.delayNode = null;
+    this.lfo = null;
+    this.lfoGain = null;
+    this.wetGain = null;
+    this.dryGain = null;
+    this.outputGain = null;
+  }
+
+  setParameter(param: string, value: number, time: number): void {
+    this.params.set(param, value);
+    if (!this.lfo || !this.lfoGain || !this.wetGain || !this.dryGain) return;
+    switch (param) {
+      case 'rate':
+        smoothRamp(this.lfo.frequency, value, time);
+        break;
+      case 'depth':
+        smoothRamp(this.lfoGain.gain, value * 0.003, time);
+        break;
+      case 'mix':
+        smoothRamp(this.wetGain.gain, value, time);
+        smoothRamp(this.dryGain.gain, 1 - value, time);
+        break;
+    }
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(port: string): AudioNode | AudioParam | null {
+    if (port === 'in') return this.inputGain;
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.outputGain;
+    return null;
+  }
+}
+
+// --- Stereo Panner Node ---
+// Wraps StereoPannerNode
+// Params: pan (-1 to 1)
+// Input: "in", Output: "out"
+
+class StereoPannerChordNode implements ChordNode {
+  id: string;
+  type = 'panner';
+  private panner: StereoPannerNode | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('pan', 0);
+  }
+
+  start(ctx: AudioContext): void {
+    this.panner = ctx.createStereoPanner();
+    this.panner.pan.value = this.params.get('pan')!;
+  }
+
+  stop(): void {
+    this.panner?.disconnect();
+    this.panner = null;
+  }
+
+  setParameter(param: string, value: number, time: number): void {
+    this.params.set(param, value);
+    if (!this.panner) return;
+    if (param === 'pan') {
+      smoothRamp(this.panner.pan, value, time);
+    }
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(port: string): AudioNode | AudioParam | null {
+    if (port === 'in') return this.panner;
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.panner;
+    return null;
+  }
+}
+
+// --- Limiter Node ---
+// DynamicsCompressorNode with high ratio (20:1) acting as a limiter
+// Params: ceiling (dB), release (s)
+// Input: "in", Output: "out"
+
+class LimiterChordNode implements ChordNode {
+  id: string;
+  type = 'limiter';
+  private compressor: DynamicsCompressorNode | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('ceiling', -1);
+    this.params.set('release', 0.1);
+  }
+
+  start(ctx: AudioContext): void {
+    this.compressor = ctx.createDynamicsCompressor();
+    this.compressor.threshold.value = this.params.get('ceiling')!;
+    this.compressor.ratio.value = 20;
+    this.compressor.knee.value = 0;
+    this.compressor.attack.value = 0.001;
+    this.compressor.release.value = this.params.get('release')!;
+  }
+
+  stop(): void {
+    this.compressor?.disconnect();
+    this.compressor = null;
+  }
+
+  setParameter(param: string, value: number, time: number): void {
+    this.params.set(param, value);
+    if (!this.compressor) return;
+    switch (param) {
+      case 'ceiling':
+        smoothRamp(this.compressor.threshold, value, time);
+        break;
+      case 'release':
+        smoothRamp(this.compressor.release, value, time);
+        break;
+    }
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(port: string): AudioNode | AudioParam | null {
+    if (port === 'in') return this.compressor;
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.compressor;
+    return null;
+  }
+}
+
+// --- Bitcrusher Node ---
+// Sample rate + bit depth reduction via ScriptProcessorNode
+// Params: bits (1-16), rate (fraction 0-1), mix (0-1)
+// Input: "in", Output: "out"
+
+class BitcrusherChordNode implements ChordNode {
+  id: string;
+  type = 'bitcrusher';
+  private inputGain: GainNode | null = null;
+  private processor: ScriptProcessorNode | null = null;
+  private wetGain: GainNode | null = null;
+  private dryGain: GainNode | null = null;
+  private outputGain: GainNode | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('bits', 16);
+    this.params.set('rate', 1);
+    this.params.set('mix', 0.5);
+  }
+
+  start(ctx: AudioContext): void {
+    this.inputGain = ctx.createGain();
+    this.processor = ctx.createScriptProcessor(4096, 1, 1);
+    this.wetGain = ctx.createGain();
+    this.dryGain = ctx.createGain();
+    this.outputGain = ctx.createGain();
+
+    const mix = this.params.get('mix')!;
+    this.wetGain.gain.value = mix;
+    this.dryGain.gain.value = 1 - mix;
+
+    let lastSample = 0;
+    let sampleCounter = 0;
+
+    this.processor.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0);
+      const output = e.outputBuffer.getChannelData(0);
+      const bits = this.params.get('bits')!;
+      const rate = this.params.get('rate')!;
+      const levels = Math.pow(2, bits);
+      const step = Math.max(1, Math.round(1 / rate));
+
+      for (let i = 0; i < input.length; i++) {
+        sampleCounter++;
+        if (sampleCounter >= step) {
+          sampleCounter = 0;
+          // Bit depth reduction
+          lastSample = Math.round(input[i] * levels) / levels;
+        }
+        output[i] = lastSample;
+      }
+    };
+
+    // Routing: input -> dry -> output
+    //          input -> processor -> wet -> output
+    this.inputGain.connect(this.dryGain);
+    this.inputGain.connect(this.processor);
+    this.processor.connect(this.wetGain);
+    this.wetGain.connect(this.outputGain);
+    this.dryGain.connect(this.outputGain);
+  }
+
+  stop(): void {
+    if (this.processor) {
+      this.processor.onaudioprocess = null;
+    }
+    this.inputGain?.disconnect();
+    this.processor?.disconnect();
+    this.wetGain?.disconnect();
+    this.dryGain?.disconnect();
+    this.outputGain?.disconnect();
+    this.inputGain = null;
+    this.processor = null;
+    this.wetGain = null;
+    this.dryGain = null;
+    this.outputGain = null;
+  }
+
+  setParameter(param: string, value: number, time: number): void {
+    this.params.set(param, value);
+    if (!this.wetGain || !this.dryGain) return;
+    if (param === 'mix') {
+      smoothRamp(this.wetGain.gain, value, time);
+      smoothRamp(this.dryGain.gain, 1 - value, time);
+    }
+    // bits and rate are read directly in the onaudioprocess callback
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(port: string): AudioNode | AudioParam | null {
+    if (port === 'in') return this.inputGain;
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.outputGain;
+    return null;
+  }
+}
+
+// --- Clap Node ---
+// Multiple noise bursts for hand-clap percussion
+// Params: decay, tone (Hz), spread (s)
+// Output: "out"
+
+class ClapChordNode implements ChordNode {
+  id: string;
+  type = 'clap';
+  private ctx: AudioContext | null = null;
+  private outputGain: GainNode | null = null;
+  private noiseBuffer: AudioBuffer | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('decay', 0.15);
+    this.params.set('tone', 1000);
+    this.params.set('spread', 0.012);
+  }
+
+  start(ctx: AudioContext): void {
+    this.ctx = ctx;
+    this.outputGain = ctx.createGain();
+
+    // Pre-generate noise buffer
+    const length = ctx.sampleRate * 0.5;
+    this.noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = this.noiseBuffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+  }
+
+  stop(): void {
+    this.outputGain?.disconnect();
+    this.outputGain = null;
+    this.ctx = null;
+    this.noiseBuffer = null;
+  }
+
+  trigger(): void {
+    if (!this.ctx || !this.outputGain || !this.noiseBuffer) return;
+    const now = this.ctx.currentTime;
+    const decay = this.params.get('decay')!;
+    const tone = this.params.get('tone')!;
+    const spread = this.params.get('spread')!;
+
+    // Schedule 4 short noise bursts spaced by `spread` seconds
+    for (let burst = 0; burst < 4; burst++) {
+      const startTime = now + burst * spread;
+      const burstDuration = burst === 3 ? decay : spread * 0.8;
+
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+
+      const bandpass = this.ctx.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      bandpass.frequency.value = tone;
+      bandpass.Q.value = 2;
+
+      const gain = this.ctx.createGain();
+      if (burst === 3) {
+        // Final burst has the main decay envelope
+        gain.gain.setValueAtTime(0.6, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + decay);
+      } else {
+        // Initial bursts are short staccato hits
+        gain.gain.setValueAtTime(0.5, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + burstDuration);
+      }
+
+      noise.connect(bandpass);
+      bandpass.connect(gain);
+      gain.connect(this.outputGain);
+      noise.start(startTime);
+      noise.stop(startTime + Math.max(burstDuration, decay) + 0.05);
+    }
+  }
+
+  setParameter(param: string, value: number): void {
+    this.params.set(param, value);
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(): AudioNode | AudioParam | null {
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.outputGain;
+    return null;
+  }
+}
+
+// --- Tom Node ---
+// Pitched percussion: sine oscillator with pitch drop + amplitude decay
+// Params: pitch (Hz), decay (s)
+// Output: "out"
+
+class TomChordNode implements ChordNode {
+  id: string;
+  type = 'tom';
+  private ctx: AudioContext | null = null;
+  private outputGain: GainNode | null = null;
+  private params: Map<string, number> = new Map();
+
+  constructor(id: string) {
+    this.id = id;
+    this.params.set('pitch', 120);
+    this.params.set('decay', 0.3);
+  }
+
+  start(ctx: AudioContext): void {
+    this.ctx = ctx;
+    this.outputGain = ctx.createGain();
+  }
+
+  stop(): void {
+    this.outputGain?.disconnect();
+    this.outputGain = null;
+    this.ctx = null;
+  }
+
+  trigger(): void {
+    if (!this.ctx || !this.outputGain) return;
+    const now = this.ctx.currentTime;
+    const pitch = this.params.get('pitch')!;
+    const decay = this.params.get('decay')!;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(pitch, now);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(pitch * 0.4, 1), now + decay * 0.6);
+
+    gain.gain.setValueAtTime(0.8, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + decay);
+
+    osc.connect(gain);
+    gain.connect(this.outputGain);
+    osc.start(now);
+    osc.stop(now + decay + 0.05);
+  }
+
+  setParameter(param: string, value: number): void {
+    this.params.set(param, value);
+  }
+
+  getParameter(param: string): number {
+    return this.params.get(param) ?? 0;
+  }
+
+  getInput(): AudioNode | AudioParam | null {
+    return null;
+  }
+
+  getOutput(port: string): AudioNode | null {
+    if (port === 'out') return this.outputGain;
+    return null;
+  }
+}
+
+// --- Alias Map ---
+const NODE_ALIASES: Record<string, string> = {
+  // Canonical names
+  oscillator: 'oscillator', filter: 'filter', gain: 'gain', delay: 'delay',
+  reverb: 'reverb', lfo: 'lfo', noise: 'noise', output: 'output', mixer: 'mixer',
+  kick_drum: 'kick_drum', snare_drum: 'snare_drum', hi_hat: 'hi_hat',
+  compressor: 'compressor', distortion: 'distortion', chorus: 'chorus',
+  panner: 'panner', limiter: 'limiter', bitcrusher: 'bitcrusher',
+  clap: 'clap', tom: 'tom',
+  // camelCase aliases
+  kickDrum: 'kick_drum', snareDrum: 'snare_drum', hiHat: 'hi_hat',
+  // Short aliases
+  osc: 'oscillator', filt: 'filter', lpf: 'filter', hpf: 'filter',
+  vol: 'gain', amp: 'gain',
+  echo: 'delay', verb: 'reverb', space: 'reverb',
+  kick: 'kick_drum', snare: 'snare_drum', hat: 'hi_hat', hh: 'hi_hat',
+  comp: 'compressor', dynamics: 'compressor',
+  dist: 'distortion', saturation: 'distortion', waveshaper: 'distortion', overdrive: 'distortion', drive: 'distortion',
+  pan: 'panner', stereo: 'panner',
+  crush: 'bitcrusher',
+  out: 'output', master: 'output',
+};
+
+/** Resolve a node type name through aliases. Returns canonical name or null. */
+export function resolveNodeType(type: string): string | null {
+  return NODE_ALIASES[type] ?? null;
+}
+
+/** Get all canonical node type names. */
+export function getNodeTypes(): string[] {
+  return [...new Set(Object.values(NODE_ALIASES))];
+}
+
+/** Find similar node type names for error messages. */
+function findSimilarTypes(type: string): string[] {
+  const lower = type.toLowerCase();
+  return Object.keys(NODE_ALIASES).filter(k => {
+    if (k.includes(lower) || lower.includes(k)) return true;
+    // Simple Levenshtein-ish: check if >60% of chars match
+    let matches = 0;
+    for (const c of lower) { if (k.includes(c)) matches++; }
+    return matches / Math.max(lower.length, k.length) > 0.6;
+  }).slice(0, 5);
+}
+
 // --- Factory ---
 
 export function createWebAudioNode(type: string, id: string): ChordNode {
-  switch (type) {
+  const canonical = resolveNodeType(type);
+  if (!canonical) {
+    const similar = findSimilarTypes(type);
+    throw new Error(
+      `Unknown node type "${type}". ` +
+      (similar.length > 0 ? `Did you mean: ${similar.join(', ')}? ` : '') +
+      `Available: ${getNodeTypes().join(', ')}`
+    );
+  }
+
+  switch (canonical) {
     case 'oscillator': return new OscillatorChordNode(id);
     case 'filter': return new FilterChordNode(id);
     case 'gain': return new GainChordNode(id);
@@ -955,7 +1668,14 @@ export function createWebAudioNode(type: string, id: string): ChordNode {
     case 'kick_drum': return new KickDrumChordNode(id);
     case 'snare_drum': return new SnareDrumChordNode(id);
     case 'hi_hat': return new HiHatChordNode(id);
-    default:
-      throw new Error(`Unknown node type: ${type}`);
+    case 'compressor': return new CompressorChordNode(id);
+    case 'distortion': return new DistortionChordNode(id);
+    case 'chorus': return new ChorusChordNode(id);
+    case 'panner': return new StereoPannerChordNode(id);
+    case 'limiter': return new LimiterChordNode(id);
+    case 'bitcrusher': return new BitcrusherChordNode(id);
+    case 'clap': return new ClapChordNode(id);
+    case 'tom': return new TomChordNode(id);
+    default: throw new Error(`Node type "${canonical}" registered but not implemented`);
   }
 }

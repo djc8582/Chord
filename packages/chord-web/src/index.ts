@@ -5,7 +5,7 @@
 export { Chord } from './Chord.js';
 export type { Connection } from './Chord.js';
 export type { ChordNode } from './nodes.js';
-export { createWebAudioNode } from './nodes.js';
+export { createWebAudioNode, resolveNodeType, getNodeTypes } from './nodes.js';
 
 // DSL
 export { patch, compile, decompile } from './dsl/index.js';
@@ -54,3 +54,9 @@ export {
   createNodeGraph, type NodeGraphOptions,
   createSequencerGrid, type SequencerGridOptions,
 } from './visualizers/index.js';
+
+// Generative Music Systems
+export { RhythmEngine, type DrumTrack } from './rhythm-engine.js';
+export { HarmonicSequencer, type ChordSymbol, type CompEvent } from './harmonic-sequencer.js';
+export { WalkingBassGenerator, type BassNote } from './walking-bass.js';
+export { SoloGenerator, type SoloNote } from './solo-generator.js';
