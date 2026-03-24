@@ -1,9 +1,14 @@
 // Chord — The main class for the @chord/web SDK.
-// Mirrors Chord's Rust engine API: addNode, connect, setParameter.
+// Two APIs:
+//   High-level: Chord.create('warm ambient') → ChordPatch
+//   Low-level:  new Chord() → addNode/connect/setParameter
 // Runs entirely on the Web Audio API.
 
 import { createWebAudioNode } from './nodes.js';
 import type { ChordNode } from './nodes.js';
+import { ChordPatch } from './ChordPatch.js';
+import { VibeTranslator } from './vibe/translator.js';
+import { PatchBuilder } from './vibe/patch-builder.js';
 
 export interface Connection {
   fromId: string;
@@ -13,6 +18,23 @@ export interface Connection {
 }
 
 export class Chord {
+  /**
+   * Create a patch from a natural language description.
+   * This is the recommended entry point for most users.
+   *
+   * @example
+   * const music = await Chord.create('warm ambient with rain');
+   * music.start();
+   * music.setParameter('intensity', 0.7);
+   * music.modify('make it darker');
+   */
+  static create(description: string): ChordPatch {
+    const engine = new Chord();
+    const recipe = VibeTranslator.translate(description);
+    const built = PatchBuilder.build(engine, recipe);
+    return new ChordPatch(engine, built, recipe);
+  }
+
   private ctx: AudioContext | null = null;
   private nodes: Map<string, ChordNode> = new Map();
   private connections: Connection[] = [];

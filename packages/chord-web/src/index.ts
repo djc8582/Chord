@@ -1,8 +1,14 @@
-// @chord/web — Browser SDK for the Chord audio programming environment
-// Same concepts as the desktop app: nodes, connections, parameters.
-// Runs on Web Audio API.
+// @chord/web — Browser SDK for the Chord audio programming environment.
+//
+// Two APIs:
+//   High-level:  const music = Chord.create('warm ambient'); music.start();
+//   Low-level:   const engine = new Chord(); engine.addNode('oscillator'); ...
+//
+// Runs on Web Audio API. Zero dependencies. ~50KB.
 
 export { Chord } from './Chord.js';
+export { ChordPatch } from './ChordPatch.js';
+export { Sounds } from './sounds.js';
 export type { Connection } from './Chord.js';
 export type { ChordNode } from './nodes.js';
 export { createWebAudioNode, resolveNodeType, getNodeTypes } from './nodes.js';
