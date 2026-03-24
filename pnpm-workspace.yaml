@@ -3,3 +3,4 @@ packages:
   - "packages/*"
   - "server/community"
   - "experience-site"
+  - "fusion-site"
