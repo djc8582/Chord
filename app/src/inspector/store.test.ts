@@ -13,8 +13,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   createPatchDocument,
   getPatchDocument,
-  addNode,
-  setParameter as dmSetParameter,
+  addNode as _addNode,
+  setParameter as _dmSetParameter,
 } from "@chord/document-model";
 import { useCanvasStore } from "../canvas/store.js";
 import { useInspectorStore, PARAMETER_DEFINITIONS } from "./store.js";

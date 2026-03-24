@@ -57,6 +57,8 @@ export const Fader: React.FC<FaderProps> = React.memo(function Fader({
         gap: 4,
       }}
     >
+      {/* orient is a non-standard Firefox attribute for vertical sliders;
+          writingMode + direction handles WebKit/Blink browsers */}
       <input
         data-testid={`${testId}-input`}
         type="range"
@@ -65,18 +67,17 @@ export const Fader: React.FC<FaderProps> = React.memo(function Fader({
         step={0.001}
         value={faderPosition}
         onChange={handleChange}
-        orient="vertical"
         aria-label="Volume fader"
         aria-valuemin={FADER_MIN_DB}
         aria-valuemax={MAX_DB}
         aria-valuenow={isFinite(valueDb) ? valueDb : FADER_MIN_DB}
+        aria-orientation="vertical"
         style={{
-          writingMode: "vertical-lr" as const,
+          writingMode: "vertical-lr",
           direction: "rtl",
           width: 24,
           height: 120,
-          appearance: "slider-vertical" as const,
-        }}
+        } as React.CSSProperties}
       />
       <span
         data-testid={`${testId}-display`}

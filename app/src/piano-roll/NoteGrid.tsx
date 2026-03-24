@@ -16,7 +16,7 @@ import type { Note } from "./types";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_PITCH = 127;
+export const MAX_PITCH = 127;
 const NOTE_RESIZE_HANDLE_WIDTH = 6;
 
 // ---------------------------------------------------------------------------
@@ -31,7 +31,7 @@ export interface NoteGridProps {
 }
 
 export const NoteGrid: React.FC<NoteGridProps> = React.memo(
-  ({ width = 800, height = 600 }) => {
+  ({ width = 800, height: _height = 600 }) => {
     const notes = usePianoRollStore((s) => s.notes);
     const selectedNoteIds = usePianoRollStore((s) => s.selectedNoteIds);
     const zoomX = usePianoRollStore((s) => s.zoomX);

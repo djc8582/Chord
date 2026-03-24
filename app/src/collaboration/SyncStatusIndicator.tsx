@@ -6,7 +6,6 @@
  * reconnect action when disconnected or errored.
  */
 
-import React from "react";
 import { useCollaborationStore } from "./store.js";
 import { SyncStatus } from "./types.js";
 

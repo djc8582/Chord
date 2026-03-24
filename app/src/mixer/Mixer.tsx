@@ -36,11 +36,7 @@ export const Mixer: React.FC = React.memo(function Mixer() {
 
     // Re-sync whenever the canvas nodes change
     // We subscribe to the canvas store to detect document mutations
-    const unsubscribe = useCanvasStore.subscribe(
-      (state) => state.nodes,
-      () => syncFromDocument(),
-      { equalityFn: (a, b) => a === b },
-    );
+    const unsubscribe = useCanvasStore.subscribe(() => syncFromDocument());
 
     return unsubscribe;
   }, [ydoc, syncFromDocument]);

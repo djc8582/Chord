@@ -6,7 +6,6 @@
 
 import type { Note } from "../piano-roll/types";
 import type {
-  Clef,
   KeySignature,
   TimeSignature,
   NoteType,
@@ -174,7 +173,7 @@ export function pitchToStaffPosition(
   // Reference pitches for the bottom line of each clef
   // Treble: bottom line = E4 (MIDI 64)
   // Bass:   bottom line = G2 (MIDI 43)
-  const bottomLinePitch = clef === "treble" ? 64 : 43;
+  // bottomLinePitch: treble = E4 (MIDI 64), bass = G2 (MIDI 43)
   const bottomLineNote = clef === "treble" ? 2 : 4; // E=2 diatonic, G=4 diatonic
   const bottomLineOctave = clef === "treble" ? 4 : 2;
 

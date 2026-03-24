@@ -9,10 +9,8 @@
 import React, { useMemo } from "react";
 import type { Note } from "../piano-roll/types";
 import type {
-  Clef,
   KeySignature,
   TimeSignature,
-  Measure,
 } from "./types";
 import {
   beatsToMeasures,

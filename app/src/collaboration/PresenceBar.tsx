@@ -6,7 +6,7 @@
  * When there are many users a count badge collapses the overflow.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { useCollaborationStore, ACTIVE_THRESHOLD_MS } from "./store.js";
 import type { User, UserPresence } from "./types.js";
 

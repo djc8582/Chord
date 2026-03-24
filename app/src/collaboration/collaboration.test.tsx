@@ -17,7 +17,6 @@ import { CursorOverlay } from "./CursorOverlay";
 import { PresenceBar } from "./PresenceBar";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 import { CollaborationProvider, useCollaboration } from "./CollaborationProvider";
-import React from "react";
 
 // ---------------------------------------------------------------------------
 // Helpers

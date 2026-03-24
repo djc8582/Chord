@@ -77,12 +77,9 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   // Also subscribe to Yjs document changes so values stay up to date
   useEffect(() => {
-    const unsub = useCanvasStore.subscribe(
-      (state) => state.nodes,
-      () => {
-        syncFromCanvas();
-      },
-    );
+    const unsub = useCanvasStore.subscribe(() => {
+      syncFromCanvas();
+    });
     // For zustand v5, subscribe returns unsubscribe function.
     // Fallback: basic subscribe
     return typeof unsub === "function" ? unsub : undefined;

@@ -135,13 +135,10 @@ describe("ShellStore", () => {
 
   describe("commands", () => {
     it("registerCommand adds to the map", () => {
-      let called = false;
       useShellStore.getState().registerCommand({
         id: "test.cmd",
         label: "Test Command",
-        execute: () => {
-          called = true;
-        },
+        execute: () => { /* noop */ },
       });
 
       expect(useShellStore.getState().commands.get("test.cmd")).toBeDefined();

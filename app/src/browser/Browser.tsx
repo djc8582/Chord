@@ -11,7 +11,7 @@
  * - Click a node type to add it to the canvas
  */
 
-import React, { useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useBrowserStore } from "./store.js";
 import {
   filterCatalog,

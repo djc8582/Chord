@@ -6,7 +6,7 @@
  */
 
 import type { Note } from "../piano-roll/types";
-import type { MusicXMLExportOptions, TimeSignature, KeySignature } from "./types";
+import type { MusicXMLExportOptions } from "./types";
 import { beatsToMeasures, midiPitchToMusicXML, durationToNoteType } from "./music-theory";
 import type { NoteType } from "./types";
 
@@ -15,7 +15,7 @@ import type { NoteType } from "./types";
 // ---------------------------------------------------------------------------
 
 /** Map note types to MusicXML duration divisions. */
-const NOTE_TYPE_TO_DIVISIONS: Record<NoteType, number> = {
+export const NOTE_TYPE_TO_DIVISIONS: Record<NoteType, number> = {
   whole: 16,
   half: 8,
   quarter: 4,

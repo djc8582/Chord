@@ -26,7 +26,7 @@ import {
   bufferLength,
 } from "./operations.js";
 import { useAudioEditorStore } from "./store.js";
-import type { AudioBuffer, SelectionRange } from "./types.js";
+import type { AudioBuffer } from "./types.js";
 import { DEFAULT_ZOOM, MIN_ZOOM, MAX_ZOOM } from "./types.js";
 import { magnitudeToColor, computeMagnitudeSpectrum } from "./SpectralView.js";
 

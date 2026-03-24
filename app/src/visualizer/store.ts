@@ -326,9 +326,8 @@ export async function pollWaveformData(bridgeOverride?: BridgeCommands): Promise
       padded.set(waveform.subarray(0, Math.min(waveform.length, fftSize)));
       applyHannWindow(padded);
 
-      const imag = new Float64Array(fftSize);
-      fft(padded, imag);
-      const mags = magnitudesHalf(padded, imag);
+      const spectrum = fft(padded);
+      const mags = magnitudesHalf(spectrum);
       useVisualizerStore.getState().setSpectrumData(mags);
     }
   } catch {

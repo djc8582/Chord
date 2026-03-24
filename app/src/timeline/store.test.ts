@@ -533,7 +533,7 @@ describe("store: clip selection", () => {
 
   it("selectClips replaces the entire selection", () => {
     const c1 = useTimelineStore.getState().addClip(laneId, 0, 4, "midi");
-    const c2 = useTimelineStore.getState().addClip(laneId, 4, 4, "audio");
+    useTimelineStore.getState().addClip(laneId, 4, 4, "audio");
     const c3 = useTimelineStore.getState().addClip(laneId, 8, 4, "midi");
 
     useTimelineStore.getState().selectClips([c1, c3]);

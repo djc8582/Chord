@@ -22,7 +22,6 @@ import {
   filterByCategory,
   groupByCategory,
 } from "./catalog.js";
-import type { CatalogEntry } from "./catalog.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -355,7 +354,7 @@ describe("adding node from browser to canvas", () => {
       useCanvasStore.getState().initDocument(doc);
 
       const canvasStore = useCanvasStore.getState();
-      const id = canvasStore.addNode(entry.type, { x: 0, y: 0 }, entry.label);
+      canvasStore.addNode(entry.type, { x: 0, y: 0 }, entry.label);
 
       const state = useCanvasStore.getState();
       expect(state.nodes).toHaveLength(1);

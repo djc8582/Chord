@@ -23,7 +23,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({ doc }) => {
   const {
     currentPreset,
     dirty,
-    savePreset,
+    savePreset: _savePreset,
     saveCurrentPreset,
     savePresetAs,
     renamePreset,

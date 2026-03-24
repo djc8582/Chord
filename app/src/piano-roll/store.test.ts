@@ -21,7 +21,7 @@ import {
   snapToGrid,
   snapToGridFloor,
 } from "./types";
-import type { Note, SnapValue } from "./types";
+import type { Note } from "./types";
 
 // Reset store and ID counter before each test
 beforeEach(() => {

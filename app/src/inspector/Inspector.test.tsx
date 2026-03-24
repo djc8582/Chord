@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { createPatchDocument, getPatchDocument, setParameter as dmSetParameter } from "@chord/document-model";
+import { createPatchDocument, getPatchDocument } from "@chord/document-model";
 import { useCanvasStore } from "../canvas/store.js";
 import { useInspectorStore } from "./store.js";
 import { Inspector, setInspectorBridge } from "./Inspector.js";
@@ -129,16 +129,24 @@ describe("Inspector: selected node display", () => {
 describe("Inspector: parameter changes call bridge", () => {
   it("calls bridge.setParameter when a parameter is changed", async () => {
     const mockBridge = {
+      clearGraph: vi.fn().mockResolvedValue(undefined),
       addNode: vi.fn().mockResolvedValue(""),
       removeNode: vi.fn().mockResolvedValue(undefined),
       connect: vi.fn().mockResolvedValue(""),
       disconnect: vi.fn().mockResolvedValue(undefined),
       setParameter: vi.fn().mockResolvedValue(undefined),
+      syncAndPlay: vi.fn().mockResolvedValue(undefined),
       play: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn().mockResolvedValue(undefined),
       setTempo: vi.fn().mockResolvedValue(undefined),
+      sendMidiNoteOn: vi.fn().mockResolvedValue(undefined),
+      sendMidiNoteOff: vi.fn().mockResolvedValue(undefined),
       getSignalStats: vi.fn().mockResolvedValue({ peak: 0, rms: 0, clipping: false }),
       runDiagnostics: vi.fn().mockResolvedValue({ cpu_usage: 0, buffer_underruns: 0, node_count: 0, sample_rate: 44100 }),
+      getWaveformData: vi.fn().mockResolvedValue([]),
+      loadAudioFile: vi.fn().mockResolvedValue({ ok: true, samples: 0, duration: 0 }),
+      addModulation: vi.fn().mockResolvedValue(""),
+      removeModulation: vi.fn().mockResolvedValue(undefined),
       loadPatch: vi.fn().mockResolvedValue(undefined),
       savePatch: vi.fn().mockResolvedValue(undefined),
       exportPatch: vi.fn().mockResolvedValue(""),

@@ -40,7 +40,7 @@ export function setCanvasBridge(b: BridgeCommands) {
 const _pendingBackendIds = new Map<string, Promise<string>>();
 
 /** Resolve the backend ID for a Yjs node ID, waiting if the bridge call is still pending. */
-async function resolveBackendId(yjsId: string): Promise<string> {
+export async function resolveBackendId(yjsId: string): Promise<string> {
   const pending = _pendingBackendIds.get(yjsId);
   if (pending) return pending;
   const store = useCanvasStore.getState();

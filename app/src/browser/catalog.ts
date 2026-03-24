@@ -9,7 +9,7 @@
  * and augments it with browser-specific fields.
  */
 
-import type { NodeTypeDefinition, PortDefinition } from "../canvas/store.js";
+import type { PortDefinition } from "../canvas/store.js";
 import { NODE_TYPE_REGISTRY } from "../canvas/store.js";
 
 // ---------------------------------------------------------------------------

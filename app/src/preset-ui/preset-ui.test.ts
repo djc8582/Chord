@@ -18,7 +18,6 @@ import {
   connect,
   setParameter,
   serializePatch,
-  deserializePatch,
   getPatchDocument,
 } from "@chord/document-model";
 import {
@@ -28,7 +27,7 @@ import {
   groupPresetsByCategory,
 } from "./store.js";
 import { PRESET_CATEGORIES, PRESET_CATEGORY_MAP } from "./types.js";
-import type { Preset, Snapshot } from "./types.js";
+import type { Preset } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -336,7 +335,7 @@ describe("Preset CRUD", () => {
   it("deletePreset clears currentPreset if it was the deleted one", () => {
     const doc = createSampleDoc();
     const store = usePresetStore.getState();
-    const p1 = store.savePreset(doc, "First");
+    store.savePreset(doc, "First");
     const p2 = store.savePreset(doc, "Second");
 
     // Current preset is p2 (the last one saved)

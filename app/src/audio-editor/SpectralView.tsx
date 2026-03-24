@@ -114,7 +114,7 @@ export function drawSpectrogram(
   scrollSample: number,
   samplesPerPixel: number,
   fftSize: number,
-  hopSize: number,
+  _hopSize: number,
 ): void {
   ctx.fillStyle = SPECTRAL_BG;
   ctx.fillRect(0, 0, width, height);

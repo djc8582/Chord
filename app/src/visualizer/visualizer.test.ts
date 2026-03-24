@@ -32,7 +32,7 @@ import {
   clampSmoothing,
   clampPeakDecayRate,
 } from "./store.js";
-import type { VisualizerMode, FftSize } from "./store.js";
+import type { FftSize } from "./store.js";
 
 // ---------------------------------------------------------------------------
 // Reset store before each test
