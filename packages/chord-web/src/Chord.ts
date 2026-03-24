@@ -168,14 +168,32 @@ export class Chord {
     if (this.ctx) this.rebuildConnections();
   }
 
-  /** Set a parameter on a node. */
+  /** Set a parameter on a node. Warns if node or param not found. */
   setParameter(nodeId: string, param: string, value: number): void {
     const node = this.nodes.get(nodeId);
     if (!node) {
       if (this.nodes.size > 0) {
-        console.warn(`[Chord] Node "${nodeId}" not found. Active nodes: ${[...this.nodes.keys()].join(', ')}`);
+        console.warn(`[Chord] Node "${nodeId}" not found. Active: ${[...this.nodes.keys()].join(', ')}`);
       }
       return;
+    }
+    // Check if parameter exists, suggest closest if not
+    const validParams = node.getParameterNames();
+    if (validParams.length > 0 && !validParams.includes(param)) {
+      const closest = validParams.find(p =>
+        p.includes(param) || param.includes(p) ||
+        p.replace(/_/g, '') === param.replace(/_/g, '')
+      );
+      console.warn(
+        `[Chord] Unknown param "${param}" on ${node.type}.` +
+        (closest ? ` Did you mean "${closest}"?` : '') +
+        ` Valid: ${validParams.join(', ')}`
+      );
+      // Try the closest match (be forgiving)
+      if (closest) {
+        node.setParameter(closest, value, this.ctx?.currentTime ?? 0);
+        return;
+      }
     }
     node.setParameter(param, value, this.ctx?.currentTime ?? 0);
   }
@@ -184,6 +202,23 @@ export class Chord {
   getParameter(nodeId: string, param: string): number {
     const node = this.nodes.get(nodeId);
     return node ? node.getParameter(param) : 0;
+  }
+
+  /** Get the parameter names for a node. */
+  getParameterNames(nodeId: string): string[] {
+    const node = this.nodes.get(nodeId);
+    return node ? node.getParameterNames() : [];
+  }
+
+  /** Get information about a node type (parameters, aliases, etc.) */
+  static getNodeInfo(type: string): { type: string; parameters: string[] } | null {
+    try {
+      const temp = createWebAudioNode(type, '__info__');
+      const params = temp.getParameterNames();
+      return { type: temp.type, parameters: params };
+    } catch {
+      return null;
+    }
   }
 
   /** Trigger a drum/percussive node. */

@@ -15,6 +15,7 @@ export interface ChordNode {
   stop(): void;
   setParameter(param: string, value: number, time: number): void;
   getParameter(param: string): number;
+  getParameterNames(): string[];
   getInput(port: string): AudioNode | AudioParam | null;
   getOutput(port: string): AudioNode | null;
   trigger?(): void;
@@ -82,6 +83,10 @@ class OscillatorChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(): AudioNode | AudioParam | null {
@@ -152,6 +157,10 @@ class FilterChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(port: string): AudioNode | AudioParam | null {
     if (port === 'in') return this.filter;
     if (port === 'cutoff_mod') return this.filter?.frequency ?? null;
@@ -206,6 +215,10 @@ class GainChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -304,6 +317,10 @@ class DelayChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(port: string): AudioNode | AudioParam | null {
     if (port === 'in') return this.inputGain;
     return null;
@@ -392,6 +409,10 @@ class ReverbChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -509,6 +530,10 @@ class LFOChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(): AudioNode | AudioParam | null {
     return null;
   }
@@ -583,6 +608,10 @@ class NoiseChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(): AudioNode | AudioParam | null {
     return null;
   }
@@ -622,6 +651,10 @@ class OutputChordNode implements ChordNode {
 
   getParameter(): number {
     return 0;
+  }
+
+  getParameterNames(): string[] {
+    return [];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -671,6 +704,10 @@ class MixerChordNode implements ChordNode {
 
   getParameter(): number {
     return 0;
+  }
+
+  getParameterNames(): string[] {
+    return [];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -744,6 +781,10 @@ class KickDrumChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(): AudioNode | AudioParam | null {
@@ -840,6 +881,10 @@ class SnareDrumChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(): AudioNode | AudioParam | null {
     return null;
   }
@@ -929,6 +974,10 @@ class HiHatChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(): AudioNode | AudioParam | null {
     return null;
   }
@@ -997,6 +1046,10 @@ class CompressorChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -1094,6 +1147,10 @@ class DistortionChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -1207,6 +1264,10 @@ class ChorusChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(port: string): AudioNode | AudioParam | null {
     if (port === 'in') return this.inputGain;
     return null;
@@ -1254,6 +1315,10 @@ class StereoPannerChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -1313,6 +1378,10 @@ class LimiterChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(port: string): AudioNode | AudioParam | null {
@@ -1420,6 +1489,10 @@ class BitcrusherChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(port: string): AudioNode | AudioParam | null {
     if (port === 'in') return this.inputGain;
     return null;
@@ -1518,6 +1591,10 @@ class ClapChordNode implements ChordNode {
     return this.params.get(param) ?? 0;
   }
 
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
+  }
+
   getInput(): AudioNode | AudioParam | null {
     return null;
   }
@@ -1585,6 +1662,10 @@ class TomChordNode implements ChordNode {
 
   getParameter(param: string): number {
     return this.params.get(param) ?? 0;
+  }
+
+  getParameterNames(): string[] {
+    return [...this.params.keys()];
   }
 
   getInput(): AudioNode | AudioParam | null {
