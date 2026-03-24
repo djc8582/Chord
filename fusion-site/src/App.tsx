@@ -37,21 +37,27 @@ function FusionPage() {
   const scroll = useScrollPosition();
   const mouse = useMouseState();
   const lastDirection = useRef(scroll.direction);
+  const lastGlitchTime = useRef(0);
 
   // Wire scroll → audio engine
   useEffect(() => {
     if (!engine) return;
     engine.setScroll(scroll.progress);
 
-    // Scroll direction change → filter sweep
-    if (scroll.direction !== lastDirection.current) {
-      engine.triggerScrollGlitch(0.2);
+    const now = Date.now();
+    const cooldown = now - lastGlitchTime.current > 800; // max once per 800ms
+
+    // Scroll direction change → subtle filter sweep (only if cooled down)
+    if (scroll.direction !== lastDirection.current && cooldown) {
+      engine.triggerScrollGlitch(0.15);
+      lastGlitchTime.current = now;
       lastDirection.current = scroll.direction;
     }
 
-    // Fast scrolling → micro-glitch proportional to speed
-    if (scroll.velocity > 0.3) {
-      engine.triggerScrollGlitch(scroll.velocity);
+    // Very fast scrolling → micro-glitch (rare, high threshold, cooldown)
+    if (scroll.velocity > 0.6 && cooldown) {
+      engine.triggerScrollGlitch(scroll.velocity * 0.5);
+      lastGlitchTime.current = now;
     }
   }, [engine, scroll.progress, scroll.direction, scroll.velocity]);
 

@@ -558,29 +558,16 @@ export function createFusionEngine(): FusionEngine {
     if (state.section === 'silence') return;
     const i = Math.min(intensity, 1);
 
-    // Brief bitcrush burst
-    chord.setParameter(glitchCrush, 'mix', i * 0.3);
-    chord.setParameter(glitchCrush, 'bits', Math.max(6, 16 - Math.floor(i * 8)));
-    setTimeout(() => {
-      if (!state.isGlitching) {
-        chord.setParameter(glitchCrush, 'mix', 0);
-        chord.setParameter(glitchCrush, 'bits', 16);
-      }
-    }, 80);
-
-    // Brief filter sweep
-    chord.setParameter(masterFilter, 'cutoff', 1000 + Math.random() * 3000);
-    chord.setParameter(masterFilter, 'resonance', 0.2 * i);
+    // Subtle filter dip — just a gentle darkening, not a full sweep
+    const dip = 6000 + (1 - i) * 10000; // higher intensity = darker dip
+    chord.setParameter(masterFilter, 'cutoff', dip);
+    chord.setParameter(masterFilter, 'resonance', 0.08 * i);
     setTimeout(() => {
       if (!state.isGlitching) {
         chord.setParameter(masterFilter, 'cutoff', 18000);
         chord.setParameter(masterFilter, 'resonance', 0);
       }
-    }, 80);
-
-    if (i > 0.3) {
-      chord.playNote(midiToFreq(63 + Math.floor(Math.random() * 12)), 0.04, 0.1 * i);
-    }
+    }, 120);
   }
 
   // ═══════════════════════════════════════════
