@@ -107,12 +107,13 @@ impl Default for PatchRecipe {
             key: Key::C,
             scale: Scale::MinorPentatonic,
             layers: Vec::new(),
+            // Musical defaults: present but not washy
             reverb_mix: 0.2,
-            reverb_size: 0.5,
-            delay_time: 0.375,
-            delay_feedback: 0.25,
-            delay_mix: 0.15,
-            master_gain: 0.5,
+            reverb_size: 0.65,      // medium room — universally useful
+            delay_time: 0.375,      // 1/8 note at 120 BPM
+            delay_feedback: 0.25,   // 2-3 repeats then fades
+            delay_mix: 0.15,        // subtle depth
+            master_gain: 0.45,      // headroom for dynamics
         }
     }
 }

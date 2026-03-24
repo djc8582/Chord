@@ -27,6 +27,7 @@
 
 mod server;
 pub mod sound_planner;
+pub mod recipes;
 mod tools;
 mod types;
 pub mod vibe;

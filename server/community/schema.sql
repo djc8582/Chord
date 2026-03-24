@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL DEFAULT '',
   tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'pro', 'studio')),
   created_at TEXT DEFAULT (datetime('now'))
 );

@@ -9,7 +9,13 @@
  *   npx chord validate      Validate all patches
  *   npx chord build         Build patches for deployment
  *   npx chord edit [patch]  Open visual editor
+ *   npx chord search "..."  Search community library
+ *   npx chord fork <slug>   Fork a community patch
+ *   npx chord publish <file> Publish to community library
+ *   npx chord preview <slug> Preview a community patch
  */
+
+const COMMUNITY_API = process.env.CHORD_COMMUNITY_URL || 'http://localhost:3847';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -39,6 +45,18 @@ async function main() {
     case 'info':
       await info(args.slice(1));
       break;
+    case 'search':
+      await search(args.slice(1));
+      break;
+    case 'fork':
+      await fork(args.slice(1));
+      break;
+    case 'publish':
+      await publish(args.slice(1));
+      break;
+    case 'preview':
+      await preview(args.slice(1));
+      break;
     case '--help':
     case '-h':
     case undefined:
@@ -55,7 +73,7 @@ function printHelp() {
   console.log(`
   ♪ Chord CLI — Audio for every project
 
-  Usage:
+  Local:
     chord init [--react]         Initialize a Chord project
     chord create <description>   Create a patch from description
     chord list                   List all patches
@@ -64,12 +82,19 @@ function printHelp() {
     chord edit [patch]           Open in visual editor
     chord info <patch>           Show patch details
 
+  Community:
+    chord search <query>         Search community library
+    chord search --category ambient
+    chord fork <slug>            Fork a community patch
+    chord publish <file>         Publish a patch to community
+    chord preview <slug>         Preview a community patch
+
   Examples:
     chord init
     chord create "chill lo-fi beats with vinyl texture"
-    chord create "rain sounds for meditation app"
-    chord validate
-    chord build
+    chord search "ambient rain"
+    chord fork nature/gentle-rain
+    chord publish patches/my-patch.chord.json
   `);
 }
 
@@ -364,6 +389,298 @@ async function info(args: string[]) {
     console.log('');
   } catch {
     console.error(`  Could not read ${filename}`);
+  }
+}
+
+// ─── SEARCH (Community) ───
+async function search(args: string[]) {
+  const params = new URLSearchParams();
+
+  // Parse flags
+  let i = 0;
+  const queryParts: string[] = [];
+  while (i < args.length) {
+    if (args[i] === '--category' && args[i + 1]) {
+      params.set('category', args[i + 1]);
+      i += 2;
+    } else if (args[i] === '--sort' && args[i + 1]) {
+      params.set('sort', args[i + 1]);
+      i += 2;
+    } else if (args[i] === '--min-tempo' && args[i + 1]) {
+      params.set('minTempo', args[i + 1]);
+      i += 2;
+    } else if (args[i] === '--max-tempo' && args[i + 1]) {
+      params.set('maxTempo', args[i + 1]);
+      i += 2;
+    } else {
+      queryParts.push(args[i]);
+      i++;
+    }
+  }
+
+  if (queryParts.length > 0) {
+    params.set('q', queryParts.join(' '));
+  }
+
+  try {
+    const res = await fetch(`${COMMUNITY_API}/api/search?${params}`);
+    if (!res.ok) {
+      console.error(`  Error: ${res.status} ${res.statusText}`);
+      return;
+    }
+
+    const data = await res.json() as {
+      patches: Array<{
+        slug: string;
+        name: string;
+        description: string;
+        author: string;
+        tempo: number | null;
+        downloads: number;
+        rating: number;
+        nodeCount: number;
+      }>;
+      total: number;
+    };
+
+    if (data.patches.length === 0) {
+      console.log('  No patches found.');
+      return;
+    }
+
+    console.log(`  ♪ ${data.total} result${data.total > 1 ? 's' : ''}:\n`);
+    for (const p of data.patches) {
+      console.log(`  ${p.slug}`);
+      console.log(`    ${p.description.slice(0, 80)}${p.description.length > 80 ? '...' : ''}`);
+      console.log(`    by ${p.author} · ${p.nodeCount} nodes · ${p.downloads} downloads${p.tempo ? ` · ${p.tempo} BPM` : ''}`);
+      console.log('');
+    }
+  } catch (e) {
+    console.error(`  Could not connect to community server at ${COMMUNITY_API}`);
+    console.error('  Is the server running? Set CHORD_COMMUNITY_URL to override.');
+  }
+}
+
+// ─── FORK (Community) ───
+async function fork(args: string[]) {
+  const fs = await import('fs');
+  const path = await import('path');
+
+  const slug = args[0];
+  if (!slug) {
+    console.error('  Usage: chord fork <slug>');
+    console.error('  Example: chord fork nature/gentle-rain');
+    return;
+  }
+
+  let name: string | undefined;
+  const nameIdx = args.indexOf('--name');
+  if (nameIdx >= 0 && args[nameIdx + 1]) {
+    name = args[nameIdx + 1];
+  }
+
+  try {
+    // First fetch the patch details
+    const res = await fetch(`${COMMUNITY_API}/api/patches/${slug}`);
+    if (!res.ok) {
+      if (res.status === 404) {
+        console.error(`  Patch not found: ${slug}`);
+      } else {
+        console.error(`  Error: ${res.status} ${res.statusText}`);
+      }
+      return;
+    }
+
+    const data = await res.json() as {
+      name: string;
+      description: string;
+      patch_json: string;
+    };
+
+    // Save locally
+    const patchDir = path.join(process.cwd(), 'patches');
+    if (!fs.existsSync(patchDir)) fs.mkdirSync(patchDir, { recursive: true });
+
+    const filename = `${(name || data.name).toLowerCase().replace(/[^a-z0-9]+/g, '-')}.chord.json`;
+    const filepath = path.join(patchDir, filename);
+
+    let patchContent: string;
+    try {
+      // Pretty-print the patch JSON
+      const parsed = JSON.parse(data.patch_json);
+      patchContent = JSON.stringify(parsed, null, 2);
+    } catch {
+      patchContent = data.patch_json;
+    }
+
+    fs.writeFileSync(filepath, patchContent);
+
+    console.log(`  ♪ Forked ${slug} → patches/${filename}`);
+    console.log(`    ${data.description}`);
+    console.log(`\n  Edit with: chord edit ${filename.replace('.chord.json', '')}`);
+  } catch (e) {
+    console.error(`  Could not connect to community server at ${COMMUNITY_API}`);
+  }
+}
+
+// ─── PUBLISH (Community) ───
+async function publish(args: string[]) {
+  const fs = await import('fs');
+  const path = await import('path');
+
+  const file = args[0];
+  if (!file) {
+    console.error('  Usage: chord publish <patch-file>');
+    console.error('  Example: chord publish patches/my-ambient.chord.json');
+    return;
+  }
+
+  const filepath = path.resolve(file);
+  if (!fs.existsSync(filepath)) {
+    console.error(`  File not found: ${file}`);
+    return;
+  }
+
+  let patchJson: string;
+  try {
+    patchJson = fs.readFileSync(filepath, 'utf-8');
+    JSON.parse(patchJson); // validate JSON
+  } catch {
+    console.error(`  Invalid JSON: ${file}`);
+    return;
+  }
+
+  const parsed = JSON.parse(patchJson);
+
+  // Check for auth token
+  const tokenPath = path.join(process.env.HOME || '~', '.chord-token');
+  let token: string | null = null;
+  if (fs.existsSync(tokenPath)) {
+    token = fs.readFileSync(tokenPath, 'utf-8').trim();
+  }
+
+  if (!token) {
+    console.error('  Not logged in. Run: chord login');
+    console.error('  (Or set a token in ~/.chord-token)');
+    return;
+  }
+
+  const name = parsed.name || path.basename(file, '.chord.json');
+  const description = parsed.description || '';
+  const category = parsed.metadata?.category || 'other';
+  const tags = parsed.metadata?.tags || [];
+
+  try {
+    const res = await fetch(`${COMMUNITY_API}/api/patches`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name,
+        description,
+        patchJson,
+        category,
+        tags,
+      }),
+    });
+
+    const data = await res.json() as {
+      slug?: string;
+      error?: string;
+      validationErrors?: string[];
+      validation?: { warnings: string[] };
+    };
+
+    if (!res.ok) {
+      console.error(`  Publish failed: ${data.error}`);
+      if (data.validationErrors) {
+        for (const err of data.validationErrors) {
+          console.error(`    - ${err}`);
+        }
+      }
+      return;
+    }
+
+    console.log(`  ♪ Published: ${data.slug}`);
+    if (data.validation?.warnings?.length) {
+      console.log('  Warnings:');
+      for (const w of data.validation.warnings) {
+        console.log(`    - ${w}`);
+      }
+    }
+  } catch (e) {
+    console.error(`  Could not connect to community server at ${COMMUNITY_API}`);
+  }
+}
+
+// ─── PREVIEW (Community) ───
+async function preview(args: string[]) {
+  const slug = args[0];
+  if (!slug) {
+    console.error('  Usage: chord preview <slug>');
+    console.error('  Example: chord preview ambient/breathing-space');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${COMMUNITY_API}/api/patches/${slug}`);
+    if (!res.ok) {
+      console.error(`  Patch not found: ${slug}`);
+      return;
+    }
+
+    const data = await res.json() as {
+      name: string;
+      description: string;
+      author: string;
+      version: string;
+      category: string;
+      tags: string;
+      tempo: number | null;
+      key_sig: string | null;
+      scale: string | null;
+      node_count: number;
+      connection_count: number;
+      downloads: number;
+      rating_sum: number;
+      rating_count: number;
+      patch_json: string;
+    };
+
+    let parsedTags: string[] = [];
+    try { parsedTags = JSON.parse(data.tags); } catch { /* ignore */ }
+
+    console.log(`\n  ♪ ${data.name} (${slug})`);
+    console.log(`  ─────────────────────────`);
+    console.log(`  ${data.description}`);
+    console.log(`  by ${data.author} · v${data.version}`);
+    console.log(`  ${data.node_count} nodes, ${data.connection_count} connections`);
+    if (data.tempo) console.log(`  ${data.tempo} BPM, ${data.key_sig || '?'} ${data.scale || ''}`);
+    console.log(`  ${data.downloads} downloads`);
+    if (data.rating_count > 0) {
+      console.log(`  Rating: ${(data.rating_sum / data.rating_count).toFixed(1)}/5 (${data.rating_count} ratings)`);
+    }
+    if (parsedTags.length > 0) console.log(`  Tags: ${parsedTags.join(', ')}`);
+
+    // Show node types from patch JSON
+    try {
+      const patch = JSON.parse(data.patch_json);
+      const types: Record<string, number> = {};
+      for (const n of patch.nodes || []) {
+        types[n.type] = (types[n.type] || 0) + 1;
+      }
+      console.log(`\n  Nodes:`);
+      for (const [type, count] of Object.entries(types)) {
+        console.log(`    ${type}: ${count}`);
+      }
+    } catch { /* ignore */ }
+
+    console.log(`\n  Fork with: chord fork ${slug}`);
+    console.log('');
+  } catch (e) {
+    console.error(`  Could not connect to community server at ${COMMUNITY_API}`);
   }
 }
 

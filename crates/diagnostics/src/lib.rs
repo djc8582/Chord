@@ -16,6 +16,7 @@
 pub mod analysis;
 mod detector;
 mod engine;
+pub mod professional_check;
 mod profiler;
 mod report;
 mod signal_monitor;
@@ -24,6 +25,7 @@ mod stats;
 pub use analysis::{analyze, SoundAnalysis};
 pub use detector::*;
 pub use engine::*;
+pub use professional_check::{sounds_professional_check, ProfessionalReport, QualityIssue, IssueSeverity};
 pub use profiler::*;
 pub use report::*;
 pub use signal_monitor::*;
